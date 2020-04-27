@@ -1,0 +1,3 @@
+[submodule "src/preprocessing/clevr-iep"]
+	path = src/preprocessing/clevr-iep
+	url = https://github.com/facebookresearch/clevr-iep.git
