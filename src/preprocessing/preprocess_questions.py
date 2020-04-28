@@ -52,7 +52,8 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
         json.dump(vocab, f)
 
   print('Encoding questions...')
-  questions_encoded = []
+  input_questions_encoded = []
+  target_questions_encoded = []
   for orig_idx, q in enumerate(questions):
     question = q['question']
 
@@ -64,27 +65,35 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
     question_encoded = encode(seq_tokens=question_tokens,
                               token_to_idx=vocab['question_token_to_idx'],
                               allow_unk=True)
-    questions_encoded.append(question_encoded)
+    input_question, target_question = question_encoded[:-1], question_encoded[1:]
+    assert len(input_question) == len(target_question)
+    input_questions_encoded.append(input_question)
+    target_questions_encoded.append(target_question)
 
   # Pad encoded questions
-  max_question_length = max(len(x) for x in questions_encoded)
-  for qe in questions_encoded:
-    while len(qe) < max_question_length:
-      qe.append(vocab['question_token_to_idx']['<PAD>'])
+  max_question_length = max(len(x) for x in input_questions_encoded)
+  for iqe, tqe in zip(input_questions_encoded, target_questions_encoded):
+    while len(iqe) < max_question_length:
+      iqe.append(vocab['question_token_to_idx']['<PAD>'])
+      tqe.append(vocab['question_token_to_idx']['<PAD>'])
+    assert len(iqe) == len(tqe)
 
   # Create h5 file
   print('Writing output...')
-  questions_encoded = np.asarray(questions_encoded, dtype=np.int32)
-  print(questions_encoded.shape)
+  input_questions_encoded = np.asarray(input_questions_encoded, dtype=np.int32)
+  target_questions_encoded = np.asarray(target_questions_encoded, dtype=np.int32)
+  print("input questions shape", input_questions_encoded.shape)
+  print('target questions shape', target_questions_encoded.shape)
   with h5py.File(h5_out_path, 'w') as f:
-    f.create_dataset('questions', data=questions_encoded)
+    f.create_dataset('input_questions', data=input_questions_encoded)
+    f.create_dataset('target_questions', data=target_questions_encoded)
 
 
 if __name__ == '__main__':
 
   train_json_data_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/questions/CLEVR_train_questions.json'
   train_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/train_questions_subset.json'
-  extract_short_json(json_data_path=train_json_data_path, out_path=train_out_path, num_questions=5000)
+  #extract_short_json(json_data_path=train_json_data_path, out_path=train_out_path, num_questions=5000)
 
   val_json_data_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/questions/CLEVR_val_questions.json'
   val_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/val_questions_subset.json'
@@ -92,7 +101,7 @@ if __name__ == '__main__':
 
   test_json_data_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/questions/CLEVR_test_questions.json'
   test_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.json'
-  extract_short_json(json_data_path=test_json_data_path, out_path=test_out_path, num_questions=2000)
+  #extract_short_json(json_data_path=test_json_data_path, out_path=test_out_path, num_questions=2000)
 
   vocab_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/vocab_subset_from_train.json'
   punct_to_keep = [';', ',', '?']
