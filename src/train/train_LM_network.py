@@ -19,34 +19,35 @@ if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
 
-  parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-  parser.add_argument("-emb_size", type=int, default=12, help="dimension of the embedding layer")
-  parser.add_argument("-hidden_size", type=int, default=48, help="dimension of the hidden state")
-  parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
-  parser.add_argument("-grad_clip", type=bool, default=False)
-  parser.add_argument("-data_path", type=str, default='../../data/CLEVR_v1.0/temp')
-  parser.add_argument("-out_path", type=str, default='../../output')
-  parser.add_argument('-cuda', type=bool, default=False, help='use cuda')
+  parser.add_argument("-num_layers", type=int, required=True, default=1, help="num layers for language model")
+  parser.add_argument("-emb_size", type=int, required=True, default=12, help="dimension of the embedding layer")
+  parser.add_argument("-hidden_size", type=int, required=True, default=24, help="dimension of the hidden state")
+  parser.add_argument("-p_drop", type=float, required=True, default=0, help="dropout rate")
+  parser.add_argument("-grad_clip", type=bool, required=True, default=False)
+  parser.add_argument("-data_path", type=str, required=True, default='../../data')
+  parser.add_argument("-out_path", type=str, required=True, default='../../output')
+  parser.add_argument('-cuda', type=bool, required=True, default=False, help='use cuda')
 
   args = parser.parse_args()
 
   device = torch.device("cpu" if not args.cuda else "cuda")
+  #device = torch.device("cpu")
 
   ###############################################################################
   # Load data
   ###############################################################################
 
-  train_questions_path = os.path.join(args.data_path, "train_questions_subset.h5")
-  val_questions_path = os.path.join(args.data_path, "val_questions_subset.h5")
-  test_questions_path = os.path.join(args.data_path, "test_questions_subset.h5")
-  vocab_path = os.path.join(args.data_path, "vocab_subset_from_train.json")
+  train_questions_path = os.path.join(args.data_path, "train_questions.h5")
+  val_questions_path = os.path.join(args.data_path, "val_questions.h5")
+  test_questions_path = os.path.join(args.data_path, "test_questions.h5")
+  vocab_path = os.path.join(args.data_path, "vocab.json")
 
   train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path)
   val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
   test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
 
   num_tokens = train_dataset.vocab_len
-  BATCH_SIZE = 64
+  BATCH_SIZE = 512
   PAD_IDX = train_dataset.get_vocab()["<PAD>"]
 
   train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True)
@@ -65,7 +66,7 @@ if __name__ == '__main__':
   learning_rate = 0.001
   optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
   criterion = torch.nn.NLLLoss(ignore_index=PAD_IDX)
-  EPOCHS = 1
+  EPOCHS = 50
 
   ###############################################################################
   # Create logger, output_path and config file.
@@ -153,7 +154,7 @@ if __name__ == '__main__':
   #################################################################################################################################################
 
   logger.info("start training...")
-  logger.info("hparams:{}".format(hparams))
+  logger.info("hparams: {}".format(hparams))
   train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
   best_val_loss = None
   for epoch in range(EPOCHS):
