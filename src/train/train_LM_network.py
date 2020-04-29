@@ -29,6 +29,7 @@ if __name__ == '__main__':
   parser.add_argument("-grad_clip", type=bool, default=False)
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
+  parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
   parser.add_argument('-cuda', type=bool, required=True, help='use cuda')
 
   args = parser.parse_args()
@@ -50,12 +51,12 @@ if __name__ == '__main__':
   test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
 
   num_tokens = train_dataset.vocab_len
-  BATCH_SIZE = 2048
+  BATCH_SIZE = 128
   PAD_IDX = train_dataset.get_vocab()["<PAD>"]
 
-  train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True)
-  val_generator = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, drop_last=True)
-  test_generator = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, drop_last=True)
+  train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
+  val_generator = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
+  test_generator = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
 
   ###############################################################################
   # Build the model
