@@ -47,7 +47,7 @@ if __name__ == '__main__':
   test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
 
   num_tokens = train_dataset.vocab_len
-  BATCH_SIZE = 512
+  BATCH_SIZE = 1024
   PAD_IDX = train_dataset.get_vocab()["<PAD>"]
 
   train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True)
