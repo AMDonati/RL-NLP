@@ -10,6 +10,7 @@ import json
 import h5py
 import numpy as np
 import os
+import argparse
 
 from preprocessing.text_functions import tokenize, encode, build_vocab
 
@@ -88,62 +89,24 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
     f.create_dataset('input_questions', data=input_questions_encoded)
     f.create_dataset('target_questions', data=target_questions_encoded)
 
-
 if __name__ == '__main__':
 
-  train_json_data_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/questions/CLEVR_train_questions.json'
-  train_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/train_questions_subset.json'
-  #extract_short_json(json_data_path=train_json_data_path, out_path=train_out_path, num_questions=5000)
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-data_path", type=str, required=True, help="path for CLEVR questions json files")
+  parser.add_argument("-out_vocab_path", type=str, default="../../data/vocab.json", required=True, help="output path fpr vocab")
+  parser.add_argument("-out_h5_path", type=str, required=True, help="output path for questions encoded dataset")
+  parser.add_argument("-min_token_count", type=int, default=1, required=True, help="min count for adding token in vocab")
 
-  val_json_data_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/questions/CLEVR_val_questions.json'
-  val_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/val_questions_subset.json'
-  extract_short_json(json_data_path=val_json_data_path, out_path=val_out_path, num_questions=2000)
+  args = parser.parse_args()
 
-  test_json_data_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/questions/CLEVR_test_questions.json'
-  test_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.json'
-  #extract_short_json(json_data_path=test_json_data_path, out_path=test_out_path, num_questions=2000)
-
-  vocab_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/vocab_subset_from_train.json'
   punct_to_keep = [';', ',', '?']
   punct_to_remove = ['.']
 
-  # ------------------ preprocessing for train dataset ---------------------------------------------------------------------------------
-
-  json_data_path = train_out_path
-  h5_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/train_questions_subset.h5'
-
   preprocess_questions(min_token_count=1,
                        punct_to_keep=punct_to_keep,
                        punct_to_remove=punct_to_remove,
                        add_start_token=True,
                        add_end_token=True,
-                       json_data_path=json_data_path,
-                       vocab_out_path=vocab_out_path,
-                       h5_out_path=h5_out_path)
-
-  # ------------------- preprocessing for val dataset ----------------------------------------------------------------------------------
-
-  json_data_path = val_out_path
-  h5_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/val_questions_subset.h5'
-
-  preprocess_questions(min_token_count=1,
-                       punct_to_keep=punct_to_keep,
-                       punct_to_remove=punct_to_remove,
-                       add_start_token=True,
-                       add_end_token=True,
-                       json_data_path=json_data_path,
-                       vocab_out_path=vocab_out_path,
-                       h5_out_path=h5_out_path)
-
-  # ----------------- preprocessing for test dataset ------------------------------------------------------------------------------------
-  json_data_path = test_out_path
-  h5_out_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.h5'
-
-  preprocess_questions(min_token_count=1,
-                       punct_to_keep=punct_to_keep,
-                       punct_to_remove=punct_to_remove,
-                       add_start_token=True,
-                       add_end_token=True,
-                       json_data_path=json_data_path,
-                       vocab_out_path=vocab_out_path,
-                       h5_out_path=h5_out_path)
+                       json_data_path=args.data_path,
+                       vocab_out_path=args.out_vocab_path,
+                       h5_out_path=args.out_h5_path)
