@@ -27,6 +27,8 @@ if __name__ == '__main__':
   parser.add_argument("-hidden_size", type=int, required=True, default=24, help="dimension of the hidden state")
   parser.add_argument("-p_drop", type=float, required=True, default=0, help="dropout rate")
   parser.add_argument("-grad_clip", type=bool, default=False)
+  parser.add_argument("-bs", type=int, default=128, help="batch size")
+  parser.add_argument("-ep", type=int, default=30, help="number of epochs")
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
@@ -51,7 +53,7 @@ if __name__ == '__main__':
   test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
 
   num_tokens = train_dataset.vocab_len
-  BATCH_SIZE = 128
+  BATCH_SIZE = args.bs
   PAD_IDX = train_dataset.get_vocab()["<PAD>"]
 
   train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
@@ -70,7 +72,7 @@ if __name__ == '__main__':
   learning_rate = 0.001
   optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
   criterion = torch.nn.NLLLoss(ignore_index=PAD_IDX)
-  EPOCHS = 50
+  EPOCHS = args.ep
 
   ###############################################################################
   # Create logger, output_path and config file.
