@@ -1,4 +1,7 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
+#https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+
+
 import torch
 import argparse
 import time
@@ -23,7 +26,7 @@ if __name__ == '__main__':
   parser.add_argument("-emb_size", type=int, required=True, default=12, help="dimension of the embedding layer")
   parser.add_argument("-hidden_size", type=int, required=True, default=24, help="dimension of the hidden state")
   parser.add_argument("-p_drop", type=float, required=True, default=0, help="dropout rate")
-  parser.add_argument("-grad_clip", type=bool, required=True, default=False)
+  parser.add_argument("-grad_clip", type=bool, default=False)
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument('-cuda', type=bool, required=True, help='use cuda')
@@ -125,8 +128,8 @@ if __name__ == '__main__':
       loss.backward()
 
       # clip grad norm:
-      if grad_clip:
-        torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=0.25)
+      # if grad_clip:
+      #   torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=0.25)
       optimizer.step()
       total_loss += loss.item()
 
