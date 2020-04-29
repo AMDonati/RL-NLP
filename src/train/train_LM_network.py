@@ -26,7 +26,7 @@ if __name__ == '__main__':
   parser.add_argument("-grad_clip", type=bool, required=True, default=False)
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
-  parser.add_argument('-cuda', type=bool, required=True, default=False, help='use cuda')
+  parser.add_argument('-cuda', type=bool, required=True, help='use cuda')
 
   args = parser.parse_args()
 
