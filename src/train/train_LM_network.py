@@ -78,7 +78,7 @@ if __name__ == '__main__':
   # Create logger, output_path and config file.
   ###############################################################################
 
-  out_path = 'GRU_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}'.format(args.num_layers, args.emb_size, args.hidden_size, args.p_drop, args.grad_clip)
+  out_path = 'GRU_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}'.format(args.num_layers, args.emb_size, args.hidden_size, args.p_drop, args.grad_clip, args.bs)
   out_path = os.path.join(args.out_path, out_path)
   if not os.path.exists(out_path):
     os.makedirs(out_path)
