@@ -1,7 +1,6 @@
 # code inspired from: https://github.com/pytorch/examples/blob/master/word_language_model/model.py
 
 import torch
-import math
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -30,10 +29,10 @@ class GRUModel(nn.Module):
   def forward(self, input, hidden):
     emb = self.embedding(input)
     emb = self.dropout(emb)
-    output, hidden = self.gru(emb, hidden)
+    output, hidden = self.gru(emb, hidden) # (seq_len, batch_size, hidden_size)
     output = self.dropout(output)
-    dec_output = self.fc(output)
-    dec_output = dec_output.view(-1, self.num_tokens)
+    dec_output = self.fc(output) # (seq_len, batch_size, num_tokens)
+    dec_output = dec_output.view(-1, self.num_tokens) # (seq_len * batch_size, num_tokens)
     log_probas = F.log_softmax(dec_output, dim=1)
 
     return log_probas, hidden
@@ -44,7 +43,16 @@ class GRUModel(nn.Module):
 
 if __name__ == '__main__':
     batch_size = 8
-    inp_size = 512
+    emb_size = 512
     hidden_size = 128
     num_tokens = 85
-    input = torch.randn(batch_size, 1, dtype=torch.int)
+    seq_len = 20
+    device = torch.device("cpu")
+    inputs = torch.ones(seq_len, batch_size, dtype=torch.long).to(device)
+    model = GRUModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size)
+    hidden = model.init_hidden(batch_size)
+    output, hidden = model(inputs, hidden)
+    print('output', output.shape)
+    print('hidden', hidden.shape)
+    #output = output.view(batch_size, seq_len, num_tokens)
+    #print('output reshaped', output.shape)
