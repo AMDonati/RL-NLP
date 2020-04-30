@@ -3,12 +3,14 @@
 
 import torch
 import argparse
+import numpy as np
 import time
 import os
 import math
 import json
 from models.LM_networks import GRUModel
 from preprocessing.QuestionsDataset import QuestionsDataset
+from preprocessing.text_functions import decode
 from torch.utils.data import DataLoader
 from utils.utils_train import create_logger, write_to_csv
 
@@ -43,6 +45,7 @@ if __name__ == '__main__':
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
   parser.add_argument('-cuda', type=str2bool, required=True, default=False, help='use cuda')
+  #parser.add_argument('-skip_training', type=str2bool, required=True, default=False)
 
   args = parser.parse_args()
 
@@ -56,11 +59,13 @@ if __name__ == '__main__':
   train_questions_path = os.path.join(args.data_path, "train_questions.h5")
   val_questions_path = os.path.join(args.data_path, "val_questions.h5")
   test_questions_path = os.path.join(args.data_path, "test_questions.h5")
+  test_questions_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.h5'
   vocab_path = os.path.join(args.data_path, "vocab.json")
+  vocab_test = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/vocab_subset_from_train.json'
 
   train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path)
   val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
-  test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
+  test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_test)
 
   num_tokens = train_dataset.vocab_len
   BATCH_SIZE = args.bs
@@ -68,7 +73,6 @@ if __name__ == '__main__':
 
   train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
   val_generator = DataLoader(dataset=val_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
-  test_generator = DataLoader(dataset=test_dataset, batch_size=BATCH_SIZE, drop_last=True, num_workers=args.num_workers)
 
   ###############################################################################
   # Build the model
@@ -83,6 +87,10 @@ if __name__ == '__main__':
   optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
   criterion = torch.nn.NLLLoss(ignore_index=PAD_IDX)
   EPOCHS = args.ep
+
+  num_batches = int(len(train_dataset)/args.bs)
+  print_interval = int(num_batches / 10)
+  #skip_training = args.skip_training
 
   ###############################################################################
   # Create logger, output_path and config file.
@@ -123,7 +131,7 @@ if __name__ == '__main__':
     else:
       return tuple(repackage_hidden(v) for v in h)
 
-  def train_one_epoch(model, train_generator, optimizer, criterion, BATCH_SIZE, grad_clip):
+  def train_one_epoch(model, train_generator, optimizer, criterion, BATCH_SIZE, args, print_interval=10):
 
     model.train() # Turns on train mode which enables dropout.
     hidden = model.init_hidden(BATCH_SIZE)
@@ -145,6 +153,11 @@ if __name__ == '__main__':
         torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=args.grad_clip)
       optimizer.step()
       total_loss += loss.item()
+
+      # print loss every number of batches
+      if (batch + 1) % print_interval == 0:
+        print('loss for batch {}: {:5.3f}'.format(batch+1, total_loss / (batch + 1)))
+        print('time for {} training steps: {:5.2f}'.format(print_interval, start_time-time.time()))
 
     curr_loss = total_loss / (batch + 1)
     elapsed = time.time() - start_time
@@ -168,33 +181,100 @@ if __name__ == '__main__':
   ################################################################################################################################################
   # Train the model
   #################################################################################################################################################
+  skip_training = True
+  if not skip_training:
 
-  logger.info("start training...")
-  logger.info("hparams: {}".format(hparams))
-  train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
-  best_val_loss = None
-  for epoch in range(EPOCHS):
-    logger.info('epoch {}/{}'.format(epoch+1, EPOCHS))
-    train_loss, elapsed = train_one_epoch(model=model, train_generator=train_generator, optimizer=optimizer, criterion=criterion, BATCH_SIZE=BATCH_SIZE, grad_clip=args.grad_clip)
-    logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
-    train_loss_history.append(train_loss)
-    train_ppl_history.append(math.exp(train_loss))
-    logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-    val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, BATCH_SIZE=BATCH_SIZE)
-    logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
-    val_loss_history.append(val_loss)
-    val_ppl_history.append(math.exp(val_loss))
-    logger.info('-' * 89)
-    # Save the model if the validation loss is the best we've seen so far.
-    if not best_val_loss or val_loss < best_val_loss:
-      with open(model_path, 'wb') as f:
-        torch.save(model, f)
-      best_val_loss = val_loss
+    logger.info("start training...")
+    logger.info("hparams: {}".format(hparams))
+    train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
+    best_val_loss = None
+    for epoch in range(EPOCHS):
+      logger.info('epoch {}/{}'.format(epoch+1, EPOCHS))
+      train_loss, elapsed = train_one_epoch(model=model, train_generator=train_generator, optimizer=optimizer, criterion=criterion, BATCH_SIZE=BATCH_SIZE, grad_clip=args.grad_clip)
+      logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
+      train_loss_history.append(train_loss)
+      train_ppl_history.append(math.exp(train_loss))
+      logger.info('time for one epoch...{:5.2f}'.format(elapsed))
+      val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, BATCH_SIZE=BATCH_SIZE)
+      logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+      val_loss_history.append(val_loss)
+      val_ppl_history.append(math.exp(val_loss))
+      logger.info('-' * 89)
+      # Save the model if the validation loss is the best we've seen so far.
+      if not best_val_loss or val_loss < best_val_loss:
+        with open(model_path, 'wb') as f:
+          torch.save(model, f)
+        best_val_loss = val_loss
 
-  logger.info("saving loss and metrics information...")
-  hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
-  hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
-  write_to_csv(out_csv, hist_dict)
+    logger.info("saving loss and metrics information...")
+    hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
+    hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
+    write_to_csv(out_csv, hist_dict)
+
+  ################################################################################################################################################
+  # Eval the model
+  ################################################################################################################################################
+
+  # test generator with one batch:
+  test_generator = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), num_workers=args.num_workers)
+
+  model_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/output/GRU_layers_1_emb_16_hidden_32_pdrop_0.0_gradclip_None_bs_512/model.pt'
+  # get test loss:
+  with open(model_path, 'rb') as f:
+    model = torch.load(f)
+
+  #model.flatten_parameters()
+  test_loss = evaluate(model=model, criterion=criterion, BATCH_SIZE=len(test_dataset), val_generator=test_generator)
+  print('test loss: {:5.3f}, test ppl: {:8.3f}', test_loss, math.exp(test_loss))
+
+  def generate_top_k_words(test_dataset, seq_len, samples, k):
+    test_q, _ = test_dataset.get_questions()
+    vocab = test_dataset.get_vocab()
+    idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
+    test_sample = test_q[:seq_len, samples].long() # (S, num_samples)
+
+    decoded_input_text = []
+    for index in range(len(samples)):
+      text_i = list(test_sample[:,index].data.numpy()) # (S)
+      decode_seq = decode(seq_idx=text_i, idx_to_token=idx_to_token, stop_at_end=False, delim=' ')
+      decoded_input_text.append(decode_seq)
+    # forward pass:
+    model.eval()
+    hidden = model.init_hidden(len(samples))
+    with torch.no_grad():
+      output, hidden = model(test_sample, hidden) # output (S*num_samples, num_words)
+      output = output.view(-1, len(samples), output.size(-1)) # (S, num_samples, num_words)
+      log_pred = output[-1,:,:] # taking last pred of the seq
+      top_k, top_i = torch.topk(log_pred, k, dim=-1) # (num_samples, k)
+      top_i = top_i.data.numpy()
+
+    list_top_words = []
+    for index in range(len(samples)):
+      seq_idx = list(top_i[index,:])
+      token_idx = decode(seq_idx=seq_idx, idx_to_token=idx_to_token, stop_at_end=False, delim=',')
+      list_top_words.append(token_idx)
+
+    dict_top_words = dict(zip(decoded_input_text, list_top_words))
+    return dict_top_words
+
+  sample_index = list(np.random.randint(0, len(test_dataset), size=20))
+  sample_top_words = generate_top_k_words(test_dataset=test_dataset, seq_len=10, samples=sample_index, k=10)
+  print('top words', sample_top_words)
+  #sample_top_words['sampled index'] = sample_index
+  json_top_words = os.path.join(args.out_path, 'sampled_top_words.json')
+  with open(json_top_words, mode='w') as f:
+    json.dump(sample_top_words, f)
+
+
+
+
+
+
+
+
+
+
+
 
 
 

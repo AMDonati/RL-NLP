@@ -37,7 +37,7 @@ class QuestionsDataset(Dataset):
     target_questions = np.array(target_questions)
     target_questions = torch.tensor(target_questions, dtype=torch.int)
     target_questions = target_questions.t()
-    return input_questions, target_questions
+    return input_questions, target_questions # dim (S,B)
 
   def __len__(self):
     '''Denotes the total number of samples'''
@@ -69,4 +69,6 @@ if __name__ == '__main__':
     if batch == 0:
       print('input', inp.shape)
       print('target', tar.shape)
+  vocab = train_dataset.get_vocab()
+  len_vocab = len(vocab)
 
