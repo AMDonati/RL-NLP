@@ -1,0 +1,33 @@
+INFO:training log:start training...
+INFO:training log:hparams: {'model': 'GRU', 'emb_size': 16, 'hidden_size': 32, 'p_drop': 0.0, 'grad_clip': None, 'BATCH_SIZE': 512, 'learning_rate': 0.001}
+INFO:training log:epoch 1/20
+INFO:training log:train loss 4.136 - train perplexity   62.565
+INFO:training log:time for one epoch...2097.84
+INFO:training log:val loss: 3.940 - val perplexity:   51.406
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 2/20
+INFO:training log:train loss 3.935 - train perplexity   51.177
+INFO:training log:time for one epoch...2168.61
+INFO:training log:val loss: 3.937 - val perplexity:   51.247
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 3/20
+INFO:training log:train loss 3.934 - train perplexity   51.113
+INFO:training log:time for one epoch...2008.39
+INFO:training log:val loss: 3.936 - val perplexity:   51.216
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 4/20
+INFO:training log:train loss 3.934 - train perplexity   51.096
+INFO:training log:time for one epoch...3826.30
+INFO:training log:val loss: 3.936 - val perplexity:   51.204
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 5/20
+INFO:training log:train loss 3.934 - train perplexity   51.088
+INFO:training log:time for one epoch...2072.23
+INFO:training log:val loss: 3.936 - val perplexity:   51.197
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 6/20
+INFO:training log:train loss 3.933 - train perplexity   51.083
+INFO:training log:time for one epoch...2620.16
+INFO:training log:val loss: 3.936 - val perplexity:   51.197
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 7/20
