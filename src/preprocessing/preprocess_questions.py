@@ -17,15 +17,6 @@ from preprocessing.text_functions import tokenize, encode, build_vocab
 """
 Preprocessing script for CLEVR question files.
 """
-def extract_short_json(json_data_path, out_path, num_questions):
-
-  with open(json_data_path, 'r') as f:
-    questions = json.load(f)['questions']
-  select_questions = questions[:num_questions]
-  out_json = {'questions': select_questions}
-
-  with open(out_path, 'w') as f:
-    json.dump(out_json, f)
 
 def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_start_token, add_end_token, json_data_path, vocab_out_path, h5_out_path):
 
@@ -96,26 +87,11 @@ if __name__ == '__main__':
   parser.add_argument("-out_vocab_path", type=str, default="../../data/vocab.json", required=True, help="output path for vocab")
   parser.add_argument("-out_h5_path", type=str, required=True, help="output path for questions encoded dataset")
   parser.add_argument("-min_token_count", type=int, default=1, required=True, help="min count for adding token in vocab")
-  parser.add_argument('-num_samples', type=int, default=100, help="used to select a subset of the whole CLEVR dataset")
 
   args = parser.parse_args()
 
   punct_to_keep = [';', ',', '?']
   punct_to_remove = ['.']
-
-  #if len(args.num_samples) > 0:
-  #print("selecting a subset of {} questions....".format(args.num_samples))
-  # num_samples = 50000
-  # val_samples = 20000
-  # # train_data_path = "../../data/CLEVR_v1.0/questions/CLEVR_train_questions.json"
-  # # train_out_path = "../../data/CLEVR_v1.0/temp/train_questions_{}_samples.json".format(num_samples)
-  # # extract_short_json(out_path=train_out_path, json_data_path=train_data_path, num_questions=num_samples)
-  # # val_data_path = "../../data/CLEVR_v1.0/questions/CLEVR_val_questions.json"
-  # # val_out_path = "../../data/CLEVR_v1.0/temp/train_val_{}_samples.json".format(num_samples)
-  # # extract_short_json(out_path=val_out_path, json_data_path=val_data_path, num_questions=val_samples)
-  # test_data_path = "../../data/CLEVR_v1.0/questions/CLEVR_test_questions.json"
-  # test_out_path = "../../data/CLEVR_v1.0/temp/test_questions_{}_samples.json".format(val_samples)
-  # extract_short_json(out_path=test_out_path, json_data_path=test_data_path, num_questions=val_samples)
 
 
   preprocess_questions(min_token_count=1,

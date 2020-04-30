@@ -1,7 +1,6 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
 #https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 
-
 import torch
 import argparse
 import time
@@ -20,19 +19,30 @@ Inspired from: https://github.com/pytorch/examples/blob/master/word_language_mod
 
 if __name__ == '__main__':
 
+  #  trick to boolean parser args.
+  def str2bool(v):
+    if isinstance(v, bool):
+      return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+      return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+      return False
+    else:
+      raise argparse.ArgumentTypeError('Boolean value expected.')
+
   parser = argparse.ArgumentParser()
 
   parser.add_argument("-num_layers", type=int, required=True, default=1, help="num layers for language model")
   parser.add_argument("-emb_size", type=int, required=True, default=12, help="dimension of the embedding layer")
   parser.add_argument("-hidden_size", type=int, required=True, default=24, help="dimension of the hidden state")
   parser.add_argument("-p_drop", type=float, required=True, default=0, help="dropout rate")
-  parser.add_argument("-grad_clip", type=bool, default=False)
+  parser.add_argument("-grad_clip", type=float)
   parser.add_argument("-bs", type=int, default=128, help="batch size")
   parser.add_argument("-ep", type=int, default=30, help="number of epochs")
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
-  parser.add_argument('-cuda', type=bool, required=True, help='use cuda')
+  parser.add_argument('-cuda', type=str2bool, required=True, default=False, help='use cuda')
 
   args = parser.parse_args()
 
@@ -130,9 +140,9 @@ if __name__ == '__main__':
       loss = criterion(output, targets)
       loss.backward()
 
-      # clip grad norm:
-      # if grad_clip:
-      #   torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=0.25)
+      #clip grad norm:
+      if args.grad_clip is not None:
+        torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=args.grad_clip)
       optimizer.step()
       total_loss += loss.item()
 
@@ -185,6 +195,8 @@ if __name__ == '__main__':
   hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
   hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
   write_to_csv(out_csv, hist_dict)
+
+
 
 
 
