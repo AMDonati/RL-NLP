@@ -1,19 +1,14 @@
-# Copyright 2017-present, Facebook, Inc.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# Inspired from: https://github.com/facebookresearch/clevr-iep/blob/master/scripts/extract_features.py
+# https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
 
 import argparse, os, json
 import h5py
 import numpy as np
-#from scipy.misc import imread, imresize
 from imageio import imread
 import PIL
 
 import torch
 import torchvision
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_image_dir', default='/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/images/train')
@@ -50,6 +45,7 @@ def build_model(args):
 
 
 def run_batch(cur_batch, model):
+  #TODO: use a torch.data.utils.Dataset instead.
   mean = np.array([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1)
   std = np.array([0.229, 0.224, 0.224]).reshape(1, 3, 1, 1)
 
@@ -57,10 +53,10 @@ def run_batch(cur_batch, model):
   image_batch = (image_batch / 255.0 - mean) / std
   image_batch = torch.FloatTensor(image_batch).cuda()
   #image_batch = torch.FloatTensor(image_batch)
-  image_batch = torch.autograd.Variable(image_batch, volatile=True)
+  image_batch = torch.autograd.Variable(image_batch, volatile=True) # look at torch.autograd doc.
 
   feats = model(image_batch)
-  feats = feats.data.cpu().clone().numpy()
+  feats = feats.data.cpu().clone().numpy() #Why .cpu() ?
 
   return feats
 
@@ -97,12 +93,11 @@ def main(args):
       img = img.transpose(2, 0, 1)[None]
       cur_batch.append(img)
       if len(cur_batch) == args.batch_size:
-        feats = run_batch(cur_batch, model)
+        feats = run_batch(cur_batch, model) #TODO: replace this by a DataLoader Object.
         if feat_dset is None:
           N = len(input_paths)
           _, C, H, W = feats.shape
-          feat_dset = f.create_dataset('features', (N, C, H, W),
-                                       dtype=np.float32)
+          feat_dset = f.create_dataset('features', (N, C, H, W), dtype=np.float32)
         i1 = i0 + len(cur_batch)
         feat_dset[i0:i1] = feats
         i0 = i1

@@ -45,7 +45,7 @@ if __name__ == '__main__':
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
   parser.add_argument('-cuda', type=str2bool, required=True, default=False, help='use cuda')
-  #parser.add_argument('-skip_training', type=str2bool, required=True, default=False)
+  parser.add_argument('-skip_training', type=str2bool, required=True, default=False)
 
   args = parser.parse_args()
 
@@ -59,13 +59,13 @@ if __name__ == '__main__':
   train_questions_path = os.path.join(args.data_path, "train_questions.h5")
   val_questions_path = os.path.join(args.data_path, "val_questions.h5")
   test_questions_path = os.path.join(args.data_path, "test_questions.h5")
-  test_questions_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.h5'
+  #test_questions_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.h5'
   vocab_path = os.path.join(args.data_path, "vocab.json")
-  vocab_test = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/vocab_subset_from_train.json'
+  #vocab_test = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/vocab_subset_from_train.json'
 
   train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path)
   val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
-  test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_test)
+  test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
 
   num_tokens = train_dataset.vocab_len
   BATCH_SIZE = args.bs
@@ -181,8 +181,7 @@ if __name__ == '__main__':
   ################################################################################################################################################
   # Train the model
   #################################################################################################################################################
-  skip_training = True
-  if not skip_training:
+  if not args.skip_training:
 
     logger.info("start training...")
     logger.info("hparams: {}".format(hparams))
@@ -192,14 +191,17 @@ if __name__ == '__main__':
       logger.info('epoch {}/{}'.format(epoch+1, EPOCHS))
       train_loss, elapsed = train_one_epoch(model=model, train_generator=train_generator, optimizer=optimizer, criterion=criterion, BATCH_SIZE=BATCH_SIZE, grad_clip=args.grad_clip)
       logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
-      train_loss_history.append(train_loss)
-      train_ppl_history.append(math.exp(train_loss))
       logger.info('time for one epoch...{:5.2f}'.format(elapsed))
       val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, BATCH_SIZE=BATCH_SIZE)
       logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+
+      # saving loss and metrics information.
+      train_loss_history.append(train_loss)
+      train_ppl_history.append(math.exp(train_loss))
       val_loss_history.append(val_loss)
       val_ppl_history.append(math.exp(val_loss))
       logger.info('-' * 89)
+      
       # Save the model if the validation loss is the best we've seen so far.
       if not best_val_loss or val_loss < best_val_loss:
         with open(model_path, 'wb') as f:
