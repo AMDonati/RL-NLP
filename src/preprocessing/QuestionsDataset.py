@@ -48,7 +48,6 @@ class QuestionsDataset(Dataset):
     '''generate one sample of data'''
     input_questions, target_questions = self.get_questions()
     inputs, targets = input_questions[:, item], target_questions[:, item]
-    #TODO: first dim of inputs and targets need to be seq_len, second dim is batch_size
     return inputs, targets
 
 if __name__ == '__main__':

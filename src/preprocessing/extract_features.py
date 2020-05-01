@@ -90,7 +90,7 @@ def main(args):
       img = img.resize(size=img_size, resample=PIL.Image.BICUBIC)
       #img = imresize(img, img_size, interp='bicubic')
       img = np.array(img)
-      img = img.transpose(2, 0, 1)[None]
+      img = img.transpose(2, 0, 1)[None] # eq. to np.newaxis.
       cur_batch.append(img)
       if len(cur_batch) == args.batch_size:
         feats = run_batch(cur_batch, model) #TODO: replace this by a DataLoader Object.

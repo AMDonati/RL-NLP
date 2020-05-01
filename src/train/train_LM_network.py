@@ -189,7 +189,12 @@ if __name__ == '__main__':
     best_val_loss = None
     for epoch in range(EPOCHS):
       logger.info('epoch {}/{}'.format(epoch+1, EPOCHS))
-      train_loss, elapsed = train_one_epoch(model=model, train_generator=train_generator, optimizer=optimizer, criterion=criterion, BATCH_SIZE=BATCH_SIZE, grad_clip=args.grad_clip)
+      train_loss, elapsed = train_one_epoch(model=model,
+                                            train_generator=train_generator,
+                                            optimizer=optimizer,
+                                            criterion=criterion,
+                                            BATCH_SIZE=BATCH_SIZE,
+                                            args=args)
       logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
       logger.info('time for one epoch...{:5.2f}'.format(elapsed))
       val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, BATCH_SIZE=BATCH_SIZE)
@@ -201,7 +206,7 @@ if __name__ == '__main__':
       val_loss_history.append(val_loss)
       val_ppl_history.append(math.exp(val_loss))
       logger.info('-' * 89)
-      
+
       # Save the model if the validation loss is the best we've seen so far.
       if not best_val_loss or val_loss < best_val_loss:
         with open(model_path, 'wb') as f:
