@@ -194,7 +194,8 @@ if __name__ == '__main__':
                                             optimizer=optimizer,
                                             criterion=criterion,
                                             BATCH_SIZE=BATCH_SIZE,
-                                            args=args)
+                                            args=args,
+                                            print_interval=print_interval)
       logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
       logger.info('time for one epoch...{:5.2f}'.format(elapsed))
       val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, BATCH_SIZE=BATCH_SIZE)

@@ -18,7 +18,7 @@ class QuestionsDataset(Dataset):
     self.vocab_path = vocab_path
     self.vocab_len = len(self.get_vocab())
     self.inp_questions, self.target_questions = self.get_questions()
-    self.seq_len = inp_questions.size(0)
+    self.seq_len = self.inp_questions.size(0)
 
   def get_vocab(self):
     with open(self.vocab_path, 'r') as f:
