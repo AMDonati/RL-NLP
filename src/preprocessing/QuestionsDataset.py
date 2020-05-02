@@ -16,9 +16,8 @@ class QuestionsDataset(Dataset):
 
     self.data_path = h5_questions_path
     self.vocab_path = vocab_path
-    vocab = self.get_vocab()
-    self.vocab_len = len(vocab)
-    inp_questions, _ = self.get_questions()
+    self.vocab_len = len(self.get_vocab())
+    self.inp_questions, self.target_questions = self.get_questions()
     self.seq_len = inp_questions.size(0)
 
   def get_vocab(self):
@@ -46,8 +45,7 @@ class QuestionsDataset(Dataset):
 
   def __getitem__(self, item):
     '''generate one sample of data'''
-    input_questions, target_questions = self.get_questions()
-    inputs, targets = input_questions[:, item], target_questions[:, item]
+    inputs, targets = self.inp_questions[:, item], self.target_questions[:, item]
     return inputs, targets
 
 if __name__ == '__main__':

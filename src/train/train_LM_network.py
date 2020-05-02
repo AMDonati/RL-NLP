@@ -21,7 +21,7 @@ Inspired from: https://github.com/pytorch/examples/blob/master/word_language_mod
 
 if __name__ == '__main__':
 
-  #  trick to boolean parser args.
+  #  trick for boolean parser args.
   def str2bool(v):
     if isinstance(v, bool):
       return v
@@ -157,7 +157,7 @@ if __name__ == '__main__':
       # print loss every number of batches
       if (batch + 1) % print_interval == 0:
         print('loss for batch {}: {:5.3f}'.format(batch+1, total_loss / (batch + 1)))
-        print('time for {} training steps: {:5.2f}'.format(print_interval, start_time-time.time()))
+        print('time for {} training steps: {:5.2f}'.format(print_interval, time.time()-start_time))
 
     curr_loss = total_loss / (batch + 1)
     elapsed = time.time() - start_time
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     test_q, _ = test_dataset.get_questions()
     vocab = test_dataset.get_vocab()
     idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
-    test_sample = test_q[:seq_len, samples].long() # (S, num_samples)
+    test_sample = test_q[:seq_len, samples].long() # (S, num_samples) #TODO: add a to device here.
 
     decoded_input_text = []
     for index in range(len(samples)):
