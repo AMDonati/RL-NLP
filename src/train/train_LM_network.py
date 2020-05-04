@@ -60,9 +60,7 @@ if __name__ == '__main__':
   train_questions_path = os.path.join(args.data_path, "train_questions.h5")
   val_questions_path = os.path.join(args.data_path, "val_questions.h5")
   test_questions_path = os.path.join(args.data_path, "test_questions.h5")
-  #test_questions_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/test_questions_subset.h5'
   vocab_path = os.path.join(args.data_path, "vocab.json")
-  #vocab_test = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/temp/vocab_subset_from_train.json'
 
   train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path)
   val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
@@ -226,54 +224,54 @@ if __name__ == '__main__':
   if args.eval:
 
   # test generator with one batch:
-  test_generator = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), num_workers=args.num_workers)
+    test_generator = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), num_workers=args.num_workers)
 
-    model_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/output/GRU_layers_1_emb_16_hidden_32_pdrop_0.0_gradclip_None_bs_512/model.pt'
-    # get test loss:
-    with open(model_path, 'rb') as f:
-      model = torch.load(f)
+      model_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/output/GRU_layers_1_emb_16_hidden_32_pdrop_0.0_gradclip_None_bs_512/model.pt'
+      # get test loss:
+      with open(model_path, 'rb') as f:
+        model = torch.load(f)
 
-    #model.flatten_parameters()
-    test_loss = evaluate(model=model, criterion=criterion, BATCH_SIZE=len(test_dataset), val_generator=test_generator)
-    print('test loss: {:5.3f}, test ppl: {:8.3f}', test_loss, math.exp(test_loss))
+      #model.flatten_parameters()
+      test_loss = evaluate(model=model, criterion=criterion, BATCH_SIZE=len(test_dataset), val_generator=test_generator)
+      print('test loss: {:5.3f}, test ppl: {:8.3f}', test_loss, math.exp(test_loss))
 
-    def generate_top_k_words(test_dataset, seq_len, samples, k):
-      test_q, _ = test_dataset.get_questions()
-      vocab = test_dataset.get_vocab()
-      idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
-      test_sample = test_q[:seq_len, samples].long() # (S, num_samples) #TODO: add a to device here.
+      def generate_top_k_words(test_dataset, seq_len, samples, k):
+        test_q, _ = test_dataset.get_questions()
+        vocab = test_dataset.get_vocab()
+        idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
+        test_sample = test_q[:seq_len, samples].long() # (S, num_samples) #TODO: add a to device here.
 
-      decoded_input_text = []
-      for index in range(len(samples)):
-        text_i = list(test_sample[:,index].data.numpy()) # (S)
-        decode_seq = decode(seq_idx=text_i, idx_to_token=idx_to_token, stop_at_end=False, delim=' ')
-        decoded_input_text.append(decode_seq)
-      # forward pass:
-      model.eval()
-      hidden = model.init_hidden(len(samples))
-      with torch.no_grad():
-        output, hidden = model(test_sample, hidden) # output (S*num_samples, num_words)
-        output = output.view(-1, len(samples), output.size(-1)) # (S, num_samples, num_words)
-        log_pred = output[-1,:,:] # taking last pred of the seq
-        top_k, top_i = torch.topk(log_pred, k, dim=-1) # (num_samples, k)
-        top_i = top_i.data.numpy()
+        decoded_input_text = []
+        for index in range(len(samples)):
+          text_i = list(test_sample[:,index].data.numpy()) # (S)
+          decode_seq = decode(seq_idx=text_i, idx_to_token=idx_to_token, stop_at_end=False, delim=' ')
+          decoded_input_text.append(decode_seq)
+        # forward pass:
+        model.eval()
+        hidden = model.init_hidden(len(samples))
+        with torch.no_grad():
+          output, hidden = model(test_sample, hidden) # output (S*num_samples, num_words)
+          output = output.view(-1, len(samples), output.size(-1)) # (S, num_samples, num_words)
+          log_pred = output[-1,:,:] # taking last pred of the seq
+          top_k, top_i = torch.topk(log_pred, k, dim=-1) # (num_samples, k)
+          top_i = top_i.data.numpy()
 
-      list_top_words = []
-      for index in range(len(samples)):
-        seq_idx = list(top_i[index,:])
-        token_idx = decode(seq_idx=seq_idx, idx_to_token=idx_to_token, stop_at_end=False, delim=',')
-        list_top_words.append(token_idx)
+        list_top_words = []
+        for index in range(len(samples)):
+          seq_idx = list(top_i[index,:])
+          token_idx = decode(seq_idx=seq_idx, idx_to_token=idx_to_token, stop_at_end=False, delim=',')
+          list_top_words.append(token_idx)
 
-      dict_top_words = dict(zip(decoded_input_text, list_top_words))
-      return dict_top_words
+        dict_top_words = dict(zip(decoded_input_text, list_top_words))
+        return dict_top_words
 
-    sample_index = list(np.random.randint(0, len(test_dataset), size=20))
-    sample_top_words = generate_top_k_words(test_dataset=test_dataset, seq_len=10, samples=sample_index, k=10)
-    print('top words', sample_top_words)
-    #sample_top_words['sampled index'] = sample_index
-    json_top_words = os.path.join(args.out_path, 'sampled_top_words.json')
-    with open(json_top_words, mode='w') as f:
-      json.dump(sample_top_words, f)
+      sample_index = list(np.random.randint(0, len(test_dataset), size=20))
+      sample_top_words = generate_top_k_words(test_dataset=test_dataset, seq_len=10, samples=sample_index, k=10)
+      print('top words', sample_top_words)
+      #sample_top_words['sampled index'] = sample_index
+      json_top_words = os.path.join(args.out_path, 'sampled_top_words.json')
+      with open(json_top_words, mode='w') as f:
+        json.dump(sample_top_words, f)
 
 
 
