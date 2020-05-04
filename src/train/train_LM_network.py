@@ -175,22 +175,22 @@ if __name__ == '__main__':
     write_to_csv(out_csv, hist_dict)
 
   ################################################################################################################################################
-  Eval the model
+  # Eval the model
   ###############################################################################################################################################
-  if args.eval:
-
-  # test generator with one batch:
-    test_generator = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), num_workers=args.num_workers)
-
-      model_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/output/GRU_layers_1_emb_16_hidden_32_pdrop_0.0_gradclip_None_bs_512/model.pt'
-      # get test loss:
-      with open(model_path, 'rb') as f:
-        model = torch.load(f)
-
-      #model.flatten_parameters()
-      test_loss = evaluate(model=model, val_generator=test_generator, criterion=criterion, device=None,
-                           BATCH_SIZE=len(test_dataset))
-      print('test loss: {:5.3f}, test ppl: {:8.3f}', test_loss, math.exp(test_loss))
+  # if args.eval:
+  #
+  # # test generator with one batch:
+  #   test_generator = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), num_workers=args.num_workers)
+  #
+  #     model_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/output/GRU_layers_1_emb_16_hidden_32_pdrop_0.0_gradclip_None_bs_512/model.pt'
+  #     # get test loss:
+  #     with open(model_path, 'rb') as f:
+  #       model = torch.load(f)
+  #
+  #     #model.flatten_parameters()
+  #     test_loss = evaluate(model=model, val_generator=test_generator, criterion=criterion, device=None,
+  #                          BATCH_SIZE=len(test_dataset))
+  #     print('test loss: {:5.3f}, test ppl: {:8.3f}', test_loss, math.exp(test_loss))
 
 
 
