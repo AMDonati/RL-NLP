@@ -93,8 +93,8 @@ if __name__ == '__main__':
     model = LayerNormLSTMModel(num_tokens=num_tokens,
                                emb_size=args.emb_size,
                                hidden_size=args.hidden_size,
-                               num_layers=args.num_layers
-                               ).to(device)
+                               num_layers=args.num_layers,
+                               p_drop=args.p_drop).to(device)
 
   learning_rate = 0.001
   optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)

@@ -15,12 +15,14 @@ class LayerNormLSTMCell(nn.LSTMCell):
   ~LSTMCell.bias_ih – the learnable input-hidden bias, of shape (4*hidden_size)
   ~LSTMCell.bias_hh – the learnable hidden-hidden bias, of shape (4*hidden_size)
   '''
-  def __init__(self, input_size, hidden_size, bias=True):
+  def __init__(self, input_size, hidden_size, p_drop=0, bias=True):
     super(LayerNormLSTMCell, self).__init__(input_size=input_size, hidden_size=hidden_size, bias=bias)
 
+    self.p_drop = p_drop
     self.ln_ih = nn.LayerNorm(4*hidden_size)
     self.ln_hh = nn.LayerNorm(4*hidden_size)
     self.ln_ho = nn.LayerNorm(hidden_size)
+    self.dropout = nn.Dropout(p_drop)
 
   def forward(self, input, hidden=None):
 
@@ -47,18 +49,20 @@ class LayerNormLSTMCell(nn.LSTMCell):
     # update of cell gate
     cy = f * cx + i * g
     hy = o * self.ln_ho(cy).tanh()
+    hy = self.dropout(hy)
 
     return hy, cy
 
 class LayerNormLSTM(nn.Module):
-  def __init__(self, input_size, hidden_size, num_layers=1):
+  def __init__(self, input_size, hidden_size, num_layers=1, p_drop=0):
     super(LayerNormLSTM, self).__init__()
     self.input_size = input_size
     self.hidden_size = hidden_size
     self.num_layers = num_layers
 
     self.hidden = nn.ModuleList([LayerNormLSTMCell(input_size=(input_size if layer == 0 else hidden_size),
-                                                   hidden_size=hidden_size) for layer in range(num_layers)])
+                                                   hidden_size=hidden_size,
+                                                   p_drop=(0. if layer == num_layers - 1 else p_drop)) for layer in range(num_layers)])
 
   def forward(self, input, hidden=None):
     seq_len, batch_size, hidden_size = input.size()

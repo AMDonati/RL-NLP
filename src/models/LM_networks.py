@@ -107,7 +107,7 @@ class LayerNormLSTMModel(nn.Module):
     self.p_drop = p_drop
     self.dropout = nn.Dropout(p_drop)
     self.embedding = nn.Embedding(num_tokens, emb_size)
-    self.ln_lstm = LayerNormLSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers)
+    self.ln_lstm = LayerNormLSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, p_drop=p_drop)
     self.fc = nn.Linear(in_features=hidden_size, out_features=num_tokens)
 
     self.init_weights()
@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     # ----------- Test of LSTM with LayerNorm Model -------------------------------------------------------------------------------------------------------------
 
-    model = LayerNormLSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, num_layers=2)
+    model = LayerNormLSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, num_layers=2, p_drop=1)
     hidden = model.init_hidden(batch_size)
     output, (h,c) = model(inputs, hidden)
     print('output', output.shape)
