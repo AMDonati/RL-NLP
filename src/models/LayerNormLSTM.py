@@ -3,6 +3,8 @@ Implementation of a LSTM with LayerNorm.
 Inspired from: https://github.com/pytorch/pytorch/issues/11335
 '''
 
+#TODO: add dropout option.
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -66,17 +68,20 @@ class LayerNormLSTM(nn.Module):
     else:
       hx, cx = hidden
 
-    ht = input.new_zeros(seq_len, self.num_layers, batch_size, self.hidden_size)
-    ct = input.new_zeros(seq_len, self.num_layers, batch_size, self.hidden_size)
-
+    ht, ct = [], []
     h, c = hx, cx
     for t, x in enumerate(input):
+      h_t_l, c_t_l = [], []
       for l, layer in enumerate(self.hidden):
-        ht[t, l, :, :], ct[t, l, :, :] = layer(input=x, hidden=(h[l, :, :], c[l, :, :])) # output of cell: (B, hidden_size)
-        x = ht[t, l, :, :]
-      h, c = ht[t, :, :, :], ct[t, :, :, :]
-    output = ht[:, -1, :, :] # shape (S, B, H) sequence of hidden states from last layer.
-    hy = ht[-1, :, :, :] # last hidden state (of last timestep).
-    cy = ct[-1, :, :, :] # last cell state (of last tiemstep).
+        h_tl, c_tl = layer(input=x, hidden=(h[l], c[l]))
+        x = h_tl
+        h_t_l.append(h_tl)
+        c_t_l.append(h_tl)
+      ht.append(h_t_l)
+      ct.append(c_t_l)
+      h, c = ht[t], ct[t]
+    output = torch.stack([h[-1] for h in ht])
+    hy = torch.stack(ht[-1])
+    cy = torch.stack(ct[-1])
 
     return output, (hy, cy)

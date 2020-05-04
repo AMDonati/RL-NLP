@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     # ----------- Test of LSTM with LayerNorm Model -------------------------------------------------------------------------------------------------------------
 
-    model = LayerNormLSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size)
+    model = LayerNormLSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, num_layers=2)
     hidden = model.init_hidden(batch_size)
     output, (h,c) = model(inputs, hidden)
     print('output', output.shape)
