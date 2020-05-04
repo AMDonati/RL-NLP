@@ -62,7 +62,7 @@ class LSTMModel(nn.Module):
     self.bidirectional = bidirectional
     self.dropout = nn.Dropout(p_drop)
     self.embedding = nn.Embedding(num_tokens, emb_size)
-    self.lstm = nn.LSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, dropout=p_drop)
+    self.lstm = nn.LSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, dropout=p_drop, bidirectional=bidirectional)
     if bidirectional:
       in_features = 2 * hidden_size
     else:
@@ -154,12 +154,12 @@ if __name__ == '__main__':
 
     # ------------ Test of LSTM Model ---------------------------------------------------------------------------------------------------------------------------
 
-    # model = LSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, bidirectional=True)
-    # hidden = model.init_hidden(batch_size)
-    # output, (h,c) = model(inputs, hidden)
-    # print('output', output.shape)
-    # print('hidden state', h.shape)
-    # print('cell state', c.shape)
+    model = LSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, bidirectional=True)
+    hidden = model.init_hidden(batch_size)
+    output, (h,c) = model(inputs, hidden)
+    print('output', output.shape)
+    print('hidden state', h.shape)
+    print('cell state', c.shape)
 
     # ----------- Test of LSTM with LayerNorm Model -------------------------------------------------------------------------------------------------------------
 
