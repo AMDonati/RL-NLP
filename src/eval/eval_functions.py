@@ -1,6 +1,7 @@
 import os
 import torch
 import json
+from preprocessing.text_functions import decode
 
 def generate_top_k_words(model, test_dataset, device, seq_len, samples, k):
   #TODO: simplify and correct this function.

@@ -65,7 +65,7 @@ def build_vocab(sequences, min_token_count, punct_to_keep, punct_to_remove, deli
   token_to_idx = {}
   for token, idx in SPECIAL_TOKENS.items():
     token_to_idx[token] = idx
-  for token, count in sorted(token_to_count.items()): #TODO look at how to sort a dictionary.
+  for token, count in sorted(token_to_count.items()):
     if count >= min_token_count:
       token_to_idx[token] = len(token_to_idx)
 

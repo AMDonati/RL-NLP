@@ -3,7 +3,6 @@ Implementation of a LSTM with LayerNorm.
 Inspired from: https://github.com/pytorch/pytorch/issues/11335
 '''
 
-#TODO: add dropout option.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -84,8 +83,8 @@ class LayerNormLSTM(nn.Module):
       ht.append(h_t_l)
       ct.append(c_t_l)
       h, c = ht[t], ct[t]
-    output = torch.stack([h[-1] for h in ht])
-    hy = torch.stack(ht[-1])
+    output = torch.stack([h[-1] for h in ht]) # sequence of hidden states from last layer. shape (S,B,hidden_size).
+    hy = torch.stack(ht[-1]) # last hidden state (of the last timestep). shape (num_layers, B, hidden_size).
     cy = torch.stack(ct[-1])
 
     return output, (hy, cy)

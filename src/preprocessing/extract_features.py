@@ -11,9 +11,9 @@ import torch
 import torchvision
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--input_image_dir', default='/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/images/train')
+parser.add_argument('--input_image_dir', required=True, type=str, help="input path for images")
 parser.add_argument('--max_images', default=None, type=int)
-parser.add_argument('--output_h5_file', default='/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/data/CLEVR_v1.0/train_features.h5')
+parser.add_argument('--output_h5_file', type=str, required=True, help="out file path for image features")
 
 parser.add_argument('--image_height', default=224, type=int)
 parser.add_argument('--image_width', default=224, type=int)
@@ -22,6 +22,7 @@ parser.add_argument('--model', default='resnet101')
 parser.add_argument('--model_stage', default=3, type=int)
 parser.add_argument('--batch_size', default=128, type=int)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def build_model(args):
   if not hasattr(torchvision.models, args.model):
@@ -39,7 +40,7 @@ def build_model(args):
     name = 'layer%d' % (i + 1)
     layers.append(getattr(cnn, name))
   model = torch.nn.Sequential(*layers)
-  model.cuda()
+  model.to(device)
   model.eval()
   return model
 
@@ -51,12 +52,12 @@ def run_batch(cur_batch, model):
 
   image_batch = np.concatenate(cur_batch, 0).astype(np.float32)
   image_batch = (image_batch / 255.0 - mean) / std
-  image_batch = torch.FloatTensor(image_batch).cuda()
+  image_batch = torch.FloatTensor(image_batch).to(device)
   #image_batch = torch.FloatTensor(image_batch)
   image_batch = torch.autograd.Variable(image_batch, volatile=True) # look at torch.autograd doc.
 
   feats = model(image_batch)
-  feats = feats.data.cpu().clone().numpy() #Why .cpu() ?
+  feats = feats.data.cpu().clone().numpy()
 
   return feats
 
@@ -88,7 +89,6 @@ def main(args):
       img = imread(path, pilmode='RGB')
       img = PIL.Image.fromarray(img, mode='RGB')
       img = img.resize(size=img_size, resample=PIL.Image.BICUBIC)
-      #img = imresize(img, img_size, interp='bicubic')
       img = np.array(img)
       img = img.transpose(2, 0, 1)[None] # eq. to np.newaxis.
       cur_batch.append(img)

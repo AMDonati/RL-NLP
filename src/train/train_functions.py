@@ -19,8 +19,7 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, BATCH_
   # loop over batches
   for batch, (inputs, targets) in enumerate(train_generator):
     inputs, targets = inputs.to(device), targets.to(device)
-    inputs, targets = inputs.long().t(), targets.view(
-      targets.size(1) * targets.size(0)).long()  # inputs: (S,B) # targets: (S*B)
+    inputs, targets = inputs.long().t(), targets.view(targets.size(1) * targets.size(0)).long()  # inputs: (S,B) # targets: (S*B)
     optimizer.zero_grad()
     hidden = repackage_hidden(hidden)
     output, hidden = model(inputs, hidden)  # output (S * B, V), hidden (S,B,1)
