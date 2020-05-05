@@ -54,7 +54,7 @@ def run_batch(cur_batch, model):
   image_batch = (image_batch / 255.0 - mean) / std
   image_batch = torch.FloatTensor(image_batch).to(device)
   #image_batch = torch.FloatTensor(image_batch)
-  image_batch = torch.autograd.Variable(image_batch, volatile=True) # look at torch.autograd doc.
+  image_batch = torch.autograd.Variable(image_batch, volatile=True) # TODO: replace by a torch.no_grad()?
 
   feats = model(image_batch)
   feats = feats.data.cpu().clone().numpy()

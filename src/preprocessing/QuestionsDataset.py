@@ -2,7 +2,6 @@
 Create a questions Dataset to train the language model.
 Inspired from: https://stanford.edu/~shervine/blog/pytorch-how-to-generate-data-parallel
 '''
-
 import torch
 from torch.utils.data import Dataset, DataLoader
 import json

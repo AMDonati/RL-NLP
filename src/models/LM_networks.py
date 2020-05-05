@@ -84,7 +84,7 @@ class LSTMModel(nn.Module):
     output = self.dropout(output)
     dec_output = self.fc(output) # (S,B,num_tokens)
     dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokens)
-    log_probas = F.log_softmax(dec_output, dim=1)
+    log_probas = F.log_softmax(dec_output, dim=-1)
 
     return log_probas, hidden
 
