@@ -130,46 +130,45 @@ if __name__ == '__main__':
 
   ################################################################################################################################################
   # Train the model
-  #################################################################################################################################################
-  if not args.skip_training:
+  ################################################################################################################################################
 
-    logger.info("start training...")
-    logger.info("hparams: {}".format(hparams))
-    train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
-    best_val_loss = None
-    for epoch in range(EPOCHS):
-      logger.info('epoch {}/{}'.format(epoch+1, EPOCHS))
-      train_loss, elapsed = train_one_epoch(model=model,
-                                            train_generator=train_generator,
-                                            optimizer=optimizer,
-                                            criterion=criterion,
-                                            device=device,
-                                            BATCH_SIZE=BATCH_SIZE,
-                                            args=args,
-                                            print_interval=print_interval)
-      logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
-      logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-      val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, device=device,
-                          BATCH_SIZE=BATCH_SIZE)
-      logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+  logger.info("start training...")
+  logger.info("hparams: {}".format(hparams))
+  train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
+  best_val_loss = None
+  for epoch in range(EPOCHS):
+    logger.info('epoch {}/{}'.format(epoch + 1, EPOCHS))
+    train_loss, elapsed = train_one_epoch(model=model,
+                                          train_generator=train_generator,
+                                          optimizer=optimizer,
+                                          criterion=criterion,
+                                          device=device,
+                                          BATCH_SIZE=BATCH_SIZE,
+                                          args=args,
+                                          print_interval=print_interval)
+    logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
+    logger.info('time for one epoch...{:5.2f}'.format(elapsed))
+    val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, device=device,
+                        BATCH_SIZE=BATCH_SIZE)
+    logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
-      # saving loss and metrics information.
-      train_loss_history.append(train_loss)
-      train_ppl_history.append(math.exp(train_loss))
-      val_loss_history.append(val_loss)
-      val_ppl_history.append(math.exp(val_loss))
-      logger.info('-' * 89)
+    # saving loss and metrics information.
+    train_loss_history.append(train_loss)
+    train_ppl_history.append(math.exp(train_loss))
+    val_loss_history.append(val_loss)
+    val_ppl_history.append(math.exp(val_loss))
+    logger.info('-' * 89)
 
-      # Save the model if the validation loss is the best we've seen so far.
-      if not best_val_loss or val_loss < best_val_loss:
-        with open(model_path, 'wb') as f:
-          torch.save(model, f)
-        best_val_loss = val_loss
+    # Save the model if the validation loss is the best we've seen so far.
+    if not best_val_loss or val_loss < best_val_loss:
+      with open(model_path, 'wb') as f:
+        torch.save(model, f)
+      best_val_loss = val_loss
 
-    logger.info("saving loss and metrics information...")
-    hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
-    hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
-    write_to_csv(out_csv, hist_dict)
+  logger.info("saving loss and metrics information...")
+  hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
+  hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
+  write_to_csv(out_csv, hist_dict)
 
   ################################################################################################################################################
   # Eval the model
