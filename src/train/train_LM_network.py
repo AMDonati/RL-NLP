@@ -40,19 +40,16 @@ if __name__ == '__main__':
   parser.add_argument("-hidden_size", type=int, required=True, default=24, help="dimension of the hidden state")
   parser.add_argument("-p_drop", type=float, required=True, default=0, help="dropout rate")
   parser.add_argument("-grad_clip", type=float)
+  parser.add_argument("-lr", type=float, default=0.001)
   parser.add_argument("-bs", type=int, default=128, help="batch size")
   parser.add_argument("-ep", type=int, default=30, help="number of epochs")
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
-  parser.add_argument('-cuda', type=str2bool, required=True, default=False, help='use cuda')
-  parser.add_argument('-skip_training', type=str2bool, required=True, default=False)
-  parser.add_argument('-eval', type=str2bool, default=False)
 
   args = parser.parse_args()
 
-  device = torch.device("cpu" if not args.cuda else "cuda")
-  #device = torch.device("cpu")
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   ###############################################################################
   # Load data
@@ -96,7 +93,7 @@ if __name__ == '__main__':
                                num_layers=args.num_layers,
                                p_drop=args.p_drop).to(device)
 
-  learning_rate = 0.001
+  learning_rate = args.lr
   optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
   criterion = torch.nn.NLLLoss(ignore_index=PAD_IDX)
   EPOCHS = args.ep
@@ -108,7 +105,7 @@ if __name__ == '__main__':
   # Create logger, output_path and config file.
   ###############################################################################
 
-  out_path = '{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}'.format(args.model, args.num_layers, args.emb_size, args.hidden_size, args.p_drop, args.grad_clip, args.bs)
+  out_path = '{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.model, args.num_layers, args.emb_size, args.hidden_size, args.p_drop, args.grad_clip, args.bs, learning_rate)
   out_path = os.path.join(args.out_path, out_path)
   if not os.path.exists(out_path):
     os.makedirs(out_path)
