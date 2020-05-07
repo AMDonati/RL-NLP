@@ -1,0 +1,29 @@
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 20000 samples of test dataset...
+INFO:training log:test accuracy:0.06121785714285714
+INFO:training log:overconfidence rate for thr = 0.1: 0.9999166666666667
+INFO:training log:overconfidence rate for correct preds for thr= 0.1: 1.0
+INFO:training log:list of correct words predicted: the
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 20000 samples of test dataset...
+INFO:training log:test accuracy:0.06121785714285714
+INFO:training log:overconfidence rate for thr = 0.3: 0.0
+INFO:training log:overconfidence rate for correct preds for thr= 0.3: 0.0
+INFO:training log:list of correct words predicted: the
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 20000 samples of test dataset...
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 20000 samples of test dataset...
+INFO:training log:test accuracy:0.06121785714285714
+INFO:training log:overconfidence rate for thr = 0.2: 0.0
+INFO:training log:overconfidence rate for correct preds for thr= 0.2: 0.0
+INFO:training log:list of correct words predicted: the
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 20000 samples of test dataset...
+INFO:training log:test accuracy:0.06121785714285714
+INFO:training log:overconfidence rate for thr = 0.15: 0.0
+INFO:training log:overconfidence rate for correct preds for thr= 0.15: 0.0
+INFO:training log:list of correct words predicted: the
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
