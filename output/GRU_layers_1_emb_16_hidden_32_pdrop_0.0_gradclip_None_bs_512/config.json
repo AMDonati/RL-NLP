@@ -1,1 +1,0 @@
-{"hparams": {"model": "GRU", "emb_size": 16, "hidden_size": 32, "p_drop": 0.0, "grad_clip": null, "BATCH_SIZE": 512, "learning_rate": 0.001}}

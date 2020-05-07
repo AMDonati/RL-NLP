@@ -48,7 +48,7 @@ class CLEVR_Dataset(Dataset):
     img_idxs = self.img_idxs
     select_idx = list(np.where(img_idxs.data.numpy() == img_idx))
     select_questions = self.input_questions[:, select_idx]
-    return select_questions[1:, :]  # removing <sos> token.
+    return select_questions[1:, :].squeeze(1)  # removing <sos> token.
 
   def __getitem__(self, index):
     input_question = self.input_questions[:, index]

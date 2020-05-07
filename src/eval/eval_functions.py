@@ -1,20 +1,12 @@
 import os
 import torch
 import json
-from preprocessing.text_functions import decode
+import numpy as np
+from data_provider.QuestionsDataset import QuestionsDataset
 
 def generate_top_k_words(model, test_dataset, device, seq_len, samples, k):
-  #TODO: simplify and correct this function.
   test_q, _ = test_dataset.get_questions()
-  vocab = test_dataset.get_vocab()
-  idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
-  test_sample = test_q[:seq_len, samples].long().to(device) # (S, num_samples) #TODO: add a to device here.
-
-  decoded_input_text = []
-  for index in range(len(samples)):
-    text_i = list(test_sample[:, index].data.numpy())  # (S)
-    decode_seq = decode(seq_idx=text_i, idx_to_token=idx_to_token, stop_at_end=False, delim=' ')
-    decoded_input_text.append(decode_seq)
+  test_sample = test_q[:seq_len, samples].long().to(device) # (S, num_samples)
   # forward pass:
   model.eval()
   hidden = model.init_hidden(len(samples))
@@ -24,23 +16,27 @@ def generate_top_k_words(model, test_dataset, device, seq_len, samples, k):
     log_pred = output[-1, :, :]  # taking last pred of the seq
     top_k, top_i = torch.topk(log_pred, k, dim=-1)  # (num_samples, k)
     top_i = top_i.data.numpy()
-
-  list_top_words = []
+  # decode input data and top k idx.
+  list_top_words, decoded_input_text = [], []
   for index in range(len(samples)):
-    seq_idx = list(top_i[index, :])
-    token_idx = decode(seq_idx=seq_idx, idx_to_token=idx_to_token, stop_at_end=False, delim=',')
-    list_top_words.append(token_idx)
-
+    input_idx = list(test_sample[:, index].data.numpy())
+    top_k_idx = list(top_i[index, :])
+    top_k_tokens = test_dataset.idx2word(seq_idx=top_k_idx, delim=',')
+    input_tokens = test_dataset.idx2word(seq_idx=input_idx, delim=' ')
+    list_top_words.append(top_k_tokens)
+    decoded_input_text.append(input_tokens)
   dict_top_words = dict(zip(decoded_input_text, list_top_words))
   return dict_top_words
 
 if __name__ == '__main__':
 
-
-  sample_index = list(np.random.randint(0, len(test_dataset), size=20))
-  sample_top_words = generate_top_k_words(test_dataset=test_dataset, seq_len=10, samples=sample_index, k=10)
-  print('top words', sample_top_words)
+  temp_path = '../../data/CLEVR_v1.0/temp/5000_2000_samples'
+  temp_dataset = QuestionsDataset(h5_questions_path=os.path.join(temp_path, 'test_questions.h5'),
+                                  vocab_path=os.path.join(temp_path, 'vocab.json'))
+  sample_index = list(np.random.randint(0, len(temp_dataset), size=20))
+  dict_top_words = generate_top_k_words(test_dataset=temp_dataset, seq_len=5, samples=sample_index, k=10)
+  print('top words', dict_top_words)
   # sample_top_words['sampled index'] = sample_index
-  json_top_words = os.path.join(args.out_path, 'sampled_top_words.json')
+  # json_top_words = os.path.join(args.out_path, 'sampled_top_words.json')
   with open(json_top_words, mode='w') as f:
     json.dump(sample_top_words, f)

@@ -1,6 +1,6 @@
-python src/train/train_LM_network.py -model "ln_lstm" -num_layers 1 -emb_size 256 \
+python src/train/train_LM_network.py -model "ln_lstm" -num_layers 1 -emb_size 512 \
 -hidden_size 512 -p_drop 0.1 -grad_clip 1 -data_path "data" \
--out_path "output" -lr 0.005 -bs 512 -ep 30 -num_workers 5
+-out_path "output" -bs 512 -ep 50 -num_workers 5
 
 # to train on a subset of question samples.
 python src/train/train_LM_network.py -num_layers 1 -emb_size 64 \

@@ -1,6 +1,5 @@
 # code inspired from: https://github.com/pytorch/examples/blob/master/word_language_model/model.py
 #TODO - Add layer norm: https://pytorch.org/docs/stable/nn.html?highlight=layernorm#torch.nn.LayerNorm
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

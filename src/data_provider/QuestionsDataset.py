@@ -62,7 +62,7 @@ class QuestionsDataset(Dataset):
 if __name__ == '__main__':
   data_path = '../../data/CLEVR_v1.0/temp'
   vocab_path = os.path.join(data_path, "vocab_subset_from_train.json")
-  train_questions_path = os.path.join(data_path, "train_questions_subset.h5")
+  train_questions_path = os.path.join(data_path, "train_questions.h5")
 
   train_dataset = QuestionsDataset(train_questions_path, vocab_path)
 

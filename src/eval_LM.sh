@@ -1,1 +1,1 @@
-python src/eval/eval_LM.py data_path "data" -out_path "output/best_model" -model_path "output/best_model/model.pt" -words 200
+python src/eval/eval_LM.py data_path "data/CLEVR_v1.0/temp/50000_20000_samples" -out_path "output/best_model_2" -model_path "output/best_model_2/model.pt" -temp 1.0
