@@ -3,14 +3,11 @@
 
 import torch
 import argparse
-import numpy as np
-import time
 import os
 import math
 import json
 from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
-from preprocessing.QuestionsDataset import QuestionsDataset
-from preprocessing.text_functions import decode
+from data_provider.QuestionsDataset import QuestionsDataset
 from train.train_functions import train_one_epoch, evaluate
 from torch.utils.data import DataLoader
 from utils.utils_train import create_logger, write_to_csv
@@ -45,7 +42,7 @@ if __name__ == '__main__':
   parser.add_argument("-ep", type=int, default=30, help="number of epochs")
   parser.add_argument("-data_path", type=str, required=True, default='../../data')
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
-  parser.add_argument('-num_workers', type=int, required=True, default=0, help="num workers for DataLoader")
+  parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
 
   args = parser.parse_args()
 

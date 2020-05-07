@@ -1,5 +1,4 @@
 '''LSTM Policy Network taking as input multi-model data (img_features, words embeddings'''
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -33,7 +32,7 @@ class PolicyLSTM(nn.Module):
 
   def forward(self, text_inputs, img_feat, hidden):
     '''
-    :param text_inputs: shape (S, B, num_tokens)
+    :param text_inputs: shape (S, B)
     :param img_feat: shape (B, C, H, W)
     :param hidden: shape (num_layers, B, hidden_size)
     :return:
@@ -49,9 +48,9 @@ class PolicyLSTM(nn.Module):
     output = self.dropout(output)
     dec_output = self.fc(output) # (S,B,num_tokens)
     dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokens)
-    log_probas = F.log_softmax(dec_output, dim=-1)
+    probas = F.softmax(dec_output, dim=-1)
 
-    return log_probas, hidden
+    return probas, hidden
 
   def init_hidden(self, batch_size):
     weight = next(self.parameters())
@@ -67,8 +66,8 @@ if __name__ == '__main__':
     print('features shape', img_feat.shape) # shape (num_samples, 1024, 14, 14).
 
     img_feat = torch.tensor(img_feat, dtype=torch.float32)
-    seq_len = 20
-    num_tokens = 50
+    seq_len = 10
+    num_tokens = 20
     hidden_size = 128
     dummy_text_input = torch.ones(seq_len, img_feat.size(0), dtype=torch.long)
 
@@ -79,4 +78,6 @@ if __name__ == '__main__':
                        num_layers=1,
                        p_drop=0)
     hidden = model.init_hidden(batch_size=img_feat.size(0))
-    output, hidden = model(dummy_text_input, img_feat, hidden)
+    output, hidden = model(dummy_text_input, img_feat, hidden) # shape (B*S, num_tokens)
+    output = output.view(-1, seq_len, num_tokens)
+    print("sample output", output[:5, :, :])

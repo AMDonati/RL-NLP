@@ -32,23 +32,31 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
       vocab = json.load(f)
   else:
     print('Building vocab...')
+    # question_token_to_idx
     list_questions = [q['question'] for q in questions]
     question_token_to_idx = build_vocab(sequences=list_questions,
                                           min_token_count=min_token_count,
                                           punct_to_keep=punct_to_keep,
                                           punct_to_remove=punct_to_remove)
     print('number of words in vocab: {}'.format(len(question_token_to_idx)))
-    vocab = {'question_token_to_idx': question_token_to_idx}
+    # answer_token_to_idx
+    if 'answer' in questions[0]:
+      list_answers = [q['answer'] for q in questions]
+      answer_token_to_idx = build_vocab(list_answers, min_token_count=1,
+                                        punct_to_keep=None, punct_to_remove=None)
+    vocab = {'question_token_to_idx': question_token_to_idx,
+             'answer_token_to_idx': answer_token_to_idx}
 
     with open(vocab_out_path, 'w') as f:
         json.dump(vocab, f)
 
   print('Encoding questions...')
-  input_questions_encoded = []
-  target_questions_encoded = []
+  input_questions_encoded, target_questions_encoded = [], []
+  orig_idxs, img_idxs = [], []
+  question_families, answers = [], []
   for orig_idx, q in enumerate(questions):
+    # questions
     question = q['question']
-
     question_tokens = tokenize(s=question,
                               punct_to_keep=punct_to_keep,
                               punct_to_remove=punct_to_remove,
@@ -61,6 +69,13 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
     assert len(input_question) == len(target_question)
     input_questions_encoded.append(input_question)
     target_questions_encoded.append(target_question)
+    # other objects:
+    orig_idxs.append(orig_idx)
+    img_idxs.append(q['image_index'])
+    if 'question_family_index' in q:
+      question_families.append(q['question_family_index'])
+    if 'answer' in q:
+      answers.append(vocab['answer_token_to_idx'][q['answer']])
 
   # Pad encoded questions
   max_question_length = max(len(x) for x in input_questions_encoded)
@@ -79,14 +94,20 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
   with h5py.File(h5_out_path, 'w') as f:
     f.create_dataset('input_questions', data=input_questions_encoded)
     f.create_dataset('target_questions', data=target_questions_encoded)
+    f.create_dataset('orig_idxs', data=np.array(orig_idxs))
+    f.create_dataset('img_idxs', data=np.array(img_idxs))
+    if len(question_families) > 0:
+      f.create_dataset('question_families', data=np.array(question_families))
+    if len(answers) > 0:
+      f.create_dataset('answers', data=np.array(answers))
 
 if __name__ == '__main__':
 
   parser = argparse.ArgumentParser()
   parser.add_argument("-data_path", type=str, required=True, help="path for CLEVR questions json files")
-  parser.add_argument("-out_vocab_path", type=str, default="../../data/vocab.json", required=True, help="output path for vocab")
+  parser.add_argument("-out_vocab_path", type=str, required=True, help="output path for vocab")
   parser.add_argument("-out_h5_path", type=str, required=True, help="output path for questions encoded dataset")
-  parser.add_argument("-min_token_count", type=int, default=1, required=True, help="min count for adding token in vocab")
+  parser.add_argument("-min_token_count", type=int, default=1, help="min count for adding token in vocab")
 
   args = parser.parse_args()
 

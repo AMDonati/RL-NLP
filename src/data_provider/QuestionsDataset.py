@@ -10,6 +10,7 @@ import numpy as np
 import os
 from preprocessing.text_functions import decode
 
+#TODO: add a max samples here.
 class QuestionsDataset(Dataset):
   def __init__(self, h5_questions_path, vocab_path):
     super(QuestionsDataset, self).__init__()
@@ -64,7 +65,6 @@ if __name__ == '__main__':
   train_questions_path = os.path.join(data_path, "train_questions_subset.h5")
 
   train_dataset = QuestionsDataset(train_questions_path, vocab_path)
-  inp_questions, tar_questions = train_dataset.get_questions()
 
   len_train = train_dataset.__len__()
   print('number of training samples', len_train)

@@ -2,12 +2,12 @@
 Generare top-k words given a specific sequence length.
 Inspired from: https://github.com/pytorch/examples/blob/master/word_language_model/generate.py
 '''
-
 import argparse
 import os
 import torch
-from preprocessing.QuestionsDataset import QuestionsDataset
+from data_provider.QuestionsDataset import QuestionsDataset
 from torch.utils.data import DataLoader
+from utils.utils_train import create_logger
 
 #  trick for boolean parser args.
 def str2bool(v):
@@ -51,22 +51,28 @@ if __name__ == '__main__':
   parser.add_argument("-oc_th", type=float, default=0.5, help="proba threshold for overconfidence function")
   parser.add_argument('-temperature', type=float, default=1.0, help='temperature - higher will increase diversity')
   parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
-  parser.add_argument('-cuda', type=str2bool, required=True, help='use cuda')
-
 
   args = parser.parse_args()
 
-  device = torch.device("cpu" if not args.cuda else "cuda")
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
   with open(args.model_path, 'rb') as f:
-    model = torch.load(f).to(device)
+    model = torch.load(f, map_location=device).to(device)
   model.eval()
   model.bidirectional = False
-  test_dataset = QuestionsDataset(h5_questions_path=os.path.join(args.data_path, 'test_questions.h5'), vocab_path=os.path.join(args.data_path, 'vocab.json'))
-  test_loader = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), drop_last=True, num_workers=args.num_workers)
+  test_dataset = QuestionsDataset(h5_questions_path=os.path.join(args.data_path, 'test_questions.h5'),
+                                  vocab_path=os.path.join(args.data_path, 'vocab.json'))
   num_tokens = test_dataset.vocab_len
 
+  #if not torch.cuda.is_available():
+    #print("selecting a subset of the whole test dataset made of the first 10,000 samples")
+    #test_dataset = Subset(QuestionsDataset, indices=[i for i in range(10000)])
+  test_loader = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), drop_last=True, num_workers=args.num_workers)
+
+
   out_file = os.path.join(args.out_path, 'generate_words_temp_{}.txt'.format(args.temperature))
+  out_file_log = os.path.join(args.out_path, 'eval_log.log')
+  logger = create_logger(out_file_log)
   log_interval = int(args.words / 10)
 
   ###############################################################################
@@ -74,8 +80,8 @@ if __name__ == '__main__':
   #############################################################################
 
   accuracy, over_confidence = eval_overconfidence(model=model, test_loader=test_loader, device=device)
-  print('accuracy', accuracy)
-  print('overconfidence rate for thr = {}: {}'.format(0.5, over_confidence))
+  logger.info('test accuracy:{}'.format(accuracy))
+  logger.info('overconfidence rate for thr = {}: {}'.format(0.5, over_confidence))
 
   ###############################################################################
   # generate words
@@ -107,5 +113,5 @@ if __name__ == '__main__':
 
   #############################################################################################
   # look at the top-k words for a given sequence of input words.
-  ###############################################################################################
+###############################################################################################
 
