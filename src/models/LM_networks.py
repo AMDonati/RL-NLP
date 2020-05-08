@@ -1,5 +1,4 @@
 # code inspired from: https://github.com/pytorch/examples/blob/master/word_language_model/model.py
-#TODO - Add layer norm: https://pytorch.org/docs/stable/nn.html?highlight=layernorm#torch.nn.LayerNorm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -37,8 +36,8 @@ class GRUModel(nn.Module):
     output, hidden = self.gru(emb, hidden) # # output (S,B,hidden_size*num_directions) # hidden: (num_layers * num_directions, B, hidden_size)
     output = self.dropout(output)
     dec_output = self.fc(output) # (S, B, num_tokens)
-    dec_output = dec_output.view(-1, self.num_tokens) # (S * B, num_tokens)
-    log_probas = F.log_softmax(dec_output, dim=1)
+    dec_output = dec_output.view(-1, self.num_tokens) # (S * B, num_tokens) # resizing for the NLL Loss.
+    log_probas = F.log_softmax(dec_output, dim=1) # when outputting the log_probas, use torch.nn.NLLLoss and not torch.nn.CrossEntropy.
 
     return log_probas, hidden
 
@@ -123,7 +122,7 @@ class LayerNormLSTMModel(nn.Module):
     output, hidden = self.ln_lstm(input=emb, hidden=hidden) # output (S,B,hidden_size), hidden = (h,c): (num_layers, B, hidden_size)
     output = self.dropout(output)
     dec_output = self.fc(output) # (S,B,num_tokens)
-    dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokes) # resizing for the loss.
+    dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokens) # resizing for the loss.
     log_probas = F.log_softmax(dec_output, dim=1)
 
     return log_probas, hidden

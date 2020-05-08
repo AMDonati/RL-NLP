@@ -1,11 +1,11 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
 #https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-
 import torch
 import argparse
 import os
 import math
 import json
+import numpy as np
 from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
 from data_provider.QuestionsDataset import QuestionsDataset
 from train.train_functions import train_one_epoch, evaluate
@@ -132,6 +132,12 @@ if __name__ == '__main__':
   logger.info("start training...")
   logger.info("hparams: {}".format(hparams))
   train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
+  logger.info('checking shape of and values of a sample of the train dataset...')
+  idxs = list(np.random.randint(0, train_dataset.__len__(), size=2))
+  temp_inp, temp_tar = train_dataset.__getitem__(idxs)
+  logger.info('samples of input questions: {}'.format(temp_inp.t().data.numpy()))
+  logger.info('samples of target questions: {}'.format(temp_tar.t().data.numpy()))
+  logger.info('train dataset length: {}'.format(train_dataset.__len__()))
   best_val_loss = None
   for epoch in range(EPOCHS):
     logger.info('epoch {}/{}'.format(epoch + 1, EPOCHS))
@@ -167,23 +173,6 @@ if __name__ == '__main__':
   hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
   write_to_csv(out_csv, hist_dict)
 
-  ################################################################################################################################################
-  # Eval the model
-  ###############################################################################################################################################
-  # if args.eval:
-  #
-  # # test generator with one batch:
-  #   test_generator = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), num_workers=args.num_workers)
-  #
-  #     model_path = '/Users/alicemartin/000_Boulot_Polytechnique/07_PhD_thesis/code/RL-NLP/output/GRU_layers_1_emb_16_hidden_32_pdrop_0.0_gradclip_None_bs_512/model.pt'
-  #     # get test loss:
-  #     with open(model_path, 'rb') as f:
-  #       model = torch.load(f)
-  #
-  #     #model.flatten_parameters()
-  #     test_loss = evaluate(model=model, val_generator=test_generator, criterion=criterion, device=None,
-  #                          BATCH_SIZE=len(test_dataset))
-  #     print('test loss: {:5.3f}, test ppl: {:8.3f}', test_loss, math.exp(test_loss))
 
 
 

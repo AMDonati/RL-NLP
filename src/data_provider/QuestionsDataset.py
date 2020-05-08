@@ -60,7 +60,7 @@ class QuestionsDataset(Dataset):
     return inputs, targets
 
 if __name__ == '__main__':
-  data_path = '../../data/CLEVR_v1.0/temp'
+  data_path = '../../data/CLEVR_v1.0/temp/5000_2000_samples'
   vocab_path = os.path.join(data_path, "vocab_subset_from_train.json")
   train_questions_path = os.path.join(data_path, "train_questions.h5")
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
   len_train = train_dataset.__len__()
   print('number of training samples', len_train)
-  input_0, target_0 = train_dataset.__getitem__(0)
+  input_0, target_0 = train_dataset.__getitem__([0,1])
   print('first input sample', input_0)
   print('first input sample', target_0)
   train_generator = DataLoader(dataset=train_dataset, batch_size=64)

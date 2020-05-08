@@ -19,10 +19,18 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, BATCH_
   # loop over batches
   for batch, (inputs, targets) in enumerate(train_generator):
     inputs, targets = inputs.to(device), targets.to(device)
+    if batch == 0:
+      print("checking forward pass on the first batch of data samples...")
+      print('input shape:', inputs.shape)
+      print('targets shape', targets.shape)
+      print("first input of batch:", inputs[0,:].data.numpy())
+      print("first target of batch:", targets[0,:].data.numpy())
     inputs, targets = inputs.long().t(), targets.view(targets.size(1) * targets.size(0)).long()  # inputs: (S,B) # targets: (S*B)
-    optimizer.zero_grad()
+    optimizer.zero_grad() #TODO: is there a difference between model.zero_grad() and optimizer.zero_grad()
     hidden = repackage_hidden(hidden)
-    output, hidden = model(inputs, hidden)  # output (S * B, V), hidden (S,B,1)
+    output, hidden = model(inputs, hidden)  # output (S * B, V), hidden (num_layers,B,1)
+    if batch == 0:
+      print("output shape for first batch:", output.shape)
     loss = criterion(output, targets)
     loss.backward()
 

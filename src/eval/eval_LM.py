@@ -9,7 +9,7 @@ import numpy as np
 from data_provider.QuestionsDataset import QuestionsDataset
 from torch.utils.data import DataLoader
 from utils.utils_train import create_logger
-from eval.eval_functions import generate_top_k_words
+from eval.eval_functions import generate_top_k_words, eval_overconfidence
 
 #  trick for boolean parser args.
 def str2bool(v):
@@ -21,27 +21,6 @@ def str2bool(v):
     return False
   else:
     raise argparse.ArgumentTypeError('Boolean value expected.')
-
-def eval_overconfidence(model, test_loader, device, threshold=0.5):
-    N = test_loader.batch_size
-    total, correct, over_conf, over_conf_correct = 0., 0., 0., 0.
-    model.eval()
-    hidden = model.init_hidden(batch_size=N)
-    with torch.no_grad():
-      for inputs, targets in test_loader:
-        seq_len = inputs.size(1)
-        inputs, targets = inputs.t().long().to(device), targets.t().long().to(device)
-        output, _ = model(inputs, hidden)  # (N*seq_len, num_tokens)
-        output = output.view(seq_len, N, -1)  # (N, seq_len, num_tokens)
-        log_prob, word_preds = torch.max(output.data, -1) # (N, seq_len)
-        total += targets.size(0) * targets.size(1)
-        bool_correct = word_preds == targets
-        correct_words = word_preds * bool_correct
-        correct += bool_correct.sum().item()
-        over_conf += (log_prob.exp() >= threshold).sum().item()
-        over_conf_correct += ((log_prob.exp() * bool_correct) >= threshold).sum().item()
-
-    return correct / total, over_conf / total, over_conf_correct / correct, correct_words
 
 if __name__ == '__main__':
 
@@ -64,7 +43,9 @@ if __name__ == '__main__':
   with open(args.model_path, 'rb') as f:
     model = torch.load(f, map_location=device).to(device)
   model.eval()
-  model.bidirectional = False
+
+  #TODO: add a model.flatten_parameters() ?
+
   test_dataset = QuestionsDataset(h5_questions_path=os.path.join(args.data_path, 'test_questions.h5'),
                                   vocab_path=os.path.join(args.data_path, 'vocab.json'))
   num_tokens = test_dataset.vocab_len
@@ -88,7 +69,6 @@ if __name__ == '__main__':
   correct_words = correct_words.view(-1).data.numpy()
   idx_correct = np.where(correct_words !=0)
   correct_words = list(correct_words[list(idx_correct)])
-  #correct_words = correct_words.remove(0)
   unique_correct_words = list(set(correct_words))
   decoded_correct_words = test_dataset.idx2word(unique_correct_words, delim=',')
   logger.info('test accuracy:{}'.format(accuracy))
@@ -143,7 +123,3 @@ if __name__ == '__main__':
     json.dump(dict_top_words, f, indent=4)
   logger.info("done with saving top-k words")
 
-  # with open(out_file_top_k_words, 'w') as f:
-  #   f.write('sampled indexes:' + sample_index + '\n')
-  #   for (input, top_k) in zip(list(dict_top_words.keys()), list(dict_top_words.values())):
-  #     f.write(input + ' ' + ':' + ' ' + top_k + '\n')
