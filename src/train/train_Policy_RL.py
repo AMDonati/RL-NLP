@@ -7,7 +7,7 @@ import argparse, os, math, statistics
 import random
 from collections import namedtuple
 from torch.distributions import Categorical
-
+from utils.utils_train import create_logger
 
 #  trick for boolean parser args.
 def str2bool(v):
@@ -22,44 +22,44 @@ def str2bool(v):
 
 
 def select_action(policy_network, state, device):
-  policy_network.eval()
+  policy_network.train()
   hidden = policy_network.init_hidden(1)
-  with torch.no_grad():
-    state.text.to(device)
-    state.img.to(device)
-    probas, _ = policy_network(state.text, state.img, hidden) # probas > shape (1, num_tokens)
-    m = Categorical(probas)  # multinomial distribution with weights = probas.
-    action = m.sample()
-    log_prob = m.log_prob(action)
+  #with torch.no_grad():
+  state.text.to(device)
+  state.img.to(device)
+  probas, _ = policy_network(state.text, state.img, hidden) # probas > shape (s, num_tokens)
+  m = Categorical(probas[-1,:])  # multinomial distribution with weights = probas.
+  action = m.sample()
+  log_prob = m.log_prob(action)
   return action.view(1,1), log_prob # action and log_prob of shape (1).
 
-def get_reward(next_state, ep_questions, EOS_idx):
+def get_reward(next_state_text, ep_questions, EOS_idx):
   # remove <EOS> token if needed.
-  if next_state[-1] == EOS_idx:
-    next_state = next_state[:-1]
-  dialog = next_state.text.data.numpy()
-  ep_questions = ep_questions.data.numpy()
-  bools = []
-  for i in range(ep_questions.size(1)):
-    question = ep_questions[:, i]
-    if len(question) == len(dialog):
-      bool = np.array_equal(question, dialog)
-    else:
-      bool = False
-    bools.append(bool)  # TODO np.any()?
-    return 0.
+  # if next_state_text[-1] == EOS_idx:
+  #   next_state_text = next_state_text[:-1]
+  # dialog = next_state_text.data.numpy()
+  # ep_questions = ep_questions.data.numpy()
+  # bools = []
+  # for i in range(ep_questions.size(1)):
+  #   question = ep_questions[:, i]
+  #   if len(question) == len(dialog):
+  #     bool = np.array_equal(question, dialog)
+  #   else:
+  #     bool = False
+  #   bools.append(bool)  # TODO np.any()?
+  return 0.
 
-# REINFORCE ALGO.
 
 # function generate one episode. debugged.
+#TODO: batchify this function.
 def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, seed=None):
   max_length = clevr_dataset.input_questions.size(0)  # max_length set-up to max length of questions dataset.
-  max_length = 5
+  max_length = 5 # for debugging.
   # sample initial state
   if seed is not None:
     np.random.seed = seed
   img_idx = np.random.randint(0, len(clevr_dataset.img_idxs))
-  img_idx = 10
+  img_idx = 10 # for debugging.
   ep_GD_questions = clevr_dataset.get_questions_from_img_idx(img_idx) # shape (max_len - 1, 10) # used to compute the final reward of the episode.
   img_feats = clevr_dataset.get_feats_from_img_idx(img_idx) # shape (1024, 14, 14)
   initial_state = State(torch.LongTensor([special_tokens.SOS_idx]).view(1,1), img_feats.unsqueeze(0))
@@ -75,15 +75,15 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
     next_state = State(torch.cat([state.text, action]), state.img)
     done = True if action.item() == special_tokens.EOS_idx or step == (max_length - 1) else False
     if done:
-      reward = get_reward(next_state=next_state, ep_questions=ep_GD_questions, EOS_idx=special_tokens.EOS_idx)
+      reward = get_reward(next_state_text=next_state.text, ep_questions=ep_GD_questions, EOS_idx=special_tokens.EOS_idx)
     else:
       reward = 0
+      step += 1
     rewards.append(reward)
     log_probs.append(log_prob)
     state = next_state
-    step += 1
 
-  episode = Episode(img_idx, img_feats, ep_GD_questions, state.text) #TODO: add intermediate rewards.
+  episode = Episode(img_idx, img_feats, ep_GD_questions, state.text, rewards)
 
   return_ep = sum(rewards)
   returns = [return_ep] * (step + 1)
@@ -94,10 +94,9 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
 def padder_batch(batch):
   len_episodes = [len(l) for l in batch]
   max_len = max(len_episodes)  # finds the maximal length of episodes.
-  batch_tensors = [torch.FloatTensor(l) for l in batch]  # tensors of shape (len_ep, 1)
-  batch_tensors_padded = [torch.cat(t, torch.zeros(max_len - len, t.size(-1), dtype=t.dtype)) for (t, len) in
-                          zip(batch_tensors, len_episodes)]
-  # TODO: use masked_fill_(mask, value) instead ?
+  batch_tensors = [torch.FloatTensor(l).unsqueeze(-1) for l in batch]  # tensors of shape (len_ep, 1)
+  batch_tensors_padded = [torch.cat([t, torch.zeros(max_len - len, t.size(-1), dtype=t.dtype)]) for (t, len) in
+                          zip(batch_tensors, len_episodes)] # TODO: use masked_fill_(mask, value) instead ?
   batch = torch.stack(batch_tensors_padded, dim=0)
   return batch
 
@@ -107,18 +106,17 @@ def train_episodes_batch(log_probs_batch, returns_batch, optimizer):
   eps = np.finfo(np.float32).eps.item()
   returns_batch = (returns_batch - returns_batch.mean()) / (returns_batch.std() + eps)
   reinforce_loss = -log_probs_batch * returns_batch  # shape (batch_size, max_episode_len, 1) # opposite of REINFORCE objective function to apply a gradient descent algo.
-  reinforce_loss = reinforce_loss.sum(dim=1).mean(dim=0)
+  reinforce_loss = reinforce_loss.squeeze(-1).sum(dim=1).mean(dim=0)
   optimizer.zero_grad()
-  reinforce_loss.backward()
+  reinforce_loss.backward() # ERROR here: no grad_fn on the loss... # grad_fn is None on log_probs_batch and returns_batch.
   optimizer.step()
 
   return reinforce_loss.item()
 
 
-def REINFORCE(train_dataset, policy_network, special_tokens, batch_size, num_training_steps, optimizer, device, logger,
-              log_interval=100,
-              store_episodes=True):
+def REINFORCE(train_dataset, policy_network, special_tokens, batch_size, num_training_steps, optimizer, device, logger, log_interval=100, store_episodes=True):
   running_return = 0.
+  all_episodes = []
   for i in range(num_training_steps):
     log_probs_batch, returns_batch, episodes_batch = [], [], []
     for _ in range(batch_size):
@@ -138,7 +136,10 @@ def REINFORCE(train_dataset, policy_network, special_tokens, batch_size, num_tra
     if i % log_interval == 0:
       logger.info('train loss for training step {}: {:5.3f}'.format(i, loss))
       logger.info('running return for training step {}: {:8.3f}'.format(i, loss))
+    if store_episodes:
+      all_episodes.append(episodes_batch)
 
+  return all_episodes
 
 if __name__ == '__main__':
 
@@ -149,7 +150,7 @@ if __name__ == '__main__':
   parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
   parser.add_argument("-grad_clip", type=float)
   parser.add_argument("-lr", type=float, default=0.001)
-  parser.add_argument("-bs", type=int, default=32, help="batch size")
+  parser.add_argument("-bs", type=int, default=16, help="batch size")
   parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
   parser.add_argument("-data_path", type=str, required=True, help="data folder containing questions embeddings and img features")
   parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -171,14 +172,13 @@ if __name__ == '__main__':
 
   num_tokens = clevr_dataset.len_vocab
   feats_shape = clevr_dataset.feats_shape
-  #vocab_questions = clevr_dataset.vocab_questions
   SOS_idx = clevr_dataset.vocab_questions["<SOS>"]
   EOS_idx = clevr_dataset.vocab_questions["<EOS>"]
 
   Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx'))
   special_tokens = Special_Tokens(SOS_idx, EOS_idx)
   State = namedtuple('State', ('text', 'img'))
-  Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'dialog'))
+  Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'dialog', 'rewards')) #TODO: Build an Episode Dataset instead.
 
   ###############################################################################
   # Build the Policy Network and define hparams
@@ -191,8 +191,22 @@ if __name__ == '__main__':
                               num_layers=args.num_layers,
                               p_drop=args.p_drop)
 
+  optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
+
+  out_file_log = os.path.join(args.out_path, 'RL_training_log.log')
+  logger = create_logger(out_file_log)
+
   # -------- test of generate one episode function  ------------------------------------------------------------------------------------------------------
   log_probs, returns, episodes = generate_one_episode(clevr_dataset=clevr_dataset,
                                                       policy_network=policy_network,
                                                       special_tokens=special_tokens,
                                                       device=device)
+  #--------- test of REINFORCE function --------------------------------------------------------------------------------------------------------------------
+  all_episodes = REINFORCE(train_dataset=clevr_dataset,
+                           policy_network=policy_network,
+                           special_tokens=special_tokens,
+                           batch_size=args.bs,
+                           optimizer=optimizer,
+                           device=device,
+                           num_training_steps=args.num_training_steps,
+                           logger=logger)
