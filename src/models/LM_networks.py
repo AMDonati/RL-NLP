@@ -15,39 +15,30 @@ class GRUModel(nn.Module):
     self.dropout = nn.Dropout(p_drop)
     self.bidirectional = bidirectional
     self.embedding = nn.Embedding(num_tokens, emb_size)
-    self.gru = nn.GRU(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, dropout=p_drop, bidirectional=bidirectional)
+    self.gru = nn.GRU(input_size=emb_size,
+                      hidden_size=hidden_size,
+                      num_layers=num_layers,
+                      dropout=p_drop,
+                      bidirectional=bidirectional,
+                      batch_first=True)
     if bidirectional:
       in_features = 2 * hidden_size
     else:
       in_features = hidden_size
-    self.fc = nn.Linear(in_features=in_features, out_features=num_tokens)
+    self.fc = nn.Linear(in_features=in_features,
+                        out_features=num_tokens)
 
-    self.init_weights()
-
-  def init_weights(self):
-    initrange = 0.1
-    self.embedding.weight.data.uniform_(-initrange, initrange)
-    self.fc.weight.data.uniform_(-initrange, initrange)
-    self.fc.bias.data.zero_()
-
-  def forward(self, input, hidden):
-    emb = self.embedding(input)
+  def forward(self, input):
+    emb = self.embedding(input) # (B, seq_len, emb_size)
     emb = self.dropout(emb)
-    output, hidden = self.gru(emb, hidden) # # output (S,B,hidden_size*num_directions) # hidden: (num_layers * num_directions, B, hidden_size)
+    #output = emb
+    output, hidden = self.gru(emb) # output (B,seq_len,hidden_size*num_directions) , hidden: (num_layers * num_directions, B, hidden_size)
     output = self.dropout(output)
-    dec_output = self.fc(output) # (S, B, num_tokens)
+    dec_output = self.fc(output) # (B, S, num_tokens)
     dec_output = dec_output.view(-1, self.num_tokens) # (S * B, num_tokens) # resizing for the NLL Loss.
     log_probas = F.log_softmax(dec_output, dim=1) # when outputting the log_probas, use torch.nn.NLLLoss and not torch.nn.CrossEntropy.
 
     return log_probas, hidden
-
-
-  def init_hidden(self, batch_size):
-    weight = next(self.parameters()) #TODO understand this part.
-    if self.bidirectional:
-      return weight.new_zeros(self.num_layers*2, batch_size, self.hidden_size)
-    else:
-      return weight.new_zeros(self.num_layers, batch_size, self.hidden_size)
 
 class LSTMModel(nn.Module):
   def __init__(self, num_tokens, emb_size, hidden_size, num_layers=1, p_drop=0, bidirectional=False):
@@ -60,25 +51,22 @@ class LSTMModel(nn.Module):
     self.bidirectional = bidirectional
     self.dropout = nn.Dropout(p_drop)
     self.embedding = nn.Embedding(num_tokens, emb_size)
-    self.lstm = nn.LSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, dropout=p_drop, bidirectional=bidirectional)
+    self.lstm = nn.LSTM(input_size=emb_size,
+                        hidden_size=hidden_size,
+                        num_layers=num_layers,
+                        dropout=p_drop,
+                        bidirectional=bidirectional,
+                        batch_first=True)
     if bidirectional:
       in_features = 2 * hidden_size
     else:
       in_features = hidden_size
     self.fc = nn.Linear(in_features=in_features, out_features=num_tokens)
 
-    self.init_weights()
-
-  def init_weights(self):
-    initrange = 0.1
-    self.embedding.weight.data.uniform_(-initrange, initrange)
-    self.fc.weight.data.uniform_(-initrange, initrange)
-    self.fc.bias.data.zero_()
-
-  def forward(self, input, hidden):
-    emb = self.embedding(input)
+  def forward(self, input):
+    emb = self.embedding(input)  #(B, seq_len, emb_size)
     emb = self.dropout(emb)
-    output, hidden = self.lstm(emb, hidden) # output (S,B,hidden_size*num_dimension) # hidden: (num_layers * num_directions, B, hidden_size)
+    output, hidden = self.lstm(emb) # output (B, seq_len, hidden_size*num_dimension) # hidden: (num_layers * num_directions, B, hidden_size)
     output = self.dropout(output)
     dec_output = self.fc(output) # (S,B,num_tokens)
     dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokens)
@@ -86,14 +74,6 @@ class LSTMModel(nn.Module):
 
     return log_probas, hidden
 
-  def init_hidden(self, batch_size):
-    weight = next(self.parameters())
-    if self.bidirectional:
-      return (weight.new_zeros(self.num_layers*2, batch_size, self.hidden_size),
-              weight.new_zeros(self.num_layers*2, batch_size, self.hidden_size))
-    else:
-      return (weight.new_zeros(self.num_layers, batch_size, self.hidden_size),
-            weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
 
 class LayerNormLSTMModel(nn.Module):
   def __init__(self, num_tokens, emb_size, hidden_size, num_layers=1, p_drop=0):
@@ -108,13 +88,13 @@ class LayerNormLSTMModel(nn.Module):
     self.ln_lstm = LayerNormLSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, p_drop=p_drop)
     self.fc = nn.Linear(in_features=hidden_size, out_features=num_tokens)
 
-    self.init_weights()
+    #self.init_weights()
 
-  def init_weights(self):
-    initrange = 0.1
-    self.embedding.weight.data.uniform_(-initrange, initrange)
-    self.fc.weight.data.uniform_(-initrange, initrange)
-    self.fc.bias.data.zero_()
+  # def init_weights(self):
+  #   initrange = 0.1
+  #   self.embedding.weight.data.uniform_(-initrange, initrange)
+  #   self.fc.weight.data.uniform_(-initrange, initrange)
+  #   self.fc.bias.data.zero_()
 
   def forward(self, input, hidden):
     emb = self.embedding(input)
@@ -128,6 +108,7 @@ class LayerNormLSTMModel(nn.Module):
     return log_probas, hidden
 
   def init_hidden(self, batch_size):
+
     weight = next(self.parameters())
     return (weight.new_zeros(self.num_layers, batch_size, self.hidden_size),
             weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
@@ -139,12 +120,11 @@ if __name__ == '__main__':
     num_tokens = 85
     seq_len = 5
     device = torch.device("cpu")
-    inputs = torch.ones(seq_len, batch_size, dtype=torch.long).to(device)
+    inputs = torch.ones(batch_size, seq_len,  dtype=torch.long).to(device)
 
     # ----------- Test of GRU Model ------------------------------------------------------------------------------------------------------------------------
     model = GRUModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, bidirectional=True)
-    hidden = model.init_hidden(batch_size)
-    output, hidden = model(inputs, hidden)
+    output, hidden = model(inputs)
     print('output', output.shape)
     print('hidden', hidden.shape)
     output = output.view(batch_size, seq_len, num_tokens)
@@ -153,8 +133,7 @@ if __name__ == '__main__':
     # ------------ Test of LSTM Model ---------------------------------------------------------------------------------------------------------------------------
 
     model = LSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, bidirectional=True)
-    hidden = model.init_hidden(batch_size)
-    output, (h,c) = model(inputs, hidden)
+    output, (h,c) = model(inputs)
     print('output', output.shape)
     print('hidden state', h.shape)
     print('cell state', c.shape)

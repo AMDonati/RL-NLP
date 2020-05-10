@@ -23,7 +23,7 @@ class QuestionsDataset(Dataset):
     self.idx_to_token = self.get_idx_to_token()
 
     self.vocab_len = len(self.vocab)
-    self.seq_len = self.inp_questions.size(0)
+    self.seq_len = self.inp_questions.size(1)
 
   def get_vocab(self):
     with open(self.vocab_path, 'r') as f:
@@ -41,22 +41,20 @@ class QuestionsDataset(Dataset):
   def get_questions(self):
     hf = h5py.File(self.data_path, 'r')
     input_questions = hf.get('input_questions')
-    input_questions = np.array(input_questions)
-    input_questions = torch.tensor(input_questions, dtype=torch.int)  # shape (num_samples, seq_len)
-    input_questions = input_questions.t()
+    input_questions = np.array(input_questions, dtype=np.int32)
+    input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
     target_questions = hf.get('target_questions')
-    target_questions = np.array(target_questions)
-    target_questions = torch.tensor(target_questions, dtype=torch.int)
-    target_questions = target_questions.t()
-    return input_questions, target_questions # dim (S,B)
+    target_questions = np.array(target_questions, dtype=np.int32)
+    target_questions = torch.LongTensor(target_questions)
+    return input_questions, target_questions # dim (B,S)
 
   def __len__(self):
     '''Denotes the total number of samples'''
-    return self.inp_questions.size(1)
+    return self.inp_questions.size(0)
 
   def __getitem__(self, item):
     '''generate one sample of data'''
-    inputs, targets = self.inp_questions[:, item], self.target_questions[:, item]
+    inputs, targets = self.inp_questions[item, :], self.target_questions[item, :]
     return inputs, targets
 
 if __name__ == '__main__':

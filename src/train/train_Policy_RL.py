@@ -23,7 +23,6 @@ def str2bool(v):
 
 def select_action(policy_network, state, device):
   policy_network.train()
-  hidden = policy_network.init_hidden(1)
   #with torch.no_grad():
   state.text.to(device)
   state.img.to(device)
@@ -53,7 +52,7 @@ def get_reward(next_state_text, ep_questions, EOS_idx):
 # function generate one episode. debugged.
 #TODO: batchify this function.
 def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, seed=None):
-  max_length = clevr_dataset.input_questions.size(0)  # max_length set-up to max length of questions dataset.
+  max_length = clevr_dataset.input_questions.size(1)  # max_length set-up to max length of questions dataset.
   max_length = 5 # for debugging.
   # sample initial state
   if seed is not None:

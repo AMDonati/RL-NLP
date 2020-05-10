@@ -10,36 +10,23 @@ def repackage_hidden(h):
     return tuple(repackage_hidden(v) for v in h)
 
 
-def train_one_epoch(model, train_generator, optimizer, criterion, device, BATCH_SIZE, args, print_interval=10):
+def train_one_epoch(model, train_generator, optimizer, criterion, device, args, print_interval=10):
   model.train()  # Turns on train mode which enables dropout.
-  hidden = model.init_hidden(BATCH_SIZE)
   total_loss = 0.
   start_time = time.time()
-
   # loop over batches
   for batch, (inputs, targets) in enumerate(train_generator):
-    inputs, targets = inputs.to(device), targets.to(device)
-    if batch == 0:
-      print("checking forward pass on the first batch of data samples...")
-      print('input shape:', inputs.shape)
-      print('targets shape', targets.shape)
-      print("first input of batch:", inputs[0,:].data.numpy())
-      print("first target of batch:", targets[0,:].data.numpy())
-    inputs, targets = inputs.long().t(), targets.view(targets.size(1) * targets.size(0)).long()  # inputs: (S,B) # targets: (S*B)
-    optimizer.zero_grad() #TODO: is there a difference between model.zero_grad() and optimizer.zero_grad()
-    hidden = repackage_hidden(hidden)
-    output, hidden = model(inputs, hidden)  # output (S * B, V), hidden (num_layers,B,1)
-    if batch == 0:
-      print("output shape for first batch:", output.shape)
+    inputs = inputs.to(device)
+    targets = targets.view(targets.size(1) * targets.size(0)).to(device) # targets (S*B)
+    model.zero_grad() #TODO: is there a difference between model.zero_grad() and optimizer.zero_grad()
+    output, hidden = model(inputs)  # output (S * B, V), hidden (num_layers,B,1)
     loss = criterion(output, targets)
     loss.backward()
-
     # clip grad norm:
     if args.grad_clip is not None:
       torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=args.grad_clip)
     optimizer.step()
     total_loss += loss.item()
-
     # print loss every number of batches
     if (batch + 1) % print_interval == 0:
       print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
@@ -51,16 +38,15 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, BATCH_
   return curr_loss, elapsed
 
 
-def evaluate(model, val_generator, criterion, device, BATCH_SIZE):
+def evaluate(model, val_generator, criterion, device):
   model.eval()  # turn on evaluation mode which disables dropout.
   total_loss = 0.
-  hidden = model.init_hidden(BATCH_SIZE)
   with torch.no_grad():
     for batch, (inputs, targets) in enumerate(val_generator):
-      inputs, targets = inputs.to(device), targets.to(device)
-      inputs, targets = inputs.long().t(), targets.view(targets.size(1) * targets.size(0)).long()
-      output, hidden = model(inputs, hidden)
-      hidden = repackage_hidden(hidden)
+      inputs = inputs.to(device)
+      targets = targets.view(targets.size(1) * targets.size(0)).to(device)
+      output, hidden = model(inputs)
       total_loss += criterion(output, targets).item()
 
   return total_loss / (batch + 1)
+

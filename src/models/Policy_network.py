@@ -18,19 +18,12 @@ class PolicyLSTM(nn.Module):
     self.lstm = nn.LSTM(input_size=emb_size,
                         hidden_size=hidden_size,
                         num_layers=num_layers,
-                        dropout=p_drop)
+                        dropout=p_drop,
+                        batch_first=True)
     self.fc = nn.Linear(hidden_size, num_tokens)
 
-    self.init_weights()
 
-  def init_weights(self):
-    initrange = 0.1
-    self.embedding.weight.data.uniform_(-initrange, initrange)
-    self.fc.weight.data.uniform_(-initrange, initrange)
-    self.fc.bias.data.zero_()
-
-
-  def forward(self, text_inputs, img_feat, hidden):
+  def forward(self, text_inputs, img_feat):
     '''
     :param text_inputs: shape (S, B)
     :param img_feat: shape (B, C, H, W)
@@ -39,23 +32,18 @@ class PolicyLSTM(nn.Module):
     log_probas: shape (S*B, num_tokens), hidden (num_layers, B, hidden_size)
     '''
     #TODO: add additionnal encoding of img features?
-    words_emb = self.embedding(text_inputs) # shape (S, B, emb_size)
-    seq_len = words_emb.size(0)
+    words_emb = self.embedding(text_inputs) # shape (B, S, emb_size)
+    seq_len = words_emb.size(1)
     words_emb = self.dropout(words_emb)
-    img_feat = img_feat.view(img_feat.size(0), -1).unsqueeze(0).repeat(seq_len, 1, 1) # shape (S, B, C*H*W)
+    img_feat = img_feat.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1) # shape (B, S, C*H*W)
     emb = torch.cat([words_emb, img_feat], axis=-1)
-    output, hidden = self.lstm(emb, hidden)
+    output, hidden = self.lstm(emb)
     output = self.dropout(output)
     dec_output = self.fc(output) # (S,B,num_tokens)
-    dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokens)
+    dec_output = dec_output.view(-1, self.num_tokens) #(S*B, num_tokens)
     probas = F.softmax(dec_output, dim=-1)
 
     return probas, hidden
-
-  def init_hidden(self, batch_size):
-    weight = next(self.parameters())
-    return (weight.new_zeros(self.num_layers, batch_size, self.hidden_size),
-            weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
 
 
 if __name__ == '__main__':
@@ -69,7 +57,7 @@ if __name__ == '__main__':
     seq_len = 10
     num_tokens = 20
     hidden_size = 128
-    dummy_text_input = torch.ones(seq_len, img_feat.size(0), dtype=torch.long)
+    dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
 
     model = PolicyLSTM(num_tokens=num_tokens,
                        word_emb_size=64,
@@ -77,7 +65,7 @@ if __name__ == '__main__':
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0)
-    hidden = model.init_hidden(batch_size=img_feat.size(0))
-    output, hidden = model(dummy_text_input, img_feat, hidden) # shape (B*S, num_tokens)
+
+    output, hidden = model(dummy_text_input, img_feat) # shape (B*S, num_tokens)
     output = output.view(-1, seq_len, num_tokens)
     print("sample output", output[:5, :, :])

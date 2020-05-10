@@ -31,11 +31,11 @@ if __name__ == '__main__':
       raise argparse.ArgumentTypeError('Boolean value expected.')
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("-model", type=str, required=True, default="gru", help="rnn model")
-  parser.add_argument("-num_layers", type=int, required=True, default=1, help="num layers for language model")
-  parser.add_argument("-emb_size", type=int, required=True, default=12, help="dimension of the embedding layer")
-  parser.add_argument("-hidden_size", type=int, required=True, default=24, help="dimension of the hidden state")
-  parser.add_argument("-p_drop", type=float, required=True, default=0, help="dropout rate")
+  parser.add_argument("-model", type=str, default="gru", help="rnn model")
+  parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
+  parser.add_argument("-emb_size", type=int, required=True, help="dimension of the embedding layer")
+  parser.add_argument("-hidden_size", type=int, required=True, help="dimension of the hidden state")
+  parser.add_argument("-p_drop", type=float, required=True, help="dropout rate")
   parser.add_argument("-grad_clip", type=float)
   parser.add_argument("-lr", type=float, default=0.001)
   parser.add_argument("-bs", type=int, default=128, help="batch size")
@@ -135,8 +135,8 @@ if __name__ == '__main__':
   logger.info('checking shape of and values of a sample of the train dataset...')
   idxs = list(np.random.randint(0, train_dataset.__len__(), size=2))
   temp_inp, temp_tar = train_dataset.__getitem__(idxs)
-  logger.info('samples of input questions: {}'.format(temp_inp.t().data.numpy()))
-  logger.info('samples of target questions: {}'.format(temp_tar.t().data.numpy()))
+  logger.info('samples of input questions: {}'.format(temp_inp.data.numpy()))
+  logger.info('samples of target questions: {}'.format(temp_tar.data.numpy()))
   logger.info('train dataset length: {}'.format(train_dataset.__len__()))
   best_val_loss = None
   for epoch in range(EPOCHS):
@@ -146,13 +146,11 @@ if __name__ == '__main__':
                                           optimizer=optimizer,
                                           criterion=criterion,
                                           device=device,
-                                          BATCH_SIZE=BATCH_SIZE,
                                           args=args,
                                           print_interval=print_interval)
     logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
     logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-    val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, device=device,
-                        BATCH_SIZE=BATCH_SIZE)
+    val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, device=device)
     logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
     # saving loss and metrics information.
