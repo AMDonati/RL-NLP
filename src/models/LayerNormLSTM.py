@@ -28,7 +28,7 @@ class LayerNormLSTMCell(nn.LSTMCell):
     self.check_forward_input(input) # check correct shape of input for forward pass.
     if hidden is None:
       # initialization of (c,h) to zeros tensors with same dtype & device than input.
-      hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
+      hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False) #TODO: understand and improves this part if needed.
       cx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
     else:
       hx, cx = hidden
@@ -64,7 +64,7 @@ class LayerNormLSTM(nn.Module):
                                                    p_drop=(0. if layer == num_layers - 1 else p_drop)) for layer in range(num_layers)])
 
   def forward(self, input, hidden=None):
-    seq_len, batch_size, hidden_size = input.size()
+    seq_len, batch_size, hidden_size = input.size() #TODO: change dim ordering here.
     if hidden is None:
       hx = input.new_zeros(self.num_layers, batch_size, self.hidden_size, requires_grad=False)
       cx = input.new_zeros(self.num_layers, batch_size, self.hidden_size, requires_grad=False)
@@ -73,7 +73,7 @@ class LayerNormLSTM(nn.Module):
 
     ht, ct = [], []
     h, c = hx, cx
-    for t, x in enumerate(input):
+    for t, x in enumerate(input): #TODO: if first dim is batch_size, enumerate might not work.
       h_t_l, c_t_l = [], []
       for l, layer in enumerate(self.hidden):
         h_tl, c_tl = layer(input=x, hidden=(h[l], c[l]))

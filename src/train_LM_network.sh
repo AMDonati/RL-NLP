@@ -1,3 +1,9 @@
+# the folder data needs to contain the following files:
+* "train_questions.h5"
+* "val_questions.h5"
+* "test_questions.h5"
+$ "vocab.json"
+
 python src/train/train_LM_network.py -model "ln_lstm" -num_layers 1 -emb_size 512 \
 -hidden_size 512 -p_drop 0.1 -grad_clip 1 -data_path "data" \
 -out_path "output" -bs 512 -ep 50 -num_workers 5
