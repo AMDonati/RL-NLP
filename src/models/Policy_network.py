@@ -1,3 +1,6 @@
+# see tutorial for Image Captioning in Tensorflow.
+# Use a CNN Encoder to encode the pre-trained features.
+
 '''LSTM Policy Network taking as input multi-model data (img_features, words embeddings'''
 import torch
 import torch.nn as nn
@@ -6,7 +9,7 @@ import h5py
 import numpy as np
 
 class PolicyLSTM(nn.Module):
-  def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_layers, p_drop):
+  def __init__(self, num_tokens, word_emb_size, vis_emb_size, emb_size, hidden_size, num_layers, p_drop):
     super(PolicyLSTM, self).__init__()
     self.num_tokens = num_tokens
     self.emb_size = emb_size
@@ -15,6 +18,7 @@ class PolicyLSTM(nn.Module):
     self.p_drop = p_drop
     self.dropout = nn.Dropout(p_drop)
     self.embedding = nn.Embedding(num_tokens, word_emb_size)
+    self.fc_emb = nn.Linear(vis_emb_size, emb_size)
     self.lstm = nn.LSTM(input_size=emb_size,
                         hidden_size=hidden_size,
                         num_layers=num_layers,
@@ -36,14 +40,14 @@ class PolicyLSTM(nn.Module):
     seq_len = words_emb.size(1)
     words_emb = self.dropout(words_emb)
     img_feat = img_feat.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1) # shape (B, S, C*H*W)
-    emb = torch.cat([words_emb, img_feat], axis=-1)
-    output, hidden = self.lstm(emb)
+    vistext_emb = torch.cat([words_emb, img_feat], axis=-1)
+    vistext_emb = F.relu(self.fc_emb(vistext_emb))
+    output, hidden = self.lstm(vistext_emb)
     output = self.dropout(output)
-    dec_output = self.fc(output) # (S,B,num_tokens)
-    dec_output = dec_output.view(-1, self.num_tokens) #(S*B, num_tokens)
-    probas = F.softmax(dec_output, dim=-1)
+    logits = self.fc(output) # (S,B,num_tokens)
+    logits = logits.view(-1, self.num_tokens) #(S*B, num_tokens)
 
-    return probas, hidden
+    return logits, hidden
 
 
 if __name__ == '__main__':
@@ -61,7 +65,8 @@ if __name__ == '__main__':
 
     model = PolicyLSTM(num_tokens=num_tokens,
                        word_emb_size=64,
-                       emb_size=(64 + img_feat.size(1)*img_feat.size(2)*img_feat.size(3)),
+                       vis_emb_size=64 + img_feat.size(1) * img_feat.size(2) * img_feat.size(3),
+                       emb_size=128,
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0)

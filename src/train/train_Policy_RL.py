@@ -1,5 +1,6 @@
 # example of ROUGE computation: https://github.com/atulkum/pointer_summarizer/blob/master/data_util/utils.py
 import torch
+import torch.nn.functional as F
 from models.Policy_network import PolicyLSTM
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 import numpy as np
@@ -23,37 +24,25 @@ def str2bool(v):
 
 def select_action(policy_network, state, device):
   policy_network.train()
-  #with torch.no_grad():
   state.text.to(device)
   state.img.to(device)
-  probas, _ = policy_network(state.text, state.img, hidden) # probas > shape (s, num_tokens)
+  logits, _ = policy_network(state.text, state.img) # logits > shape (s, num_tokens)
+  probas = F.softmax(logits)
   m = Categorical(probas[-1,:])  # multinomial distribution with weights = probas.
   action = m.sample()
-  log_prob = m.log_prob(action)
+  log_prob = F.log_softmax(logits[-1,action]) #TODO: understand why log_softmax can return stuff different than log(softmax).
+  #log_prob = torch.log(probas[-1, action])
   return action.view(1,1), log_prob # action and log_prob of shape (1).
 
 def get_reward(next_state_text, ep_questions, EOS_idx):
-  # remove <EOS> token if needed.
-  # if next_state_text[-1] == EOS_idx:
-  #   next_state_text = next_state_text[:-1]
-  # dialog = next_state_text.data.numpy()
-  # ep_questions = ep_questions.data.numpy()
-  # bools = []
-  # for i in range(ep_questions.size(1)):
-  #   question = ep_questions[:, i]
-  #   if len(question) == len(dialog):
-  #     bool = np.array_equal(question, dialog)
-  #   else:
-  #     bool = False
-  #   bools.append(bool)  # TODO np.any()?
   return 0.
 
 
 # function generate one episode. debugged.
 #TODO: batchify this function.
-def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, seed=None):
-  max_length = clevr_dataset.input_questions.size(1)  # max_length set-up to max length of questions dataset.
-  max_length = 5 # for debugging.
+def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, max_len=None, seed=None):
+  if max_len is None:
+    max_len = clevr_dataset.input_questions.size(1)  # max_length set-up to max length of questions dataset.
   # sample initial state
   if seed is not None:
     np.random.seed = seed
@@ -71,10 +60,12 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
     # select the next action from the state using an epsilon greedy policy:
     action, log_prob = select_action(policy_network, state, device)
     # compute next state, done, reward from the action.
-    next_state = State(torch.cat([state.text, action]), state.img)
-    done = True if action.item() == special_tokens.EOS_idx or step == (max_length - 1) else False
+    next_state = State(torch.cat([state.text, action], dim=1), state.img)
+    done = True if action.item() == special_tokens.EOS_idx or step == (max_len - 1) else False
     if done:
-      reward = get_reward(next_state_text=next_state.text, ep_questions=ep_GD_questions, EOS_idx=special_tokens.EOS_idx)
+      reward = get_reward(next_state_text=next_state.text,
+                          ep_questions=ep_GD_questions,
+                          EOS_idx=special_tokens.EOS_idx)
     else:
       reward = 0
       step += 1
@@ -83,7 +74,6 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
     state = next_state
 
   episode = Episode(img_idx, img_feats, ep_GD_questions, state.text, rewards)
-
   return_ep = sum(rewards)
   returns = [return_ep] * (step + 1)
 
@@ -93,7 +83,7 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
 def padder_batch(batch):
   len_episodes = [len(l) for l in batch]
   max_len = max(len_episodes)  # finds the maximal length of episodes.
-  batch_tensors = [torch.FloatTensor(l).unsqueeze(-1) for l in batch]  # tensors of shape (len_ep, 1)
+  batch_tensors = [torch.tensor(l,dtype=torch.float32, requires_grad=True).unsqueeze(-1) for l in batch]  # tensors of shape (len_ep, 1)
   batch_tensors_padded = [torch.cat([t, torch.zeros(max_len - len, t.size(-1), dtype=t.dtype)]) for (t, len) in
                           zip(batch_tensors, len_episodes)] # TODO: use masked_fill_(mask, value) instead ?
   batch = torch.stack(batch_tensors_padded, dim=0)
@@ -101,15 +91,13 @@ def padder_batch(batch):
 
 
 def train_episodes_batch(log_probs_batch, returns_batch, optimizer):
-  # normalize returns
   eps = np.finfo(np.float32).eps.item()
-  returns_batch = (returns_batch - returns_batch.mean()) / (returns_batch.std() + eps)
-  reinforce_loss = -log_probs_batch * returns_batch  # shape (batch_size, max_episode_len, 1) # opposite of REINFORCE objective function to apply a gradient descent algo.
+  returns_batch = (returns_batch - returns_batch.mean()) / (returns_batch.std() + eps) # normalize returns
+  reinforce_loss = -log_probs_batch * returns_batch  # shape (bs, max_len, 1) # opposite of REINFORCE objective function to apply a gradient descent algo.
   reinforce_loss = reinforce_loss.squeeze(-1).sum(dim=1).mean(dim=0)
   optimizer.zero_grad()
   reinforce_loss.backward() # ERROR here: no grad_fn on the loss... # grad_fn is None on log_probs_batch and returns_batch.
   optimizer.step()
-
   return reinforce_loss.item()
 
 
@@ -122,14 +110,17 @@ def REINFORCE(train_dataset, policy_network, special_tokens, batch_size, num_tra
       log_probs, returns, episode = generate_one_episode(clevr_dataset=train_dataset,
                                                          policy_network=policy_network,
                                                          special_tokens=special_tokens,
+                                                         max_len=args.max_len,
                                                          device=device)
       log_probs_batch.append(log_probs)
       returns_batch.append(returns)
       if store_episodes:
         episodes_batch.append(episode)
 
-    batch_avg_return = statistics.mean([r[-1] for r in returns_batch])
-    log_probs_batch, returns_batch = padder_batch(log_probs_batch), padder_batch(returns_batch)
+    #batch_avg_return = statistics.mean([r.numpy() for r in returns_batch])
+    log_probs_batch = padder_batch(log_probs_batch)
+    returns_batch = padder_batch(returns_batch)
+    batch_avg_return = returns_batch[:,-1,:].mean(0).squeeze().data.numpy()
     loss = train_episodes_batch(log_probs_batch=log_probs_batch, returns_batch=returns_batch, optimizer=optimizer)
     running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
     if i % log_interval == 0:
@@ -150,6 +141,7 @@ if __name__ == '__main__':
   parser.add_argument("-grad_clip", type=float)
   parser.add_argument("-lr", type=float, default=0.001)
   parser.add_argument("-bs", type=int, default=16, help="batch size")
+  parser.add_argument("-max_len", type=int, default=10, help="max episode length")
   parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
   parser.add_argument("-data_path", type=str, required=True, help="data folder containing questions embeddings and img features")
   parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -185,7 +177,8 @@ if __name__ == '__main__':
 
   policy_network = PolicyLSTM(num_tokens=num_tokens,
                               word_emb_size=args.word_emb_size,
-                              emb_size=args.word_emb_size + feats_shape[0]*feats_shape[1]*feats_shape[2],
+                              vis_emb_size=args.word_emb_size + feats_shape[0] * feats_shape[1] * feats_shape[2],
+                              emb_size=args.word_emb_size,
                               hidden_size=args.hidden_size,
                               num_layers=args.num_layers,
                               p_drop=args.p_drop)
@@ -209,3 +202,20 @@ if __name__ == '__main__':
                            device=device,
                            num_training_steps=args.num_training_steps,
                            logger=logger)
+
+  # ---------------------------------------- code draft ----------------------------------------------------------------------------------------
+  # def get_reward(next_state_text, ep_questions, EOS_idx):
+  #   # remove <EOS> token if needed.
+  #   # if next_state_text[-1] == EOS_idx:
+  #   #   next_state_text = next_state_text[:-1]
+  #   # dialog = next_state_text.data.numpy()
+  #   # ep_questions = ep_questions.data.numpy()
+  #   # bools = []
+  #   # for i in range(ep_questions.size(1)):
+  #   #   question = ep_questions[:, i]
+  #   #   if len(question) == len(dialog):
+  #   #     bool = np.array_equal(question, dialog)
+  #   #   else:
+  #   #     bool = False
+  #   #   bools.append(bool)  # TODO np.any()?
+  #   return 0.
