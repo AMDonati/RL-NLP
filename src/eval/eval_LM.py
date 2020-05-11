@@ -31,7 +31,7 @@ if __name__ == '__main__':
   parser.add_argument("-out_path", type=str, required=True, default='../../output')
   parser.add_argument("-words", type=int, default=200, help="num words to generate")
   #parser.add_argument("-seed", type=int, default=123, help="seed for reproducibility")
-  parser.add_argument("-oc_th", type=float, default=0.1, help="proba threshold for overconfidence function")
+  parser.add_argument("-oc_th", type=float, default=0.5, help="proba threshold for overconfidence function")
   parser.add_argument('-temperature', type=float, help='temperature - higher will increase diversity')
   parser.add_argument("-top_k", type=int, default=10, help="num of top-k words to generate from input sequence.")
   parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
@@ -80,29 +80,28 @@ if __name__ == '__main__':
   # generate words
   ###############################################################################
 
-  # initialize hidden state
-  hidden = model.init_hidden(batch_size=1)
-  input = torch.randint(low=0, high=num_tokens, size=(1,1), dtype=torch.long).to(device)
-
-  with open(out_file, 'w') as f:
-    input_word = test_dataset.idx2word([input[0].item()], delim='')
-    f.write(input_word + '\n')
-    with torch.no_grad():
-      for i in range(args.words):
-        output, hidden = model(input, hidden) # output (1, num_tokens)
-        if args.temperature is not None:
-          word_weights = output.squeeze().div(args.temperature).exp().cpu()
-          word_idx = torch.multinomial(word_weights, num_samples=1)[0] # [0] to have a scalar tensor.
-        else:
-          word_idx = output.squeeze().argmax()
-        input.fill_(word_idx)
-
-        word = test_dataset.idx2word(seq_idx=[word_idx.item()], delim='')
-
-        f.write(word + ('\n' if i % 20 == 19 else ' '))
-
-        if i % log_interval == 0:
-          print('| Generated {}/{} words'.format(i, args.words))
+  # # initialize hidden state
+  # input = torch.randint(low=0, high=num_tokens, size=(1,1), dtype=torch.long).to(device)
+  #
+  # with open(out_file, 'w') as f:
+  #   input_word = test_dataset.idx2word([input[0].item()], delim='')
+  #   f.write(input_word + '\n')
+  #   with torch.no_grad():
+  #     for i in range(args.words):
+  #       output, hidden = model(input) # output (1, num_tokens)
+  #       if args.temperature is not None:
+  #         word_weights = output.squeeze().div(args.temperature).exp().cpu()
+  #         word_idx = torch.multinomial(word_weights, num_samples=1)[0] # [0] to have a scalar tensor.
+  #       else:
+  #         word_idx = output.squeeze().argmax()
+  #       input.fill_(word_idx)
+  #
+  #       word = test_dataset.idx2word(seq_idx=[word_idx.item()], delim='')
+  #
+  #       f.write(word + ('\n' if i % 20 == 19 else ' '))
+  #
+  #       if i % log_interval == 0:
+  #         print('| Generated {}/{} words'.format(i, args.words))
 
   #############################################################################################
   # look at the top-k words for a given sequence of input words.
