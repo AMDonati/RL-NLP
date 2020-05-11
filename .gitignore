@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 # Custom
-*/__pycache__/*
+#/__pycache__/*
 .idea
