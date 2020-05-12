@@ -31,12 +31,11 @@ def select_action(policy_network, state, device):
   m = Categorical(probas[-1,:])  # multinomial distribution with weights = probas.
   action = m.sample()
   log_prob = F.log_softmax(logits[-1,action]) #TODO: understand why log_softmax can return stuff different than log(softmax).
-  #log_prob = torch.log(probas[-1, action])
-  return action.view(1,1), log_prob # action and log_prob of shape (1).
+  log_prob_2 = torch.log(probas[-1, action])
+  return action.view(1,1), log_prob, log_prob_2 # action and log_prob of shape (1).
 
 def get_reward(next_state_text, ep_questions, EOS_idx):
   return 0.
-
 
 # function generate one episode. debugged.
 #TODO: batchify this function.
@@ -58,7 +57,7 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
   rewards, log_probs = [], []
   while not done:
     # select the next action from the state using an epsilon greedy policy:
-    action, log_prob = select_action(policy_network, state, device)
+    action, log_prob, log_prob2 = select_action(policy_network, state, device)
     # compute next state, done, reward from the action.
     next_state = State(torch.cat([state.text, action], dim=1), state.img)
     done = True if action.item() == special_tokens.EOS_idx or step == (max_len - 1) else False
@@ -120,7 +119,7 @@ def REINFORCE(train_dataset, policy_network, special_tokens, batch_size, num_tra
     #batch_avg_return = statistics.mean([r.numpy() for r in returns_batch])
     log_probs_batch = padder_batch(log_probs_batch)
     returns_batch = padder_batch(returns_batch)
-    batch_avg_return = returns_batch[:,-1,:].mean(0).squeeze().data.numpy()
+    batch_avg_return = returns_batch[:,-1,:].mean(0).squeeze().data.numpy() #TODO: save the running reward and avg_return_batch and plot it.
     loss = train_episodes_batch(log_probs_batch=log_probs_batch, returns_batch=returns_batch, optimizer=optimizer)
     running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
     if i % log_interval == 0:

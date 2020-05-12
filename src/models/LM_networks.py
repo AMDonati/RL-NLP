@@ -96,10 +96,10 @@ class LayerNormLSTMModel(nn.Module):
   #   self.fc.weight.data.uniform_(-initrange, initrange)
   #   self.fc.bias.data.zero_()
 
-  def forward(self, input, hidden):
+  def forward(self, input):
     emb = self.embedding(input)
     emb = self.dropout(emb)
-    output, hidden = self.ln_lstm(input=emb, hidden=hidden) # output (S,B,hidden_size), hidden = (h,c): (num_layers, B, hidden_size)
+    output, hidden = self.ln_lstm(input=emb) # output (S,B,hidden_size), hidden = (h,c): (num_layers, B, hidden_size)
     output = self.dropout(output)
     dec_output = self.fc(output) # (S,B,num_tokens)
     dec_output = dec_output.view(-1, self.num_tokens) # (S*B, num_tokens) # resizing for the loss.
@@ -107,11 +107,10 @@ class LayerNormLSTMModel(nn.Module):
 
     return log_probas, hidden
 
-  def init_hidden(self, batch_size):
-
-    weight = next(self.parameters())
-    return (weight.new_zeros(self.num_layers, batch_size, self.hidden_size),
-            weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
+  # def init_hidden(self, batch_size):
+  #   weight = next(self.parameters())
+  #   return (weight.new_zeros(self.num_layers, batch_size, self.hidden_size),
+  #           weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
 
 if __name__ == '__main__':
     batch_size = 8
@@ -141,8 +140,7 @@ if __name__ == '__main__':
     # ----------- Test of LSTM with LayerNorm Model -------------------------------------------------------------------------------------------------------------
 
     model = LayerNormLSTMModel(num_tokens=num_tokens, emb_size=emb_size, hidden_size=hidden_size, num_layers=2, p_drop=1)
-    hidden = model.init_hidden(batch_size)
-    output, (h,c) = model(inputs, hidden)
+    output, (h,c) = model(inputs)
     print('output', output.shape)
     print('hidden state', h.shape)
     print('cell state', c.shape)

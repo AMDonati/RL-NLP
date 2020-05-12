@@ -9,23 +9,29 @@ import h5py
 import numpy as np
 
 class PolicyLSTM(nn.Module):
-  def __init__(self, num_tokens, word_emb_size, vis_emb_size, emb_size, hidden_size, num_layers, p_drop):
+  def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0, pooling=True):
     super(PolicyLSTM, self).__init__()
     self.num_tokens = num_tokens
     self.emb_size = emb_size
     self.hidden_size = hidden_size
     self.num_layers = num_layers
     self.p_drop = p_drop
+    if num_filters is None:
+      self.num_filters = word_emb_size
+    else:
+      self.num_filters = num_filters
+    self.pooling = pooling
     self.dropout = nn.Dropout(p_drop)
     self.embedding = nn.Embedding(num_tokens, word_emb_size)
-    self.fc_emb = nn.Linear(vis_emb_size, emb_size)
+    self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
+    if pooling:
+      self.max_pool = nn.MaxPool2d(kernel_size=2)
     self.lstm = nn.LSTM(input_size=emb_size,
                         hidden_size=hidden_size,
                         num_layers=num_layers,
                         dropout=p_drop,
                         batch_first=True)
     self.fc = nn.Linear(hidden_size, num_tokens)
-
 
   def forward(self, text_inputs, img_feat):
     '''
@@ -35,20 +41,62 @@ class PolicyLSTM(nn.Module):
     :return:
     log_probas: shape (S*B, num_tokens), hidden (num_layers, B, hidden_size)
     '''
-    #TODO: add additionnal encoding of img features?
+    # embeddings of text input
     words_emb = self.embedding(text_inputs) # shape (B, S, emb_size)
     seq_len = words_emb.size(1)
     words_emb = self.dropout(words_emb)
+    # encoding of img features:
+    img_feat = F.relu(self.conv(img_feat))
+    if self.pooling:
+      img_feat = self.max_pool(img_feat)
+
     img_feat = img_feat.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1) # shape (B, S, C*H*W)
-    vistext_emb = torch.cat([words_emb, img_feat], axis=-1)
-    vistext_emb = F.relu(self.fc_emb(vistext_emb))
-    output, hidden = self.lstm(vistext_emb)
+    vis_text_emb = torch.cat([words_emb, img_feat], axis=-1)
+    output, hidden = self.lstm(vis_text_emb)
+
     output = self.dropout(output)
     logits = self.fc(output) # (S,B,num_tokens)
     logits = logits.view(-1, self.num_tokens) #(S*B, num_tokens)
 
     return logits, hidden
 
+class PolicyMLP(nn.Module):
+  def __init__(self, num_tokens, word_emb_size, units, num_filters=None, pooling=True):
+    super(PolicyMLP, self).__init__()
+    self.num_tokens = num_tokens
+    self.units = units
+    if num_filters is None:
+      self.num_filters = word_emb_size
+    else:
+      self.num_filters = num_filters
+    self.pooling = pooling
+    self.embedding = nn.Embedding(num_tokens, word_emb_size)
+    self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
+    if pooling:
+      self.max_pool = nn.MaxPool2d(kernel_size=2)
+    self.fc = nn.Linear(units, num_tokens)
+
+  def forward(self, text_inputs, img_feat):
+    '''
+    :param text_inputs: shape (S, B)
+    :param img_feat: shape (B, C, H, W)
+    :param hidden: shape (num_layers, B, hidden_size)
+    :return:
+    log_probas: shape (S*B, num_tokens), hidden (num_layers, B, hidden_size)
+    '''
+    # embeddings of text input
+    words_emb = self.embedding(text_inputs)  # shape (B, S, emb_size)
+    seq_len = words_emb.size(1)
+    # encoding of img features:
+    img_feat = F.relu(self.conv(img_feat))
+    if self.pooling:
+      img_feat = self.max_pool(img_feat)
+    img_feat = img_feat.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)  # shape (B, S, C*H*W)
+    vis_text_emb = torch.cat([words_emb, img_feat], axis=-1)
+    logits = self.fc(vis_text_emb)
+    logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+
+    return logits
 
 if __name__ == '__main__':
     train_features_path = '../../data/train_features.h5'
@@ -65,12 +113,21 @@ if __name__ == '__main__':
 
     model = PolicyLSTM(num_tokens=num_tokens,
                        word_emb_size=64,
-                       vis_emb_size=64 + img_feat.size(1) * img_feat.size(2) * img_feat.size(3),
-                       emb_size=128,
+                       emb_size=64 + 64 * 7 * 7,
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0)
 
     output, hidden = model(dummy_text_input, img_feat) # shape (B*S, num_tokens)
     output = output.view(-1, seq_len, num_tokens)
-    print("sample output", output[:5, :, :])
+    print('output shape', output.shape)
+    #print("sample output", output[0, :, :])
+
+    # ------- test of PolicyMLP --------------------------------------------------------------------------------------------------------
+    dummy_model = PolicyMLP(num_tokens=num_tokens,
+                            word_emb_size=64,
+                            units=64 + 64 * 7 * 7)
+    output = dummy_model(dummy_text_input, img_feat)
+    output = output.view(-1, seq_len, num_tokens)
+    print('output shape', output.shape)
+    #print("sample output", output[0, :, :])

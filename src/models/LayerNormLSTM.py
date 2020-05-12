@@ -28,7 +28,7 @@ class LayerNormLSTMCell(nn.LSTMCell):
     self.check_forward_input(input) # check correct shape of input for forward pass.
     if hidden is None:
       # initialization of (c,h) to zeros tensors with same dtype & device than input.
-      hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False) #TODO: understand and improves this part if needed.
+      hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False) # hx, and cx should be of size (batch_size, hidden_size).
       cx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
     else:
       hx, cx = hidden
@@ -62,9 +62,10 @@ class LayerNormLSTM(nn.Module):
     self.hidden = nn.ModuleList([LayerNormLSTMCell(input_size=(input_size if layer == 0 else hidden_size),
                                                    hidden_size=hidden_size,
                                                    p_drop=(0. if layer == num_layers - 1 else p_drop)) for layer in range(num_layers)])
+    # shape (num_layers, batch_size, hidden_size).
 
   def forward(self, input, hidden=None):
-    seq_len, batch_size, hidden_size = input.size() #TODO: change dim ordering here.
+    batch_size, seq_len, hidden_size = input.size()
     if hidden is None:
       hx = input.new_zeros(self.num_layers, batch_size, self.hidden_size, requires_grad=False)
       cx = input.new_zeros(self.num_layers, batch_size, self.hidden_size, requires_grad=False)
@@ -73,7 +74,8 @@ class LayerNormLSTM(nn.Module):
 
     ht, ct = [], []
     h, c = hx, cx
-    for t, x in enumerate(input): #TODO: if first dim is batch_size, enumerate might not work.
+    for t in range(seq_len):
+      x = input[:,t,:]
       h_t_l, c_t_l = [], []
       for l, layer in enumerate(self.hidden):
         h_tl, c_tl = layer(input=x, hidden=(h[l], c[l]))
@@ -83,7 +85,7 @@ class LayerNormLSTM(nn.Module):
       ht.append(h_t_l)
       ct.append(c_t_l)
       h, c = ht[t], ct[t]
-    output = torch.stack([h[-1] for h in ht]) # sequence of hidden states from last layer. shape (S,B,hidden_size).
+    output = torch.stack([h[-1] for h in ht], dim=1) # sequence of hidden states from last layer. shape (S,B,hidden_size).
     hy = torch.stack(ht[-1]) # last hidden state (of the last timestep). shape (num_layers, B, hidden_size).
     cy = torch.stack(ct[-1])
 
