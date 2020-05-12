@@ -31,7 +31,6 @@ class GRUModel(nn.Module):
   def forward(self, input):
     emb = self.embedding(input) # (B, seq_len, emb_size)
     emb = self.dropout(emb)
-    #output = emb
     output, hidden = self.gru(emb) # output (B,seq_len,hidden_size*num_directions) , hidden: (num_layers * num_directions, B, hidden_size)
     output = self.dropout(output)
     dec_output = self.fc(output) # (B, S, num_tokens)
@@ -88,14 +87,6 @@ class LayerNormLSTMModel(nn.Module):
     self.ln_lstm = LayerNormLSTM(input_size=emb_size, hidden_size=hidden_size, num_layers=num_layers, p_drop=p_drop)
     self.fc = nn.Linear(in_features=hidden_size, out_features=num_tokens)
 
-    #self.init_weights()
-
-  # def init_weights(self):
-  #   initrange = 0.1
-  #   self.embedding.weight.data.uniform_(-initrange, initrange)
-  #   self.fc.weight.data.uniform_(-initrange, initrange)
-  #   self.fc.bias.data.zero_()
-
   def forward(self, input):
     emb = self.embedding(input)
     emb = self.dropout(emb)
@@ -106,11 +97,6 @@ class LayerNormLSTMModel(nn.Module):
     log_probas = F.log_softmax(dec_output, dim=1)
 
     return log_probas, hidden
-
-  # def init_hidden(self, batch_size):
-  #   weight = next(self.parameters())
-  #   return (weight.new_zeros(self.num_layers, batch_size, self.hidden_size),
-  #           weight.new_zeros(self.num_layers, batch_size, self.hidden_size))
 
 if __name__ == '__main__':
     batch_size = 8
