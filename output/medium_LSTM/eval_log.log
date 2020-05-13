@@ -1,0 +1,36 @@
+INFO:training log:generating text with temperature: None
+INFO:training log:generating text with temperature: 0.5
+INFO:training log:generating text with temperature: 1
+INFO:training log:generating text with temperature: 2
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 2000 samples of test dataset...
+INFO:training log:test accuracy:0.2943571428571429
+INFO:training log:overconfidence rate for each threshold: {0.5: 0.5614285714285714, 0.75: 0.377, 0.9: 0.2845714285714286}
+INFO:training log:overconfidence rate for correct preds for each threshold: {0.5: 0.4360899067005937, 0.75: 0.5854174561071113, 0.9: 0.7417168674698795}
+INFO:training log:number of correct words predicted: 71
+INFO:training log:list of correct words predicted: <EOS>,,;,?,What,a,and,any,are,as,behind,big,block,blue,both,brown,color,cube,cyan,cylinder,cylinders,either,else,equal,front,greater,green,has,have,in,is,it,its,large,left,less,made,many,material,matte,metal,metallic,number,object,objects,of,on,or,other,purple,red,right,rubber,same,shape,shiny,side,size,small,sphere,than,that,the,there,thing,things,tiny,to,visible,what,yellow
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:generating text with temperature: None
+INFO:training log:generating text with temperature: 0.5
+INFO:training log:generating text with temperature: 1
+INFO:training log:generating text with temperature: 2
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 2000 samples of test dataset...
+INFO:training log:test accuracy:0.2943571428571429
+INFO:training log:overconfidence rate for each threshold: {0.5: 0.5614285714285714, 0.75: 0.377, 0.9: 0.2845714285714286}
+INFO:training log:overconfidence rate for correct preds for each threshold: {0.5: 0.4360899067005937, 0.75: 0.5854174561071113, 0.9: 0.7417168674698795}
+INFO:training log:number of correct words predicted: 71
+INFO:training log:list of correct words predicted: <EOS>,,;,?,What,a,and,any,are,as,behind,big,block,blue,both,brown,color,cube,cyan,cylinder,cylinders,either,else,equal,front,greater,green,has,have,in,is,it,its,large,left,less,made,many,material,matte,metal,metallic,number,object,objects,of,on,or,other,purple,red,right,rubber,same,shape,shiny,side,size,small,sphere,than,that,the,there,thing,things,tiny,to,visible,what,yellow
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:generating text with temperature: None
+INFO:training log:generating text with temperature: 0.5
+INFO:training log:generating text with temperature: 1
+INFO:training log:generating text with temperature: 2
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 2000 samples of test dataset...
+INFO:training log:test accuracy:0.2943571428571429
+INFO:training log:overconfidence rate for each threshold: {0.5: 0.5614285714285714, 0.75: 0.377, 0.9: 0.2845714285714286}
+INFO:training log:overconfidence rate for correct preds for each threshold: {0.5: 0.4360899067005937, 0.75: 0.5854174561071113, 0.9: 0.7417168674698795}
+INFO:training log:number of correct words predicted: 71
+INFO:training log:list of correct words predicted: <EOS>,,;,?,What,a,and,any,are,as,behind,big,block,blue,both,brown,color,cube,cyan,cylinder,cylinders,either,else,equal,front,greater,green,has,have,in,is,it,its,large,left,less,made,many,material,matte,metal,metallic,number,object,objects,of,on,or,other,purple,red,right,rubber,same,shape,shiny,side,size,small,sphere,than,that,the,there,thing,things,tiny,to,visible,what,yellow
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words

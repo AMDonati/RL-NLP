@@ -1,0 +1,36 @@
+INFO:training log:generating text with temperature: None
+INFO:training log:generating text with temperature: 0.5
+INFO:training log:generating text with temperature: 1
+INFO:training log:generating text with temperature: 2
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 2000 samples of test dataset...
+INFO:training log:test accuracy:0.26279761904761906
+INFO:training log:overconfidence rate for each threshold: {0.5: 0.2065595238095238, 0.75: 0.1558452380952381, 0.9: 0.10769047619047618}
+INFO:training log:overconfidence rate for correct preds for each threshold: {0.5: 0.9311278888824852, 0.75: 0.9901459017645711, 0.9: 0.99557815609109}
+INFO:training log:number of correct words predicted: 48
+INFO:training log:list of correct words predicted: <EOS>,;,?,What,a,any,are,as,behind,big,brown,color,cyan,cylinder,cylinders,either,else,front,green,in,is,it,its,large,many,material,matte,number,object,objects,of,or,other,right,rubber,same,shape,side,size,small,than,that,the,there,thing,things,tiny,what
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:generating text with temperature: None
+INFO:training log:generating text with temperature: 0.5
+INFO:training log:generating text with temperature: 1
+INFO:training log:generating text with temperature: 2
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 2000 samples of test dataset...
+INFO:training log:test accuracy:0.26279761904761906
+INFO:training log:overconfidence rate for each threshold: {0.5: 0.2065595238095238, 0.75: 0.1558452380952381, 0.9: 0.10769047619047618}
+INFO:training log:overconfidence rate for correct preds for each threshold: {0.5: 0.9311278888824852, 0.75: 0.9901459017645711, 0.9: 0.99557815609109}
+INFO:training log:number of correct words predicted: 48
+INFO:training log:list of correct words predicted: <EOS>,;,?,What,a,any,are,as,behind,big,brown,color,cyan,cylinder,cylinders,either,else,front,green,in,is,it,its,large,many,material,matte,number,object,objects,of,or,other,right,rubber,same,shape,side,size,small,than,that,the,there,thing,things,tiny,what
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
+INFO:training log:generating text with temperature: None
+INFO:training log:generating text with temperature: 0.5
+INFO:training log:generating text with temperature: 1
+INFO:training log:generating text with temperature: 2
+INFO:training log:evaluating accuracy, overconfidence, and correct words on first 2000 samples of test dataset...
+INFO:training log:test accuracy:0.26279761904761906
+INFO:training log:overconfidence rate for each threshold: {0.5: 0.2065595238095238, 0.75: 0.1558452380952381, 0.9: 0.10769047619047618}
+INFO:training log:overconfidence rate for correct preds for each threshold: {0.5: 0.9311278888824852, 0.75: 0.9901459017645711, 0.9: 0.99557815609109}
+INFO:training log:number of correct words predicted: 48
+INFO:training log:list of correct words predicted: <EOS>,;,?,What,a,any,are,as,behind,big,brown,color,cyan,cylinder,cylinders,either,else,front,green,in,is,it,its,large,many,material,matte,number,object,objects,of,or,other,right,rubber,same,shape,side,size,small,than,that,the,there,thing,things,tiny,what
+INFO:training log:looking at top 10 words for 50 samples of the test dataset
+INFO:training log:done with saving top-k words
