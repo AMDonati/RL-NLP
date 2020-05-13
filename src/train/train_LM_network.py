@@ -108,7 +108,7 @@ if __name__ == '__main__':
     os.makedirs(out_path)
   out_file_log = os.path.join(out_path, 'training_log.log')
   logger = create_logger(out_file_log)
-  out_csv = os.path.join(out_path, 'train_history_gru_1_l_emb_8_hid_16_pdrop_0_gradclip_None_bs_128_lr_0.001.csv')
+  out_csv = os.path.join(out_path, 'train_history_lstm_1_l_emb_8_hid_16_pdrop_0_gradclip_None_bs_128_lr_0.001.csv')
   model_path = os.path.join(out_path, 'model.pt')
   config_path = os.path.join(out_path, 'config.json')
 
@@ -170,22 +170,3 @@ if __name__ == '__main__':
   hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
   hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
   write_to_csv(out_csv, hist_dict)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

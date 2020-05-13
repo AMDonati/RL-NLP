@@ -14,7 +14,6 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, args, 
   model.train()  # Turns on train mode which enables dropout.
   total_loss = 0.
   start_time = time.time()
-  # loop over batches
   for batch, (inputs, targets) in enumerate(train_generator):
     inputs = inputs.to(device)
     targets = targets.view(targets.size(1) * targets.size(0)).to(device) # targets (S*B)
