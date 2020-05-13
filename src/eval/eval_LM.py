@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from utils.utils_train import create_logger
 from eval.eval_functions import generate_top_k_words, eval_overconfidence
 
+
 #  trick for boolean parser args.
 def str2bool(v):
     if isinstance(v, bool):
@@ -34,7 +35,8 @@ if __name__ == '__main__':
     parser.add_argument("-seed", type=int, default=123, help="seed for reproducibility")
     parser.add_argument("-oc_th", type=list, default=[0.5, 0.75, 0.9],
                         help="proba threshold for overconfidence function")
-    parser.add_argument('-temperature', type=list, default=[None, 0.5, 1, 2], help='temperature - higher will increase diversity')
+    parser.add_argument('-temperature', type=list, default=[None, 0.5, 1, 2],
+                        help='temperature - higher will increase diversity')
     parser.add_argument("-top_k", type=int, default=10, help="num of top-k words to generate from input sequence.")
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
 
@@ -52,7 +54,8 @@ if __name__ == '__main__':
     num_tokens = test_dataset.vocab_len
     test_loader = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), drop_last=True,
                              num_workers=args.num_workers)
-    out_file_top_k_words = os.path.join(args.out_path, 'generate_top_k_words_k_{}_seed_{}.json'.format(args.top_k, args.seed))
+    out_file_top_k_words = os.path.join(args.out_path,
+                                        'generate_top_k_words_k_{}_seed_{}.json'.format(args.top_k, args.seed))
     out_file_log = os.path.join(args.out_path, 'eval_log.log')
     logger = create_logger(out_file_log)
     log_interval = int(args.words / 10)
@@ -61,7 +64,7 @@ if __name__ == '__main__':
     # generate words
     ###############################################################################
     np.random.seed(args.seed)
-    input = torch.LongTensor(np.random.randint(0,num_tokens,size=1,dtype=np.int32)).view(1,1).to(device)
+    input = torch.LongTensor(np.random.randint(0, num_tokens, size=1, dtype=np.int32)).view(1, 1).to(device)
     input_word = test_dataset.idx2word([input[0].item()], delim='')
     for temp in args.temperature:
         logger.info("generating text with temperature: {}".format(temp))
@@ -72,7 +75,7 @@ if __name__ == '__main__':
                 for i in range(args.words):
                     output, hidden = model(input)  # output (1, num_tokens)
                     if temp is not None:
-                        word_weights = output.squeeze().div(temp).exp() # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
+                        word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
                         word_weights = word_weights / word_weights.sum(dim=-1).cpu()
                         word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
                     else:

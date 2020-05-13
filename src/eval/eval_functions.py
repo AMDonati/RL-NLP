@@ -56,7 +56,6 @@ def eval_overconfidence(model, test_loader, device, threshold=[0.5]):
         over_confs = dict(zip(threshold, over_confs))
         over_confs_correct = dict(zip(threshold, over_confs_correct))
 
-
     return correct / total, over_confs, over_confs_correct, correct_words
 
 
