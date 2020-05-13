@@ -143,6 +143,7 @@ if __name__ == '__main__':
     logger.info('samples of input questions: {}'.format(temp_inp.data.numpy()))
     logger.info('samples of target questions: {}'.format(temp_tar.data.numpy()))
     logger.info('train dataset length: {}'.format(train_dataset.__len__()))
+    logger.info('number of tokens: {}'.format(num_tokens))
     best_val_loss = None
     for epoch in range(EPOCHS):
         logger.info('epoch {}/{}'.format(epoch + 1, EPOCHS))
