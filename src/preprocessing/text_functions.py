@@ -40,17 +40,20 @@ def tokenize(s, add_start_token, add_end_token, punct_to_keep, punct_to_remove, 
             s = s.replace(p, '')
 
     tokens = s.split(delim)
+    start_token_upper = tokens[0]
+    tokens = [w.lower() for w in tokens] # lower all letters.
     if add_start_token:
         tokens.insert(0, '<SOS>')
     if add_end_token:
         tokens.append('<EOS>')
-    return tokens
+    return tokens, start_token_upper
 
 
 def build_vocab(sequences, min_token_count, punct_to_keep, punct_to_remove, delim=' '):
     token_to_count = {}
+    start_tokens = []
     for seq in sequences:
-        seq_tokens = tokenize(s=seq,
+        seq_tokens, start_token_upper = tokenize(s=seq,
                               delim=delim,
                               punct_to_keep=punct_to_keep,
                               punct_to_remove=punct_to_remove,
@@ -61,6 +64,7 @@ def build_vocab(sequences, min_token_count, punct_to_keep, punct_to_remove, deli
             if token not in token_to_count:
                 token_to_count[token] = 0
             token_to_count[token] += 1
+        start_tokens.append(start_token_upper)
 
     token_to_idx = {}
     for token, idx in SPECIAL_TOKENS.items():
@@ -69,7 +73,10 @@ def build_vocab(sequences, min_token_count, punct_to_keep, punct_to_remove, deli
         if count >= min_token_count:
             token_to_idx[token] = len(token_to_idx)
 
-    return token_to_idx
+    # getting the unique starting words.
+    start_tokens = list(set(start_tokens))
+
+    return token_to_idx, start_tokens
 
 
 def encode(seq_tokens, token_to_idx, allow_unk):

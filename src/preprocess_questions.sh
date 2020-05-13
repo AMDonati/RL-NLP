@@ -15,3 +15,7 @@ python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/que
 python src/preprocessing/extract_questions_subset.py -data_path "data/CLEVR_v1.0/questions/train_questions.json"
 -out_path "data/CLEVR_v1.0/temp/train_questions_subset.json"
 
+
+# set of starting words when building vocab:
+set of starting words...: ['The', 'Does', 'There', 'What', 'How', 'Are', 'Is', 'Do']
+
