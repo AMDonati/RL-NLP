@@ -20,9 +20,11 @@ def select_action(policy_network, state, device):
     probas = F.softmax(logits, dim=-1)
     m = Categorical(probas[-1, :])  # multinomial distribution with weights = probas.
     action = m.sample()
+    log_prob_2 = m.log_prob(action)
     log_prob = F.log_softmax(logits, dim=-1)[-1, action]
-    # log_prob_2 = torch.log(probas[-1, action])
-    # assert log_prob == log_prob_2
+    log_prob_3 = torch.log(probas[-1, action])
+    assert abs(log_prob - log_prob_2) < 1e-5
+    assert abs(log_prob - log_prob_3) < 1e-5
     return action.view(1, 1), log_prob
 
 
@@ -61,7 +63,7 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
     img_idx = np.random.randint(0, len(clevr_dataset.img_idxs))
     img_idx = 0  # FOR DEBUGGING.
     ep_GD_questions = clevr_dataset.get_questions_from_img_idx(
-        img_idx)  # shape (max_len - 1, 10) # used to compute the final reward of the episode.
+        img_idx)  # shape (10, S-1) # used to compute the final reward of the episode.
     img_feats = clevr_dataset.get_feats_from_img_idx(img_idx)  # shape (1024, 14, 14)
     initial_state = State(torch.LongTensor([special_tokens.SOS_idx]).view(1, 1), img_feats.unsqueeze(0))
 
@@ -86,7 +88,7 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
         log_probs.append(log_prob)
         state = next_state
 
-    episode = Episode(img_idx, img_feats.data.numpy(), ep_GD_questions, state.text.squeeze().data.numpy(), rewards)
+    episode = Episode(img_idx, img_feats.data.numpy(), ep_GD_questions.data.numpy(), state.text.squeeze().data.numpy(), rewards)
     return_ep = sum(rewards)
     returns = [return_ep] * (step + 1)
 

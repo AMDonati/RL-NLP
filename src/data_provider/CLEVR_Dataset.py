@@ -7,7 +7,7 @@ import json
 import h5py
 import numpy as np
 import os
-
+from preprocessing.text_functions import decode
 
 # TODO: add idx_to_token function.
 
@@ -19,6 +19,7 @@ class CLEVR_Dataset(Dataset):
         self.vocab_questions = self.get_vocab('question_token_to_idx')
         self.vocab_answers = self.get_vocab('answer_token_to_idx')
         self.len_vocab = len(self.vocab_questions)
+        self.idx_to_token = self.get_idx_to_token()
         self.max_samples = max_samples
 
         # load dataset objects in memory except img:
@@ -51,6 +52,18 @@ class CLEVR_Dataset(Dataset):
         select_idx = list(np.where(img_idxs.data.numpy() == img_idx))
         select_questions = self.input_questions[select_idx, :]
         return select_questions.squeeze(0)[:, 1:]  # removing <sos> token.
+
+    def get_idx_to_token(self, questions=True):
+        if questions:
+            vocab = self.vocab_questions
+        else:
+            vocab = self.vocab_answers
+        idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
+        return idx_to_token
+
+    def idx2word(self, seq_idx, delim=' ', stop_at_end=False):
+        tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
+        return tokens
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]
@@ -87,9 +100,10 @@ if __name__ == '__main__':
     print('tar_q', tar_q.shape)
     print('feats', feats.shape)
     print('answer', answer)
-    questions_subset = clevr_dataset.get_questions_from_img_idx(0)
-    print('questions subset', questions_subset.shape)
+    ep_questions = clevr_dataset.get_questions_from_img_idx(0)
+    print('questions subset', ep_questions.shape)
 
+    #-----------------------------------------------------------------------------
     # test max samples case.
     clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                   h5_feats_path=h5_feats_path,
@@ -101,4 +115,13 @@ if __name__ == '__main__':
 
     for batch, ((inp, tar), feats, _) in enumerate(clevr_loader):
         if batch == 0:
-            print('')
+            print('inp', inp[0,:])
+            print('tar', tar[0,:])
+            print('feats shape', feats.shape)
+    print('number of samples', batch)
+    # ----------------------------------------------- test get_questions_from_img_idx------------
+    ep_questions = clevr_dataset.get_questions_from_img_idx(0).data.numpy()
+    print('questions subset', ep_questions.shape)
+    ep_questions = [list(ep_questions[i, :]) for i in range(ep_questions.shape[0])]
+    decoded_questions = [clevr_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
+    print('questions decoded :\n{}'.format("\n".join(decoded_questions)))

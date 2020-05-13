@@ -10,8 +10,9 @@ python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/que
 python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/questions/CLEVR_test_questions.json" \
 -out_vocab_path "data/vocab.json" -out_h5_path "data/test_questions.h5" -min_token_count 1
 
-# to extract a smaller json with a subset of the datasets.
 
+
+# to extract a smaller json with a subset of the datasets.
 python src/preprocessing/extract_questions_subset.py -data_path "data/CLEVR_v1.0/questions/train_questions.json"
 -out_path "data/CLEVR_v1.0/temp/train_questions_subset.json"
 
