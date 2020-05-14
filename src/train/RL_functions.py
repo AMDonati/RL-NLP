@@ -15,16 +15,16 @@ def select_action(policy_network, state, device):
     policy_network.train()
     state.text.to(device)
     state.img.to(device)
-    # logits, _ = policy_network(state.text, state.img) # logits > shape (s, num_tokens)
-    logits = policy_network(state.text, state.img)  # logits > shape (s, num_tokens)
+    logits, _ = policy_network(state.text, state.img) # logits > shape (s, num_tokens)
+    #logits = policy_network(state.text, state.img)  # logits > shape (s, num_tokens)
     probas = F.softmax(logits, dim=-1)
     m = Categorical(probas[-1, :])  # multinomial distribution with weights = probas.
     action = m.sample()
-    log_prob_2 = m.log_prob(action)
+    #log_prob_2 = m.log_prob(action)
     log_prob = F.log_softmax(logits, dim=-1)[-1, action]
-    log_prob_3 = torch.log(probas[-1, action])
-    assert abs(log_prob - log_prob_2) < 1e-5
-    assert abs(log_prob - log_prob_3) < 1e-5
+    #log_prob_3 = torch.log(probas[-1, action])
+    #assert abs(log_prob - log_prob_2) < 1e-5
+    #assert abs(log_prob - log_prob_3) < 1e-5
     return action.view(1, 1), log_prob
 
 
@@ -35,7 +35,7 @@ def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
     # trunc state:
     state_len = next_state_text.size(1)
     if state_len == 0:
-        print('no final reward...')
+        #print('no final reward...')
         return 0.
     else:
         # max_len = ep_questions.size(1)
@@ -54,12 +54,11 @@ def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
 # TODO: batchify this function.
 def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, max_len=None, seed=None):
     if max_len is None:
-        max_len = clevr_dataset.input_questions.size(
-            1)  # max_length set-up to max length of questions dataset (or avg len?)
+        max_len = clevr_dataset.input_questions.size(1)  # max_length set-up to max length of questions dataset (or avg len?)
     max_len = 10  # FOR DEBUGGING.
     # sample initial state
     if seed is not None:
-        np.random.seed = seed
+        np.random.seed(seed)
     img_idx = np.random.randint(0, len(clevr_dataset.img_idxs))
     img_idx = 0  # FOR DEBUGGING.
     ep_GD_questions = clevr_dataset.get_questions_from_img_idx(

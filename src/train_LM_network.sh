@@ -32,7 +32,13 @@ python src/train/train_LM_network.py -model "ln_lstm" -num_layers 2 -emb_size 51
 python src/train/train_LM_network.py -model "ln_lstm" -num_layers 1 -emb_size 512  \
 -hidden_size 512 -p_drop 0.1 -data_path "data" \
 -out_path "output/num_tokens_87" -bs 512 -ep 20 -num_workers 6
-# 1.095, 1.098.
+# 1.093, 1.098.
+
+python src/train/train_LM_network.py -model "ln_lstm" -num_layers 1 -emb_size 512  \
+-hidden_size 512 -p_drop 0.1 -data_path "data" \ -grap_clip 1
+-out_path "output/num_tokens_87" -bs 512 -ep 20 -num_workers 6
+# 1.094, 1.099.
+
 
 
 # to train on a subset of question samples.

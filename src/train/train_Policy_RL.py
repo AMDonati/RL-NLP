@@ -21,15 +21,16 @@ def str2bool(v):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("-model", type=str, default="lstm", help="lstm or mlp")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-word_emb_size", type=int, default=64, help="dimension of the embedding layer")
+    parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
     parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
     parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-bs", type=int, default=16, help="batch size")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
-    parser.add_argument("-num_training_steps", type=int, default=10000, help="number of training_steps")
+    parser.add_argument("-num_training_steps", type=int, default=100000, help="number of training_steps")
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -62,25 +63,31 @@ if __name__ == '__main__':
     ##################################################################################################################
     # Build the Policy Network and define hparams
     ##################################################################################################################
-
-    policy_network = PolicyMLP(num_tokens=num_tokens,
+    if args.model == 'mlp':
+        policy_network = PolicyMLP(num_tokens=num_tokens,
                                word_emb_size=args.word_emb_size,
-                               units=args.word_emb_size + args.word_emb_size * 7 * 7)
-    # policy_network = PolicyLSTM(num_tokens=num_tokens,
-    #                             word_emb_size=args.word_emb_size,
-    #                             emb_size=args.word_emb_size + args.word_emb_size*7*7,
-    #                             hidden_size=args.hidden_size,
-    #                             num_layers=args.num_layers,
-    #                             p_drop=args.p_drop)
+                               units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
+    elif args.model == 'lstm':
+        policy_network = PolicyLSTM(num_tokens=num_tokens,
+                                word_emb_size=args.word_emb_size,
+                                emb_size=args.word_emb_size + args.word_emb_size*7*7,
+                                hidden_size=args.hidden_size,
+                                num_layers=args.num_layers,
+                                p_drop=args.p_drop).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
-
-    output_path = os.path.join(args.out_path, "RL_PolicyMLP_emb_{}_lr_{}_bs_{}_{}steps".format(args.word_emb_size, args.lr, args.bs, args.num_training_steps))
+    output_path = os.path.join(args.out_path, "RL_{}_emb_{}_lr_{}_bs_{}_{}steps".format(args.model,
+                                                                                        args.word_emb_size,
+                                                                                        args.lr,
+                                                                                        args.bs,
+                                                                                        args.num_training_steps))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     logger = create_logger(out_file_log)
     csv_out_file = os.path.join(output_path, 'train_history.csv')
+    model_path = os.path.join(output_path, 'model.pt')
+
 
     train_dataset = clevr_dataset
     store_episodes = True
@@ -102,6 +109,13 @@ if __name__ == '__main__':
     loss_hist, batch_return_hist, running_return_hist = [], [], []
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
+    # Get and print set of questions for the fixed img.
+    ep_questions = train_dataset.get_questions_from_img_idx(0).data.numpy()
+    ep_questions = [list(ep_questions[i, :10]) for i in range(ep_questions.shape[0])]
+    decoded_questions = [train_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
+    logger.info("episode questions (10tokens):")
+    logger.info('{}'.format('\n').join(decoded_questions))
+
     for i in range(args.num_training_steps):
         log_probs_batch, returns_batch, episodes_batch = [], [], []
         for _ in range(args.bs):
@@ -121,43 +135,36 @@ if __name__ == '__main__':
         loss = train_episodes_batch(log_probs_batch=log_probs_batch, returns_batch=returns_batch, optimizer=optimizer)
         sum_loss += loss
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
+
         if i % log_interval == log_interval - 1:
+            # writing metrics to tensorboard.
+            writer.add_scalar('batch return',batch_avg_return,i)
+            writer.add_scalar('running return', running_return,i)
+            if store_episodes and i == log_interval - 1:
+                writer.add_text('episode_questions(10tokens)', ('...').join(decoded_questions))
+
+        if i % (10*log_interval) == (10*log_interval - 1):
             logger.info('train loss for training step {}: {:5.3f}'.format(i, loss))
             logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
-            logger.info('running return for training step {}: {:8.3f}'.format(i, loss))
+            logger.info('running return for training step {}: {:8.3f}'.format(i, loss / (i + 1)))
+            writer.add_scalar('training loss', sum_loss / (i + 1), i)
+            dialog_batch = [list(ep.dialog) for ep in episodes_batch]
+            decoded_dialog_batch = [train_dataset.idx2word(dialog, stop_at_end=True) for dialog in dialog_batch]
+            writer.add_text('dialog_batch', ('...\t').join(decoded_dialog_batch), global_step=i)
 
-            if store_episodes:
-                if i == log_interval - 1:
-                    ep_questions = episodes_batch[0].GD_questions
-                    ep_questions = [list(ep_questions[i, :10]) for i in range(ep_questions.shape[0])]
-                    decoded_questions = [train_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
-                    #logger.info('episode questions (10tokens): {}'.format('\n').join(decoded_questions))
-                    writer.add_text('episode_questions(10tokens)', ('...').join(decoded_questions))
-                dialog_batch = [list(ep.dialog) for ep in episodes_batch]
-                decoded_dialog_batch = [train_dataset.idx2word(dialog, stop_at_end=True) for dialog in dialog_batch]
-                #logger.info('dialog_batch: {}'.format('\n').join(decoded_dialog_batch))
-                writer.add_text('dialog_batch', ('...').join(decoded_dialog_batch), global_step=i)
+            sum_loss = 0. #resetting loss.
+            with open(model_path, 'wb') as f:
+                torch.save(policy_network, f)
+            # save loss and return information.
+            loss_hist.append(loss / (i + 1))
+            batch_return_hist.append(batch_avg_return)
+            running_return_hist.append(running_return)
 
-            # writing metrics to tensorboard.
-            writer.add_scalar('training loss',
-                              sum_loss / (i + 1),
-                              i)
-            writer.add_scalar('batch return',
-                              batch_avg_return,
-                              i)
-            writer.add_scalar('running return',
-                              running_return,
-                              i)
         if store_episodes:
             all_episodes.append(episodes_batch)
-        # save loss and return information.
-        loss_hist.append(loss)
-        batch_return_hist.append(batch_avg_return)
-        running_return_hist.append(running_return)
 
     hist_keys = ['loss', 'return_batch', 'running_return']
     hist_dict = dict(zip(hist_keys, [loss_hist, batch_return_hist, running_return_hist]))
-
     write_to_csv(csv_out_file, hist_dict)
 
     # ------------------------------------------------------------
