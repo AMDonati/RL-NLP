@@ -86,14 +86,14 @@ if __name__ == '__main__':
     if args.model == 'mlp':
         policy_network = PolicyMLP(num_tokens=num_tokens,
                                    word_emb_size=args.word_emb_size,
-                                   units=args.word_emb_size + args.word_emb_size * 7 * 7)
+                                   units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
     elif args.model == 'lstm':
         policy_network = PolicyLSTM(num_tokens=num_tokens,
                                     word_emb_size=args.word_emb_size,
                                     emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
                                     hidden_size=args.hidden_size,
                                     num_layers=args.num_layers,
-                                    p_drop=args.p_drop)
+                                    p_drop=args.p_drop).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
