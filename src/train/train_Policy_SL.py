@@ -93,7 +93,8 @@ if __name__ == '__main__':
                                     emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
                                     hidden_size=args.hidden_size,
                                     num_layers=args.num_layers,
-                                    p_drop=args.p_drop).to(device)
+                                    p_drop=args.p_drop,
+                                    project=True).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
@@ -101,14 +102,14 @@ if __name__ == '__main__':
     EPOCHS = args.ep
 
     num_batches = int(len(train_dataset) / args.bs)
-    print_interval = 10
-    #print_interval = int(num_batches / 10)
+    #print_interval = 10
+    print_interval = int(num_batches / 10)
 
     ###############################################################################
     # Create logger, output_path and config file.
     ###############################################################################
 
-    out_path = 'SL_{}_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}'.format(args.model, args.num_layers,
+    out_path = 'SL2_{}_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}'.format(args.model, args.num_layers,
                                                                                        args.word_emb_size, args.hidden_size,
                                                                                        args.p_drop, args.grad_clip,
                                                                                        args.bs, learning_rate)
