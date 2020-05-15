@@ -1,13 +1,16 @@
 {
-    "sampled_index": "1122,1766,1041,1619,106,1147,1593,1238,1761,96,113,638,47,73,1568,942,224,111,1433,1363,846,1277,420,608,1232,1092,1841,1847,451,2,340,39,1346,596,1583,504,1981,1200,1159,1897,99,380,1884,1204,1382,1889,213,1654,862,1435",
+    "sampled_index": "1534,1389,1406,1346,1122,1766,1041,1619,106,1147,1593,1238,1761,96,113,638,47,73,1568,942,224,111,1433,1363,846,1277,420,608,1232,1092,1841,1847,451,2,340,39,1346,596,1583,504,1981,1200,1159,1897,99,380,1884,1204,1382,1889",
     "top_k_words": {
+        "<SOS> what color is the": "other,tiny,small,big,large,rubber,matte,cylinder,metallic,shiny",
+        "<SOS> are there an equal": "number,shape,size,red,cyan,cubes,color,purple,cylinders,blocks",
+        "<SOS> does the tiny gray": "thing,object,cylinder,matte,rubber,metal,ball,shiny,metallic,cube",
+        "<SOS> there is a matte": "thing,object,cylinder,sphere,ball,block,cube,right,left,is",
         "<SOS> what number of shiny": "things,objects,cylinders,cubes,spheres,blocks,balls,big,is,object",
         "<SOS> are there any other": "things,tiny,small,big,large,objects,rubber,matte,cylinders,shiny",
         "<SOS> do the blue object": "and,that,in,behind,on,to,left,right,the,has",
         "<SOS> is the large thing": "that,the,behind,in,on,to,right,left,made,is",
         "<SOS> is the tiny cyan": "object,thing,cylinder,sphere,ball,cube,matte,rubber,metal,block",
         "<SOS> do the yellow rubber": "thing,object,cylinder,ball,block,cube,sphere,is,things,objects",
-        "<SOS> are there an equal": "number,shape,size,red,cyan,cubes,color,purple,cylinders,blocks",
         "<SOS> is the number of": "tiny,small,big,large,green,cyan,yellow,red,purple,blue",
         "<SOS> what number of tiny": "things,objects,cyan,matte,blue,yellow,green,red,rubber,purple",
         "<SOS> what number of gray": "things,objects,matte,rubber,metallic,shiny,cylinders,metal,spheres,blocks",
@@ -21,13 +24,11 @@
         "<SOS> are any yellow things": "visible,that,made,in,?,on,behind,to,of,right",
         "<SOS> the metallic ball right": "of,the,is,side,that,shape,spheres,balls,?,objects",
         "<SOS> how many metallic cylinders": "are,have,has,;,cylinder,that,block,cube,on,behind",
-        "<SOS> what color is the": "other,tiny,small,big,large,rubber,matte,cylinder,metallic,shiny",
         "<SOS> do the brown object": "and,that,in,behind,on,to,right,left,has,have",
         "<SOS> the ball that is": "the,made,in,behind,both,to,on,right,left,sphere",
         "<SOS> does the tiny brown": "thing,object,cylinder,rubber,matte,cube,metal,ball,metallic,shiny",
         "<SOS> is there anything else": "that,of,the,made,have,?,left,right,has,its",
         "<SOS> are there more cyan": "matte,things,rubber,objects,metallic,shiny,metal,cylinders,balls,spheres",
-        "<SOS> there is a matte": "thing,object,cylinder,sphere,ball,block,cube,right,left,is",
         "<SOS> how many other things": "are,have,that,objects,is,spheres,things,blocks,gray,object",
         "<SOS> there is a gray": "thing,object,rubber,matte,cylinder,shiny,metal,metallic,ball,cube",
         "<SOS> the red object that": "is,has,are,right,left,cylinder,have,thing,the,object",
@@ -36,9 +37,6 @@
         "<SOS> what number of brown": "things,objects,matte,rubber,cylinders,metallic,shiny,metal,spheres,blocks",
         "<SOS> how many big objects": "are,have,has,is,green,gray,objects,cyan,brown,that",
         "<SOS> there is a tiny": "thing,object,rubber,matte,cylinder,metal,shiny,yellow,red,metallic",
-        "<SOS> do the small thing": "that,and,in,behind,on,to,left,right,have,the",
-        "<SOS> are there fewer brown": "matte,shiny,objects,rubber,metal,cylinders,things,metallic,spheres,balls",
-        "<SOS> are there more tiny": "blue,cyan,red,yellow,green,purple,brown,gray,matte,rubber",
-        "<SOS> there is a yellow": "object,thing,rubber,matte,shiny,cylinder,metal,metallic,ball,cube"
+        "<SOS> do the small thing": "that,and,in,behind,on,to,left,right,have,the"
     }
 }

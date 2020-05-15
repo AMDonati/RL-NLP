@@ -1,0 +1,122 @@
+INFO:training log:start training...
+INFO:training log:hparams: {'model': 'lstm', 'emb_size': 32, 'hidden_size': 64, 'p_drop': 0, 'grad_clip': None, 'BATCH_SIZE': 512, 'learning_rate': 0.001}
+INFO:training log:checking shape of and values of a sample of the train dataset...
+INFO:training log:samples of input questions: [[ 1 85 57 60 81 13 17 78 82 15  6  0  0  0  0  0  0  0  0  0  0  0  0  0
+   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0]]
+INFO:training log:samples of target questions: [[85 57 60 81 13 17 78 82 15  6  2  0  0  0  0  0  0  0  0  0  0  0  0  0
+   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0]]
+INFO:training log:shape of img feats: torch.Size([1024, 14, 14])
+INFO:training log:train dataset length: 699989
+INFO:training log:number of tokens: 87
+INFO:training log:epoch 1/20
+INFO:training log:start training...
+INFO:training log:hparams: {'model': 'lstm', 'emb_size': 32, 'hidden_size': 64, 'p_drop': 0, 'grad_clip': None, 'BATCH_SIZE': 512, 'learning_rate': 0.001}
+INFO:training log:checking shape of and values of a sample of the train dataset...
+INFO:training log:samples of input questions: [[ 1 85 44 78 24 60 78 58 77 44 43 36 60 78 47 15 43 36 60 78 47 53 74 77
+  44 66 60 78 18 27 67 15  6  0  0  0  0  0  0  0  0  0  0  0  0  0]]
+INFO:training log:samples of target questions: [[85 44 78 24 60 78 58 77 44 43 36 60 78 47 15 43 36 60 78 47 53 74 77 44
+  66 60 78 18 27 67 15  6  2  0  0  0  0  0  0  0  0  0  0  0  0  0]]
+INFO:training log:shape of img feats: torch.Size([1024, 14, 14])
+INFO:training log:train dataset length: 699989
+INFO:training log:number of tokens: 87
+INFO:training log:epoch 1/20
+INFO:training log:train loss 1.714 - train perplexity    5.553
+INFO:training log:time for one epoch...2546.19
+INFO:training log:val loss: 1.240 - val perplexity:    3.456
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 2/20
+INFO:training log:train loss 1.186 - train perplexity    3.273
+INFO:training log:time for one epoch...2477.64
+INFO:training log:val loss: 1.155 - val perplexity:    3.175
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 3/20
+INFO:training log:train loss 1.143 - train perplexity    3.135
+INFO:training log:time for one epoch...2470.31
+INFO:training log:val loss: 1.135 - val perplexity:    3.111
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 4/20
+INFO:training log:train loss 1.125 - train perplexity    3.081
+INFO:training log:time for one epoch...2474.81
+INFO:training log:val loss: 1.120 - val perplexity:    3.064
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 5/20
+INFO:training log:train loss 1.115 - train perplexity    3.050
+INFO:training log:time for one epoch...2484.82
+INFO:training log:val loss: 1.114 - val perplexity:    3.045
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 6/20
+INFO:training log:train loss 1.110 - train perplexity    3.035
+INFO:training log:time for one epoch...2434.53
+INFO:training log:val loss: 1.110 - val perplexity:    3.034
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 7/20
+INFO:training log:train loss 1.107 - train perplexity    3.026
+INFO:training log:time for one epoch...2478.72
+INFO:training log:val loss: 1.108 - val perplexity:    3.029
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 8/20
+INFO:training log:train loss 1.105 - train perplexity    3.020
+INFO:training log:time for one epoch...2476.70
+INFO:training log:val loss: 1.108 - val perplexity:    3.027
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 9/20
+INFO:training log:train loss 1.104 - train perplexity    3.015
+INFO:training log:time for one epoch...2484.59
+INFO:training log:val loss: 1.106 - val perplexity:    3.023
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 10/20
+INFO:training log:train loss 1.102 - train perplexity    3.011
+INFO:training log:time for one epoch...2503.08
+INFO:training log:val loss: 1.105 - val perplexity:    3.019
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 11/20
+INFO:training log:train loss 1.101 - train perplexity    3.007
+INFO:training log:time for one epoch...2481.96
+INFO:training log:val loss: 1.104 - val perplexity:    3.015
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 12/20
+INFO:training log:train loss 1.099 - train perplexity    3.001
+INFO:training log:time for one epoch...2482.19
+INFO:training log:val loss: 1.101 - val perplexity:    3.008
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 13/20
+INFO:training log:train loss 1.097 - train perplexity    2.996
+INFO:training log:time for one epoch...2468.56
+INFO:training log:val loss: 1.100 - val perplexity:    3.004
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 14/20
+INFO:training log:train loss 1.096 - train perplexity    2.993
+INFO:training log:time for one epoch...2451.83
+INFO:training log:val loss: 1.099 - val perplexity:    3.001
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 15/20
+INFO:training log:train loss 1.095 - train perplexity    2.990
+INFO:training log:time for one epoch...2435.32
+INFO:training log:val loss: 1.098 - val perplexity:    3.000
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 16/20
+INFO:training log:train loss 1.095 - train perplexity    2.988
+INFO:training log:time for one epoch...2514.81
+INFO:training log:val loss: 1.098 - val perplexity:    2.998
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 17/20
+INFO:training log:train loss 1.094 - train perplexity    2.986
+INFO:training log:time for one epoch...2557.00
+INFO:training log:val loss: 1.098 - val perplexity:    2.997
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 18/20
+INFO:training log:train loss 1.093 - train perplexity    2.983
+INFO:training log:time for one epoch...2565.74
+INFO:training log:val loss: 1.097 - val perplexity:    2.994
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 19/20
+INFO:training log:train loss 1.092 - train perplexity    2.979
+INFO:training log:time for one epoch...2555.57
+INFO:training log:val loss: 1.095 - val perplexity:    2.989
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:epoch 20/20
+INFO:training log:train loss 1.090 - train perplexity    2.974
+INFO:training log:time for one epoch...2559.55
+INFO:training log:val loss: 1.093 - val perplexity:    2.984
+INFO:training log:-----------------------------------------------------------------------------------------
+INFO:training log:saving loss and metrics information...
