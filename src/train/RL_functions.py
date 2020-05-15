@@ -6,6 +6,8 @@ from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 import os
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
+import Levenshtein as lv
+
 
 State = namedtuple('State', ('text', 'img'))
 Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'dialog', 'rewards'))
@@ -49,6 +51,29 @@ def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
         reward = reward / state_len
     return reward
 
+def get_levenshtein_reward(next_state_text, ep_questions, dataset, EOS_idx):
+    next_state_text = next_state_text[:, 1:]  # removing sos token.
+    if next_state_text[:, -1] == EOS_idx:  # remove <EOS> token if needed.
+        next_state_text = next_state_text[:, :-1]
+    # trunc state:
+    state_len = next_state_text.size(1)
+    if state_len == 0:
+        # print('no final reward...')
+        return 0.
+    else:
+        # decode GD questions.
+        ep_questions = ep_questions.data.numpy()
+        ep_questions = [list(ep_questions[i, :10]) for i in range(ep_questions.shape[0])]
+        decoded_questions = [dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
+        # decode state.
+        dialog = next_state_text.view(-1).data.numpy()
+        decoded_dialog = dataset.idx2word(list(dialog), stop_at_end=True)
+        # lv distance.
+        dist = [lv.distance(q, decoded_dialog) / max(len(q),len(decoded_dialog)) for q in decoded_questions]
+        sim = [1-d for d in dist]
+
+        return max(sim)
+
 
 # function generate one episode. debugged.
 # TODO: batchify this function.
@@ -77,9 +102,13 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
         next_state = State(torch.cat([state.text, action], dim=1), state.img)
         done = True if action.item() == special_tokens.EOS_idx or step == (max_len - 1) else False
         if done:
-            reward = get_dummy_reward(next_state_text=next_state.text,
-                                      ep_questions=ep_GD_questions,
-                                      EOS_idx=special_tokens.EOS_idx)
+            # reward = get_dummy_reward(next_state_text=next_state.text,
+            #                           ep_questions=ep_GD_questions,
+            #                           EOS_idx=special_tokens.EOS_idx)
+            reward = get_levenshtein_reward(next_state_text=next_state.text,
+                                            ep_questions=ep_GD_questions,
+                                            dataset=clevr_dataset,
+                                            EOS_idx=special_tokens.EOS_idx)
         else:
             reward = 0
             step += 1
@@ -180,9 +209,13 @@ if __name__ == '__main__':
                                   h5_feats_path=h5_feats_path,
                                   vocab_path=vocab_path)
     sample_questions = clevr_dataset.get_questions_from_img_idx(0)
-    temp_state_text = torch.LongTensor([1, 7, 86, 70, 88, 21, 54, 81, 51, 84, 87, 50, 38, 17, 2]).unsqueeze(0)
+    temp_state_text = torch.LongTensor([1, 7, 86, 70, 70, 21, 54, 81, 51, 84, 86, 50, 38, 17, 2]).unsqueeze(0)
     temp_reward = get_dummy_reward(temp_state_text, sample_questions, 2)
     print('reward', temp_reward)
+
+    # test of levenstein reward function.
+    temp_rew_lv = get_levenshtein_reward(temp_state_text, sample_questions, clevr_dataset, 2)
+    print('temp rew', temp_rew_lv)
 
     # ---------------------------------------- code draft ----------------------------------------------------------------------------------------
     # def get_reward(next_state_text, ep_questions, EOS_idx):

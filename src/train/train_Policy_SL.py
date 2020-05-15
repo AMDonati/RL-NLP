@@ -138,7 +138,7 @@ if __name__ == '__main__':
     ################################################################################################################################################
     # Train the model
     ################################################################################################################################################
-
+    logger.info('LSTM with projection layer...')
     logger.info("start training...")
     logger.info("hparams: {}".format(hparams))
     train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []

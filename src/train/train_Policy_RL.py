@@ -35,7 +35,8 @@ if __name__ == '__main__':
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
-
+    parser.add_argument('-pre_train', type=str2bool, default=False, help="pre-train the policy network with SL.")
+    parser.add_argument('-model_path', type=str, default='../../output/SL_1/model.pt', help="path for the pre-trained model with SL")
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -63,21 +64,28 @@ if __name__ == '__main__':
     ##################################################################################################################
     # Build the Policy Network and define hparams
     ##################################################################################################################
-    if args.model == 'mlp':
-        policy_network = PolicyMLP(num_tokens=num_tokens,
-                               word_emb_size=args.word_emb_size,
-                               units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
-    elif args.model == 'lstm':
-        policy_network = PolicyLSTM(num_tokens=num_tokens,
-                                word_emb_size=args.word_emb_size,
-                                emb_size=args.word_emb_size + args.word_emb_size*7*7,
-                                hidden_size=args.hidden_size,
-                                num_layers=args.num_layers,
-                                p_drop=args.p_drop).to(device)
+    if args.pre_train:
+        assert args.model_path is not None
+        with open(args.model_path, 'rb') as f:
+            policy_network = torch.load(f, map_location=device).to(device)
+            policy_network.project = False
+    else:
+        if args.model == 'mlp':
+            policy_network = PolicyMLP(num_tokens=num_tokens,
+                                   word_emb_size=args.word_emb_size,
+                                   units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
+        elif args.model == 'lstm':
+            policy_network = PolicyLSTM(num_tokens=num_tokens,
+                                    word_emb_size=args.word_emb_size,
+                                    emb_size=args.word_emb_size + args.word_emb_size*7*7,
+                                    hidden_size=args.hidden_size,
+                                    num_layers=args.num_layers,
+                                    p_drop=args.p_drop).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
-    output_path = os.path.join(args.out_path, "RL_{}_emb_{}_lr_{}_bs_{}_{}steps".format(args.model,
+    output_path = os.path.join(args.out_path, "RL_lv_reward_{}_emb_{}_hid_{}_lr_{}_bs_{}_{}steps".format(args.model,
                                                                                         args.word_emb_size,
+                                                                                        args.hidden_size,
                                                                                         args.lr,
                                                                                         args.bs,
                                                                                         args.num_training_steps))
@@ -97,13 +105,6 @@ if __name__ == '__main__':
     # REINFORCE Algo.
     #####################################################################################################################
 
-    # -------- test of generate one episode function  ------------------------------------------------------------------------------------------------------
-    # log_probs, returns, episodes = generate_one_episode(clevr_dataset=clevr_dataset,
-    #                                                     policy_network=policy_network,
-    #                                                     special_tokens=special_tokens,
-    #                                                     device=device)
-    # ------------------------------------------------------------
-
     running_return, sum_loss = 0., 0.
     all_episodes = []
     loss_hist, batch_return_hist, running_return_hist = [], [], []
@@ -113,6 +114,7 @@ if __name__ == '__main__':
     ep_questions = train_dataset.get_questions_from_img_idx(0).data.numpy()
     ep_questions = [list(ep_questions[i, :10]) for i in range(ep_questions.shape[0])]
     decoded_questions = [train_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
+    logger.info('RL from scratch with levenshtein reward on Image #0, with episode max length = 10')
     logger.info("episode questions (10tokens):")
     logger.info('{}'.format('\n').join(decoded_questions))
 

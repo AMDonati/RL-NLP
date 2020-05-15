@@ -31,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, required=True, help="path for data")
     parser.add_argument("-model_path", type=str, required=True, help="path for saved model")
     parser.add_argument("-out_path", type=str, required=True, help='path for outputting eval results')
-    parser.add_argument("-words", type=int, default=200, help="num words to generate")
+    parser.add_argument("-words", type=int, default=100, help="num words to generate")
     parser.add_argument("-seed", type=int, default=123, help="seed for reproducibility")
     parser.add_argument("-oc_th", type=list, default=[0.5, 0.75, 0.9],
                         help="proba threshold for overconfidence function")
@@ -63,12 +63,12 @@ if __name__ == '__main__':
     ###############################################################################
     # generate words
     ###############################################################################
-    np.random.seed(args.seed)
-    input = torch.LongTensor(np.random.randint(0, num_tokens, size=1, dtype=np.int32)).view(1, 1).to(device)
+    input = test_dataset.get_vocab()["<SOS>"]
+    input = torch.LongTensor([input]).view(1,1).to(device)
     input_word = test_dataset.idx2word([input[0].item()], delim='')
     for temp in args.temperature:
         logger.info("generating text with temperature: {}".format(temp))
-        out_file_generate = os.path.join(args.out_path, 'generate_words_temp_{}_seed_{}.txt'.format(temp, args.seed))
+        out_file_generate = os.path.join(args.out_path, 'generate_words_temp_{}.txt'.format(temp, args.seed))
         with open(out_file_generate, 'w') as f:
             f.write(input_word + '\n')
             with torch.no_grad():
@@ -110,6 +110,7 @@ if __name__ == '__main__':
     #############################################################################################
     # look at the top-k words for a given sequence of input words.
     ###############################################################################################
+    np.random.seed(args.seed)
     seq_len = 5
     sample_index = list(np.random.randint(0, len(test_dataset), size=50))
     logger.info("looking at top {} words for 50 samples of the test dataset".format(args.top_k))
