@@ -3,7 +3,7 @@
 from models.Policy_network import PolicyLSTM, PolicyMLP
 import argparse
 from utils.utils_train import create_logger, write_to_csv
-from train.RL_functions import *
+from RL_toolbox.RL_functions import *
 from torch.utils.tensorboard import SummaryWriter
 
 

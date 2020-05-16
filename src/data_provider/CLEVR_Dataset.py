@@ -9,7 +9,6 @@ import numpy as np
 import os
 from preprocessing.text_functions import decode
 
-# TODO: add idx_to_token function.
 
 class CLEVR_Dataset(Dataset):
     def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None):
@@ -21,6 +20,10 @@ class CLEVR_Dataset(Dataset):
         self.len_vocab = len(self.vocab_questions)
         self.idx_to_token = self.get_idx_to_token()
         self.max_samples = max_samples
+
+        # load feats in memory.
+        feats_hf = h5py.File(self.features_path, 'r')
+        self.all_feats = feats_hf.get('features') #TODO: eventually add max pool here.
 
         # load dataset objects in memory except img:
         questions_hf = h5py.File(self.questions_path, 'r')
@@ -41,8 +44,7 @@ class CLEVR_Dataset(Dataset):
         return tensor
 
     def get_feats_from_img_idx(self, img_idx):
-        feats_hf = h5py.File(self.features_path, 'r')
-        feats = feats_hf.get('features')[img_idx]
+        feats = self.all_feats[img_idx]
         feats = torch.FloatTensor(np.array(feats, dtype=np.float32))
         return feats
 
@@ -76,7 +78,7 @@ class CLEVR_Dataset(Dataset):
         return (input_question, target_question), feats, answer
 
     def __len__(self):
-        if self.max_samples is None:  # TODO: understand how the max_samples works.
+        if self.max_samples is None:
             return self.input_questions.size(0)
         else:
             return min(self.max_samples, self.input_questions.size(0))
@@ -120,7 +122,9 @@ if __name__ == '__main__':
             print('feats shape', feats.shape)
     print('number of samples', batch)
     # ----------------------------------------------- test get_questions_from_img_idx------------
-    ep_questions = clevr_dataset.get_questions_from_img_idx(0).data.numpy()
+    int = np.random.randint(0, 21, size=1)
+    print(int)
+    ep_questions = clevr_dataset.get_questions_from_img_idx(int).data.numpy()
     print('questions subset', ep_questions.shape)
     ep_questions = [list(ep_questions[i, :]) for i in range(ep_questions.shape[0])]
     decoded_questions = [clevr_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]

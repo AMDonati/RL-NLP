@@ -7,7 +7,7 @@ import torch
 
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from preprocessing.text_functions import decode
-from train.reward import rewards
+from RL_toolbox.reward import rewards
 
 
 class ClevrEnv(gym.Env):

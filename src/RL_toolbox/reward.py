@@ -36,9 +36,15 @@ class Levenshtein(Reward):
     def __init__(self, path):
         Reward.__init__(self, path)
 
-    def get(self, question, ep_questions_decoded):
+    def get_old(self, question, ep_questions_decoded):
         distances = [nltk.edit_distance(question.split(), true_question.split()) for true_question in ep_questions_decoded]
         return -min(distances)
+
+    def get(self, question, ep_questions_decoded):
+        distances = [nltk.edit_distance(question.split(), true_question.split()) / (max(len(question.split()), len(true_question.split()))) for true_question in
+                     ep_questions_decoded]
+        similarities = [1-dist for dist in distances]
+        return max(similarities)
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein}
 
@@ -49,9 +55,34 @@ if __name__ == '__main__':
     rew = reward_func.get("is it blue ?", ["is it blue ?", "where is it ?"])
     print("reward {} cosine".format(rew))
 
+    print("levenshtein rewards...")
+
     reward_func = rewards["levenshtein"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
     rew = reward_func.get("is it blue ?", ["is it red ?", "where is it ?"])
     print("reward {} levenshtein".format(rew))
 
     rew = reward_func.get("is it blue ?", ["is it blue ?", "where is it ?"])
     print("reward {} levenshtein".format(rew))
+
+    str_1 = "is it blue and tiny?"
+    str_2 = "is it blue ?"
+
+    rew = reward_func.get_old(str_1, [str_2])
+    rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
+    print('rew negative ', rew)
+    print('rew norm negative', rew_norm)
+
+    rew_norm_pos = reward_func.get(str_1, [str_2])
+    print('rew norm positive', rew_norm_pos)
+
+    str_1 = "is it red?"
+    str_2 = "is it blue ?"
+
+
+    rew = reward_func.get_old(str_1, [str_2])
+    rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
+    print('rew', rew)
+    print('rew norm', rew_norm)
+
+    rew_norm_pos = reward_func.get(str_1, [str_2])
+    print('rew norm positive', rew_norm_pos)
