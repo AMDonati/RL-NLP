@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 
 from envs.clevr_env import ClevrEnv
-from train.reinforce import REINFORCE
+from agent.reinforce import REINFORCE
 
 
 def train(env, agent, log_interval=10, num_episodes=100, max_len=3):
