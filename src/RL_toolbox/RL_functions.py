@@ -42,7 +42,7 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
     # sample initial state
     if seed is not None:
         np.random.seed(seed)
-    img_idx = np.random.randint(0, len(clevr_dataset.img_idxs))
+    img_idx = np.random.randint(0, len(clevr_dataset))
     img_idx = 0  # FOR DEBUGGING.
     ep_questions = clevr_dataset.get_questions_from_img_idx(img_idx)  # shape (10, S-1) # used to compute the final reward of the episode.
     img_feats = clevr_dataset.get_feats_from_img_idx(img_idx)  # shape (1024, 14, 14)
