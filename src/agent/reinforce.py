@@ -6,9 +6,9 @@ from models.rl_basic import PolicyGRUWord
 
 
 class REINFORCE:
-    def __init__(self, hidden_size, word_emb_size, action_space, gamma=0.9):
+    def __init__(self, hidden_size, word_emb_size, action_space, gamma=0.9, lr=1e-2):
         self.model = PolicyGRUWord(num_tokens=action_space, word_emb_size=word_emb_size, hidden_size=hidden_size)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=1e-2)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma
 
     def select_action(self, state):

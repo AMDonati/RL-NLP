@@ -1,21 +1,25 @@
 # https://github.com/facebookresearch/clevr-iep/blob/master/iep/data.py
 # collate_fn in image captioning tuto: https://github.com/yunjey/pytorch-tutorial/blob/master/tutorials/03-advanced/image_captioning/data_loader.py
 # https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning/blob/master/datasets.py
-import torch
-from torch.utils.data import Dataset, DataLoader
 import json
+import os
+
 import h5py
 import numpy as np
-import os
+import torch
+from torch.utils.data import Dataset, DataLoader
+
 from preprocessing.text_functions import decode
+
 
 # TODO: add idx_to_token function.
 
 class CLEVR_Dataset(Dataset):
-    def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None):
+    def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None, debug_len_vocab=None):
         self.questions_path = h5_questions_path
         self.features_path = h5_feats_path
         self.vocab_path = vocab_path
+        self.debug_len_vocab = debug_len_vocab
         self.vocab_questions = self.get_vocab('question_token_to_idx')
         self.vocab_answers = self.get_vocab('answer_token_to_idx')
         self.len_vocab = len(self.vocab_questions)
@@ -33,7 +37,8 @@ class CLEVR_Dataset(Dataset):
     def get_vocab(self, key):
         with open(self.vocab_path, 'r') as f:
             vocab = json.load(f)[key]
-        vocab={k: vocab[k] for k in list(vocab.keys())[:20]}
+        if self.debug_len_vocab is not None:
+            vocab = {k: vocab[k] for k in list(vocab.keys())[:self.debug_len_vocab]}
         return vocab
 
     def load_data_from_h5(self, dataset):
@@ -67,8 +72,8 @@ class CLEVR_Dataset(Dataset):
         return tokens
 
     def decode(self, seq_idx, stop_at_end=True, delim=' '):
-        decoded=decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
-        decoded=decoded.replace(" <SOS>", "")
+        decoded = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
+        decoded = decoded.replace(" <SOS>", "")
         return decoded
 
     def __getitem__(self, index):
@@ -109,7 +114,7 @@ if __name__ == '__main__':
     ep_questions = clevr_dataset.get_questions_from_img_idx(0)
     print('questions subset', ep_questions.shape)
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     # test max samples case.
     clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                   h5_feats_path=h5_feats_path,
@@ -121,8 +126,8 @@ if __name__ == '__main__':
 
     for batch, ((inp, tar), feats, _) in enumerate(clevr_loader):
         if batch == 0:
-            print('inp', inp[0,:])
-            print('tar', tar[0,:])
+            print('inp', inp[0, :])
+            print('tar', tar[0, :])
             print('feats shape', feats.shape)
     print('number of samples', batch)
     # ----------------------------------------------- test get_questions_from_img_idx------------

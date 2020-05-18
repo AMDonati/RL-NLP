@@ -4,8 +4,8 @@ import os
 import pandas as pd
 import torch
 
-from envs.clevr_env import ClevrEnv
 from agent.reinforce import REINFORCE
+from envs.clevr_env import ClevrEnv
 
 
 def train(env, agent, log_interval=10, num_episodes=100, max_len=3):
@@ -52,6 +52,8 @@ if __name__ == '__main__':
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
+    parser.add_argument('-lr', type=float, default=1e-2, help="learning rate")
+    parser.add_argument('-debug_len_vocab', type=int, default=None, help="learning rate")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -60,8 +62,8 @@ if __name__ == '__main__':
     h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
     vocab_path = os.path.join(args.data_path, 'vocab.json')
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward)
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, debug_len_vocab=args.debug_len_vocab)
 
-    agent = REINFORCE(args.hidden_size, args.word_emb_size, env.clevr_dataset.len_vocab, gamma=0.9)
+    agent = REINFORCE(args.hidden_size, args.word_emb_size, env.clevr_dataset.len_vocab, gamma=args.gamma, lr=args.lr)
 
     train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes)

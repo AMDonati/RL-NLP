@@ -14,7 +14,8 @@ class ClevrEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="cosine",
-                 reward_path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json"):
+                 reward_path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json",
+                 debug_len_vocab=None):
         super(ClevrEnv, self).__init__()
         self.data_path = data_path
         h5_questions_path = os.path.join(data_path, 'train_questions.h5')
@@ -22,7 +23,7 @@ class ClevrEnv(gym.Env):
         vocab_path = os.path.join(data_path, 'vocab.json')
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
-                                           vocab_path=vocab_path)
+                                           vocab_path=vocab_path, debug_len_vocab=debug_len_vocab)
 
         # num_tokens = self.clevr_dataset.len_vocab
         # feats_shape = self.clevr_dataset.feats_shape
@@ -61,7 +62,7 @@ class ClevrEnv(gym.Env):
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(
             img_idx)  # shape (max_len - 1, 10) # used to compute the final reward of the episode.
         # self.ref_questions = self.ref_questions[1:2]
-        self.ref_questions = torch.tensor([[7, 8,10]])
+        self.ref_questions = torch.tensor([[7, 8, 10]])
         self.ref_questions_decoded = [
             self.clevr_dataset.decode(question).replace(" <PAD>", "")
             for question in self.ref_questions.numpy()]
