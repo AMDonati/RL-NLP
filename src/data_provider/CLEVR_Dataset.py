@@ -33,7 +33,7 @@ class CLEVR_Dataset(Dataset):
     def get_vocab(self, key):
         with open(self.vocab_path, 'r') as f:
             vocab = json.load(f)[key]
-        vocab={k: vocab[k] for k in list(vocab.keys())[:30]}
+        vocab={k: vocab[k] for k in list(vocab.keys())[:50]}
         return vocab
 
     def load_data_from_h5(self, dataset):

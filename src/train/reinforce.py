@@ -99,6 +99,7 @@ class PolicyGRU(nn.Module):
 
 
 class PolicyGRUWord(nn.Module):
+
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1):
         super(PolicyGRUWord, self).__init__()
         self.num_tokens = num_tokens
@@ -106,7 +107,6 @@ class PolicyGRUWord(nn.Module):
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.gru = nn.GRU(word_emb_size, self.hidden_size, batch_first=True)
-        # self.fc = nn.Linear(hidden_size, num_tokens)
         self.fc = nn.Linear(hidden_size, num_tokens + 1)
         self.saved_log_probs = []
         self.rewards = []
@@ -127,8 +127,8 @@ class PolicyGRUWord(nn.Module):
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
         probs = F.softmax(logits, dim=1)
         policy_dist = Categorical(probs)
-        probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
+        probs_ = policy_dist.probs.clone()
+        self.last_policy.append(probs_.detach().numpy()[0])
         return policy_dist, value
 
     def _get_embed_text(self, text):
@@ -153,31 +153,12 @@ epsilon = 1.
 
 
 def select_action(state):
-    # state = torch.from_numpy(state).float().unsqueeze(0)
-    # probs = policy(state.text, state.img)
-    # m = Categorical(probs[-1, :])
     m, value = policy(state.text, state.img)
     action = m.sample()
-    #global epsilon
-    #rand = np.random.random()
-    #if rand < epsilon:
-    #    print("random")
-    #    action = torch.randint(0, num_tokens, (1,))
-   # epsilon *= 0.999
-     #print("epsilon {}".format(epsilon))
-
-    # policy.saved_log_probs.append(m.log_prob(action).view(1))
     return action.item(), m.log_prob(action).view(1), value
 
 
 def finish_episode():
-    # Print model's state_dict
-    # print("Model's state_dict:")
-    states = policy.state_dict()
-    # for param_tensor in policy.state_dict():
-    # print(param_tensor, "\t", policy.state_dict()[param_tensor].size())
-    states_optim = optimizer.state_dict()
-
     R = 0
     policy_loss = []
     returns = []
@@ -186,17 +167,13 @@ def finish_episode():
         R = r + args.gamma * R
         returns.insert(0, R)
     returns = torch.tensor(returns)
-    std = returns.std() + eps if len(returns) > 1 else 1
-    # returns = (returns - returns.mean()) / std
     for log_prob, R, value in zip(policy.saved_log_probs, returns, policy.values):
         policy_loss.append(-log_prob * (R - value))
         ms = mse(value, R)
         policy_loss.append(ms.view(1))
-    # print(policy.last_policy[-1])
     optimizer.zero_grad()
     policy_loss = torch.cat(policy_loss).sum()
     policy_loss.backward()
-    # torch.nn.utils.clip_grad_norm_(policy.parameters(), 5)
     optimizer.step()
     del policy.rewards[:]
     del policy.saved_log_probs[:]
@@ -224,18 +201,13 @@ def main(num_episodes=100):
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
-        #if running_reward > 0.9:
-        #    print("Solved! Running reward is now {} and "
-        #          "the last episode runs to {} time steps!".format(running_reward, t))
-        #   break
-
         df = pd.DataFrame(policy.last_policy[-args.max_len:])
         # diff_df=df.diff(periods=5)
         diff_df = (df.iloc[-1] - df.iloc[0]).abs()
         top_words = diff_df.nlargest(4)
         print("top words changed in the policy : {}".format(clevr_dataset.decode(top_words.index)))
         # best_token=diff_df_mean.apply(lambda s, n: s.nlargest(n).index, axis=1, n=2)
-        # print("hs")
+
 
 
 if __name__ == '__main__':
