@@ -155,11 +155,11 @@ if __name__ == '__main__':
                 writer.add_text('episode_questions', ('...').join(ep_questions_decoded))
 
         if i % (10*log_interval) == (10*log_interval - 1):
-            logger.info('train loss for training step {}: {:5.3f}'.format(i, loss))
+            logger.info('train loss for training step {}: {:5.3f}'.format(i, (sum_loss / (10*log_interval))))
             logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
-            logger.info('running return for training step {}: {:8.3f}'.format(i, loss / (i + 1)))
+            logger.info('running return for training step {}: {:8.3f}'.format(i, running_return))
 
-            writer.add_scalar('training loss', sum_loss / (i + 1), i)
+            writer.add_scalar('training loss', sum_loss / (10*log_interval), i)
             writer.add_text('best current dialog and closest question:',
                             ('------------------------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
                             global_step=i+1)
