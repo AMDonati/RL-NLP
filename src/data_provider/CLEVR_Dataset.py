@@ -33,6 +33,7 @@ class CLEVR_Dataset(Dataset):
     def get_vocab(self, key):
         with open(self.vocab_path, 'r') as f:
             vocab = json.load(f)[key]
+        vocab={k: vocab[k] for k in list(vocab.keys())[:30]}
         return vocab
 
     def load_data_from_h5(self, dataset):
@@ -64,6 +65,11 @@ class CLEVR_Dataset(Dataset):
     def idx2word(self, seq_idx, delim=' ', stop_at_end=False):
         tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
         return tokens
+
+    def decode(self, seq_idx, stop_at_end=True, delim=' '):
+        decoded=decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
+        decoded=decoded.replace(" <SOS>", "")
+        return decoded
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]

@@ -8,15 +8,16 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 class Reward:
-    def __init__(self, path):
+    def __init__(self, path=None):
         self.path = path
+        self.last_reward = 0
 
     def get(self, question, ep_questions_decoded):
         pass
 
 
 class Cosine(Reward):
-    def __init__(self, path):
+    def __init__(self, path=None):
         Reward.__init__(self, path)
         with open(path) as json_file:
             data = json.load(json_file)
@@ -29,18 +30,36 @@ class Cosine(Reward):
         X = self.vectorizer.transform(data)
         S = cosine_similarity(X[0:1], X[1:])
         rew = max(S[0])
-        return rew
+        return float(rew)
 
 
-class Levenshtein(Reward):
-    def __init__(self, path):
+class Equal(Reward):
+    def __init__(self, path=None):
         Reward.__init__(self, path)
 
     def get(self, question, ep_questions_decoded):
-        distances = [nltk.edit_distance(question.split(), true_question.split()) for true_question in ep_questions_decoded]
-        return -min(distances)
+        reward = question[6:] in ep_questions_decoded
+        return int(reward)
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein}
+
+class Levenshtein(Reward):
+    def __init__(self, path=None):
+        Reward.__init__(self, path)
+
+    def get(self, question, ep_questions_decoded):
+        distances = [nltk.edit_distance(question.split()[1:], true_question.split()) for true_question in
+                     ep_questions_decoded]
+        self.last_reward = -min(distances)
+        # self.last_reward/=(25-len(question))
+        return self.last_reward
+
+    def get_diff(self, question, ep_questions_decoded):
+        prev_reward = self.last_reward
+        reward = self.get(question, ep_questions_decoded)
+        return reward - prev_reward
+
+
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "equal": Equal}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
