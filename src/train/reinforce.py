@@ -1,7 +1,6 @@
 import argparse
 import os
 
-import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -11,30 +10,6 @@ from torch.distributions import Categorical
 
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from envs.clevr_env import ClevrEnv
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-parser.add_argument("-word_emb_size", type=int, default=12, help="dimension of the embedding layer")
-parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
-parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
-parser.add_argument("-grad_clip", type=float)
-parser.add_argument("-lr", type=float, default=0.001)
-parser.add_argument("-bs", type=int, default=16, help="batch size")
-parser.add_argument("-max_len", type=int, default=10, help="max episode length")
-parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-parser.add_argument("-data_path", type=str, required=True,
-                    help="data folder containing questions embeddings and img features")
-parser.add_argument("-out_path", type=str, required=True, help="out folder")
-parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
-parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
-parser.add_argument('-gamma', type=float, default=1., help="gamma")
-parser.add_argument('-log_interval', type=int, default=10, help="gamma")
-parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
-
-args = parser.parse_args()
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward)
 
 
 # env.seed(args.seed)
@@ -136,35 +111,19 @@ class PolicyGRUWord(nn.Module):
         return hidden[-1]
 
 
-h5_questions_path = os.path.join(args.data_path, 'train_questions.h5')
-h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
-vocab_path = os.path.join(args.data_path, 'vocab.json')
-clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
-                              h5_feats_path=h5_feats_path,
-                              vocab_path=vocab_path)
-num_tokens = clevr_dataset.len_vocab
-policy = PolicyGRUWord(num_tokens=num_tokens,
-                       word_emb_size=8,
-                       hidden_size=16,
-                       )
-optimizer = optim.Adam(policy.parameters(), lr=1e-2)
-eps = np.finfo(np.float32).eps.item()
-epsilon = 1.
-
-
 def select_action(state):
     m, value = policy(state.text, state.img)
     action = m.sample()
     return action.item(), m.log_prob(action).view(1), value
 
 
-def finish_episode():
+def finish_episode(gamma=0.9):
     R = 0
     policy_loss = []
     returns = []
     mse = nn.MSELoss()
     for r in policy.rewards[::-1]:
-        R = r + args.gamma * R
+        R = r + gamma * R
         returns.insert(0, R)
     returns = torch.tensor(returns)
     for log_prob, R, value in zip(policy.saved_log_probs, returns, policy.values):
@@ -180,7 +139,7 @@ def finish_episode():
     del policy.values[:]
 
 
-def main(num_episodes=100):
+def train(env, policy, gamma=0.9, log_interval=10, num_episodes=100, max_len=3):
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
@@ -197,11 +156,11 @@ def main(num_episodes=100):
                 break
 
         running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-        finish_episode()
-        if i_episode % args.log_interval == 0:
+        finish_episode(gamma)
+        if i_episode % log_interval == 0:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
-        df = pd.DataFrame(policy.last_policy[-args.max_len:])
+        df = pd.DataFrame(policy.last_policy[-max_len:])
         # diff_df=df.diff(periods=5)
         diff_df = (df.iloc[-1] - df.iloc[0]).abs()
         top_words = diff_df.nlargest(4)
@@ -209,6 +168,40 @@ def main(num_episodes=100):
         # best_token=diff_df_mean.apply(lambda s, n: s.nlargest(n).index, axis=1, n=2)
 
 
-
 if __name__ == '__main__':
-    main(args.num_training_steps)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
+    parser.add_argument("-word_emb_size", type=int, default=12, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
+    parser.add_argument("-max_len", type=int, default=10, help="max episode length")
+    parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
+    parser.add_argument("-num_episodes", type=int, default=2000, help="number of episodes")
+
+    parser.add_argument("-data_path", type=str, required=True,
+                        help="data folder containing questions embeddings and img features")
+    parser.add_argument("-out_path", type=str, required=True, help="out folder")
+    parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
+    parser.add_argument('-gamma', type=float, default=1., help="gamma")
+    parser.add_argument('-log_interval', type=int, default=10, help="gamma")
+    parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
+
+    args = parser.parse_args()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward)
+
+    h5_questions_path = os.path.join(args.data_path, 'train_questions.h5')
+    h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
+    vocab_path = os.path.join(args.data_path, 'vocab.json')
+    clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
+                                  h5_feats_path=h5_feats_path,
+                                  vocab_path=vocab_path)
+    num_tokens = clevr_dataset.len_vocab
+    policy = PolicyGRUWord(num_tokens=num_tokens,
+                           word_emb_size=8,
+                           hidden_size=16,
+                           )
+    optimizer = optim.Adam(policy.parameters(), lr=1e-2)
+
+    train(env=env, policy=policy, gamma=args.gamma, log_interval=args.log_interval, num_episodes=args.num_episodes,
+          max_len=args.max_len)
