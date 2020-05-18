@@ -52,7 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
-    parser.add_argument('-lr', type=float, default=1e-2, help="learning rate")
+    parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-debug_len_vocab', type=int, default=None, help="learning rate")
 
     args = parser.parse_args()
@@ -63,6 +63,7 @@ if __name__ == '__main__':
     vocab_path = os.path.join(args.data_path, 'vocab.json')
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, debug_len_vocab=args.debug_len_vocab)
+    # debug_true_questions=[[7, 8, 10, 12, 14]]
 
     agent = REINFORCE(args.hidden_size, args.word_emb_size, env.clevr_dataset.len_vocab, gamma=args.gamma, lr=args.lr)
 

@@ -21,9 +21,11 @@ class ClevrEnv(gym.Env):
         h5_questions_path = os.path.join(data_path, 'train_questions.h5')
         h5_feats_path = os.path.join(data_path, 'train_features.h5')
         vocab_path = os.path.join(data_path, 'vocab.json')
+        # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
+        self.debug_len_vocab = debug_len_vocab
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
-                                           vocab_path=vocab_path, debug_len_vocab=debug_len_vocab)
+                                           vocab_path=vocab_path, debug_len_vocab=self.debug_len_vocab)
 
         # num_tokens = self.clevr_dataset.len_vocab
         # feats_shape = self.clevr_dataset.feats_shape
@@ -37,10 +39,12 @@ class ClevrEnv(gym.Env):
             'img_idx', 'img_feats', 'GD_questions', 'dialog', 'rewards'))  # TODO: Build an Episode Dataset instead.
         self.step_idx = 0
         self.state = None
+        self.ref_questions = torch.randint(0, self.debug_len_vocab,
+                                           (1, 5)) if self.debug_len_vocab is not None else None
+        self.ref_questions_decoded = None
         self.reset()
         self.max_len = max_len
-        self.ref_questions = None
-        self.ref_questions_decoded = None
+
         self.reward_func = rewards[reward_type](reward_path)
 
     def step(self, action):
@@ -59,10 +63,13 @@ class ClevrEnv(gym.Env):
     def reset(self):
         img_idx = np.random.randint(0, len(self.clevr_dataset.img_idxs))
         img_idx = 10  # for debugging.
-        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(
-            img_idx)  # shape (max_len - 1, 10) # used to compute the final reward of the episode.
+
         # self.ref_questions = self.ref_questions[1:2]
-        self.ref_questions = torch.tensor([[7, 8, 10]])
+
+        if self.debug_len_vocab is None:
+            self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(
+                img_idx)  # shape (max_len - 1, 10) # used to compute the final reward of the episode.
+            # self.ref_questions = torch.tensor(self.debug_true_questions)
         self.ref_questions_decoded = [
             self.clevr_dataset.decode(question).replace(" <PAD>", "")
             for question in self.ref_questions.numpy()]
