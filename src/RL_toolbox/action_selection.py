@@ -46,9 +46,8 @@ def select_action_batch(policy_network, state, device, mode='greedy'):
     return action.view(bs, 1), log_prob
 
 
-
-
 if __name__ == '__main__':
+
     State = namedtuple('State', ('text', 'img'))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     BATCH_SIZE = 1
