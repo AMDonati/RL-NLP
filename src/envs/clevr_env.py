@@ -39,11 +39,12 @@ class ClevrEnv(gym.Env):
             'img_idx', 'img_feats', 'GD_questions', 'dialog', 'rewards'))  # TODO: Build an Episode Dataset instead.
         self.step_idx = 0
         self.state = None
-        self.ref_questions = torch.randint(0, self.debug_len_vocab,
-                                           (1, 5)) if self.debug_len_vocab is not None else None
+        self.max_len = max_len
+        #self.ref_questions = torch.randint(0, self.debug_len_vocab,
+         #                                  (3, self.max_len)) if self.debug_len_vocab is not None else None
+        self.ref_questions=torch.tensor([[7, 8, 10, 12, 14]])
         self.ref_questions_decoded = None
         self.reset()
-        self.max_len = max_len
 
         self.reward_func = rewards[reward_type](reward_path)
 

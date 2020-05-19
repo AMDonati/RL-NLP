@@ -33,13 +33,18 @@ class Cosine(Reward):
         return float(rew)
 
 
-class Equal(Reward):
+class PerWord(Reward):
     def __init__(self, path=None):
         Reward.__init__(self, path)
 
     def get(self, question, ep_questions_decoded):
-        reward = question[6:] in ep_questions_decoded
-        return int(reward)
+        reward = max([self.compare(question.split(), true_question.split()) for true_question in ep_questions_decoded])
+        return reward
+
+    @staticmethod
+    def compare(question, true_question):
+        return sum([question[i + 1] == true_question[i] for i in range(len(true_question)) if
+                    i < len(question)-1])
 
 
 class Levenshtein(Reward):
@@ -59,7 +64,7 @@ class Levenshtein(Reward):
         return reward - prev_reward
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "equal": Equal}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "perword": PerWord}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
