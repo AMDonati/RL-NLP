@@ -12,7 +12,7 @@ def train(env, agent, log_interval=10, num_episodes=100, max_len=3):
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
-        for t in range(0, env.max_len):
+        for t in range(0, env.max_len+1):
             action, log_probs, value = agent.select_action(state)
             state, reward, done, _ = env.step(action)
             # if args.render:
