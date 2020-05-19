@@ -24,7 +24,7 @@ class REINFORCE:
         for r in self.model.rewards[::-1]:
             R = r + self.gamma * R
             returns.insert(0, R)
-        returns = torch.tensor(returns)
+        returns = torch.tensor(returns).float()
         for log_prob, R, value in zip(self.model.saved_log_probs, returns, self.model.values):
             policy_loss.append(-log_prob * (R - value))
             ms = mse(value, R)

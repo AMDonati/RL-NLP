@@ -52,7 +52,7 @@ class ClevrEnv(gym.Env):
 
         self.step_idx = 0
         self.state, self.dialog = None, None
-        self.ref_questions, self.ref_questions_decoded = None, None
+        #self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats = None, None
 
 
@@ -61,14 +61,15 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
         question = self.clevr_dataset.decode(self.state.text.numpy()[0])
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
-        question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
-                                          EOS_idx=self.special_tokens.EOS_idx)
+        #question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
+        #                                  EOS_idx=self.special_tokens.EOS_idx)
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded) if done else (
         0, None)
         self.step_idx += 1
         if done:
             self.dialog = question
+            print(question)
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
