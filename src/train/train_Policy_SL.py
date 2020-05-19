@@ -57,18 +57,21 @@ if __name__ == '__main__':
     val_questions_path = os.path.join(args.data_path, "val_questions.h5")
     val_feats_path = os.path.join(args.data_path, 'val_features.h5')
     vocab_path = os.path.join(args.data_path, "vocab.json")
-    # train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
-    #                               h5_feats_path=train_feats_path,
-    #                               vocab_path=vocab_path,
-    #                               max_samples=21)
-    train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
-                                  h5_feats_path=train_feats_path,
-                                  vocab_path=vocab_path)
-    # val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
-    #                               h5_feats_path=val_feats_path,
-    #                               vocab_path=vocab_path,
-    #                               max_samples=21)
-    val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
+
+    if device.type == 'cpu':
+        train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
+                                      h5_feats_path=train_feats_path,
+                                      vocab_path=vocab_path,
+                                      max_samples=21)
+        val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
+                                    h5_feats_path=val_feats_path,
+                                    vocab_path=vocab_path,
+                                    max_samples=21)
+    else:
+        train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
+                                      h5_feats_path=train_feats_path,
+                                      vocab_path=vocab_path)
+        val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
                                 h5_feats_path=val_feats_path,
                                 vocab_path=vocab_path)
 
@@ -102,8 +105,7 @@ if __name__ == '__main__':
     EPOCHS = args.ep
 
     num_batches = int(len(train_dataset) / args.bs)
-    #print_interval = 10
-    print_interval = int(num_batches / 10)
+    print_interval = 10 if device.type =='cpu' else int(num_batches / 10)
 
     ###############################################################################
     # Create logger, output_path and config file.
@@ -138,7 +140,7 @@ if __name__ == '__main__':
     ################################################################################################################################################
     # Train the model
     ################################################################################################################################################
-
+    logger.info('LSTM with projection layer...')
     logger.info("start training...")
     logger.info("hparams: {}".format(hparams))
     train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []

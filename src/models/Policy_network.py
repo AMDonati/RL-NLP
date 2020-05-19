@@ -11,7 +11,7 @@ import numpy as np
 
 class PolicyLSTM(nn.Module):
     def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0,
-                 pooling=True, project=False):
+                 pooling=True, value_fn=False):
         super(PolicyLSTM, self).__init__()
         self.num_tokens = num_tokens
         self.emb_size = emb_size
@@ -21,28 +21,23 @@ class PolicyLSTM(nn.Module):
         if num_filters is None:
             self.num_filters = word_emb_size
         else:
-            self.num_filters = num_filters
+            self.num_filters = num_filters #TODO add a min between 64 and word_emb_size.
         self.pooling = pooling
-        self.project = project
         self.dropout = nn.Dropout(p_drop)
         self.embedding = nn.Embedding(num_tokens, word_emb_size)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
         if pooling:
             self.max_pool = nn.MaxPool2d(kernel_size=2)
-        if project:
-            self.fc_emb = nn.Linear(emb_size, word_emb_size)
-            self.lstm = nn.LSTM(input_size=word_emb_size,
-                            hidden_size=hidden_size,
-                            num_layers=num_layers,
-                            dropout=p_drop,
-                            batch_first=True)
-        else:
-            self.lstm = nn.LSTM(input_size=emb_size,
+        self.lstm = nn.LSTM(input_size=emb_size,
                                 hidden_size=hidden_size,
                                 num_layers=num_layers,
                                 dropout=p_drop,
                                 batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_tokens)
+        self.action_head = nn.Linear(hidden_size, num_tokens)
+        if value_fn:
+            self.value_head = nn.Linear(hidden_size, 1)
+        else:
+            self.value_head = None
 
     def forward(self, text_inputs, img_feat):
         '''
@@ -60,17 +55,20 @@ class PolicyLSTM(nn.Module):
         img_feat = F.relu(self.conv(img_feat))
         if self.pooling:
             img_feat = self.max_pool(img_feat)
-
         img_feat = img_feat.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)  # shape (B, S, C*H*W)
         vis_text_emb = torch.cat([words_emb, img_feat], axis=-1)
-        if self.project:
-            vis_text_emb = F.relu(self.fc_emb(vis_text_emb))
         output, hidden = self.lstm(vis_text_emb)
         output = self.dropout(output)
-        logits = self.fc(output)  # (S,B,num_tokens)
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
 
-        return logits, hidden
+        logits = self.action_head(output)  # (S,B,num_tokens)
+        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        if self.value_head is not None:
+            value = self.value_head(output)
+            value = value.view(-1, 1)
+        else:
+            value = None
+
+        return logits, hidden, value
 
 
 class PolicyMLP(nn.Module):
@@ -131,9 +129,9 @@ if __name__ == '__main__':
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0,
-                       project=True)
+                       value_fn=True)
 
-    output, hidden = model(dummy_text_input, img_feat)  # shape (B*S, num_tokens)
+    output, hidden, value = model(dummy_text_input, img_feat)  # shape (B*S, num_tokens)
     output = output.view(-1, seq_len, num_tokens)
     print('output shape', output.shape)
     # print("sample output", output[0, :, :])

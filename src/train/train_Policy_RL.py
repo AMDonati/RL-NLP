@@ -1,9 +1,14 @@
 # https://pytorch.org/tutorials/intermediate/tensorboard_tutorial.html?highlight=tensorboard
 # example of ROUGE computation: https://github.com/atulkum/pointer_summarizer/blob/master/data_util/utils.py
-from models.Policy_network import PolicyLSTM, PolicyMLP
+import os
+import torch
+import numpy as np
 import argparse
+from models.Policy_network import PolicyLSTM, PolicyMLP
+from envs.clevr_env import ClevrEnv
 from utils.utils_train import create_logger, write_to_csv
-from train.RL_functions import *
+from RL_toolbox.RL_functions import generate_one_episode, padder_batch, train_episodes_batch
+from RL_toolbox.reinforce import REINFORCE
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -31,56 +36,52 @@ if __name__ == '__main__':
     parser.add_argument("-bs", type=int, default=16, help="batch size")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument("-num_training_steps", type=int, default=100000, help="number of training_steps")
-    parser.add_argument("-data_path", type=str, required=True,
-                        help="data folder containing questions embeddings and img features")
+    parser.add_argument("-action_selection", type=str, default='sampling', help='mode to select action (greedy or sampling)')
+    parser.add_argument("-data_path", type=str, required=True, help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
-    parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
-
+    parser.add_argument('-pre_train', type=str2bool, default=False, help="pre-train the policy network with SL.")
+    parser.add_argument('-model_path', type=str, default='../../output/SL_32_64/model.pt', help="path for the pre-trained model with SL")
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ###############################################################################
-    # Build CLEVR DATASET
+    # Load CLEVR ENVIRONMENT
     ###############################################################################
 
-    h5_questions_path = os.path.join(args.data_path, 'train_questions.h5')
-    h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
-    vocab_path = os.path.join(args.data_path, 'vocab.json')
-    clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
-                                  h5_feats_path=h5_feats_path,
-                                  vocab_path=vocab_path)
-
-    num_tokens = clevr_dataset.len_vocab
-    feats_shape = clevr_dataset.feats_shape
-    SOS_idx = clevr_dataset.vocab_questions["<SOS>"]
-    EOS_idx = clevr_dataset.vocab_questions["<EOS>"]
-
-    Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx'))
-    special_tokens = Special_Tokens(SOS_idx, EOS_idx)
-    State = namedtuple('State', ('text', 'img'))
-    Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'dialog', 'rewards'))
+    env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=20)
+    num_tokens = env.num_tokens
 
     ##################################################################################################################
     # Build the Policy Network and define hparams
     ##################################################################################################################
-    if args.model == 'mlp':
-        policy_network = PolicyMLP(num_tokens=num_tokens,
-                               word_emb_size=args.word_emb_size,
-                               units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
-    elif args.model == 'lstm':
-        policy_network = PolicyLSTM(num_tokens=num_tokens,
-                                word_emb_size=args.word_emb_size,
-                                emb_size=args.word_emb_size + args.word_emb_size*7*7,
-                                hidden_size=args.hidden_size,
-                                num_layers=args.num_layers,
-                                p_drop=args.p_drop).to(device)
+    if args.pre_train:
+        print('pre-training phase...')
+        assert args.model_path is not None
+        with open(args.model_path, 'rb') as f:
+            policy_network = torch.load(f, map_location=device).to(device)
+            #TODO: add the value_head layer.
+    else:
+        if args.model == 'mlp':
+            policy_network = PolicyMLP(num_tokens=num_tokens,
+                                   word_emb_size=args.word_emb_size,
+                                   units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
+        elif args.model == 'lstm':
+            policy_network = PolicyLSTM(num_tokens=num_tokens,
+                                    word_emb_size=args.word_emb_size,
+                                    emb_size=args.word_emb_size + args.word_emb_size*7*7,
+                                    hidden_size=args.hidden_size,
+                                    num_layers=args.num_layers,
+                                    p_drop=args.p_drop,
+                                    value_fn=True).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
-    output_path = os.path.join(args.out_path, "RL_{}_emb_{}_lr_{}_bs_{}_{}steps".format(args.model,
+    output_path = os.path.join(args.out_path, "RL_lv_reward_{}_emb_{}_hid_{}_lr_{}_bs_{}_{}steps_mode_{}".format(args.model,
                                                                                         args.word_emb_size,
+                                                                                        args.hidden_size,
                                                                                         args.lr,
                                                                                         args.bs,
-                                                                                        args.num_training_steps))
+                                                                                        args.num_training_steps,
+                                                                                        args.action_selection))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
@@ -88,21 +89,13 @@ if __name__ == '__main__':
     csv_out_file = os.path.join(output_path, 'train_history.csv')
     model_path = os.path.join(output_path, 'model.pt')
 
-
-    train_dataset = clevr_dataset
-    store_episodes = True
-    log_interval = 10
+    log_interval = 100
 
     #####################################################################################################################
     # REINFORCE Algo.
     #####################################################################################################################
 
-    # -------- test of generate one episode function  ------------------------------------------------------------------------------------------------------
-    # log_probs, returns, episodes = generate_one_episode(clevr_dataset=clevr_dataset,
-    #                                                     policy_network=policy_network,
-    #                                                     special_tokens=special_tokens,
-    #                                                     device=device)
-    # ------------------------------------------------------------
+    reinforce = REINFORCE(env=env, model=policy_network, optimizer=optimizer, device=device, mode=args.action_selection)
 
     running_return, sum_loss = 0., 0.
     all_episodes = []
@@ -110,57 +103,51 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
     # Get and print set of questions for the fixed img.
-    ep_questions = train_dataset.get_questions_from_img_idx(0).data.numpy()
-    ep_questions = [list(ep_questions[i, :10]) for i in range(ep_questions.shape[0])]
-    decoded_questions = [train_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
-    logger.info("episode questions (10tokens):")
-    logger.info('{}'.format('\n').join(decoded_questions))
+    logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 10')
 
     for i in range(args.num_training_steps):
-        log_probs_batch, returns_batch, episodes_batch = [], [], []
-        for _ in range(args.bs):
-            log_probs, returns, episode = generate_one_episode(clevr_dataset=train_dataset,
-                                                               policy_network=policy_network,
-                                                               special_tokens=special_tokens,
-                                                               max_len=args.max_len,
-                                                               device=device)
+        log_probs_batch, returns_batch, values_batch, episodes_batch = [], [], [], []
+        for batch in range(args.bs):
+            log_probs, returns, values, episode = reinforce.generate_one_episode()
             log_probs_batch.append(log_probs)
             returns_batch.append(returns)
-            if store_episodes:
-                episodes_batch.append(episode)
+            values_batch.append(values)
+            episodes_batch.append(episode)
 
-        log_probs_batch = padder_batch(log_probs_batch)
-        returns_batch = padder_batch(returns_batch)
-        batch_avg_return = returns_batch[:, -1, :].mean(0).squeeze().data.numpy()
-        loss = train_episodes_batch(log_probs_batch=log_probs_batch, returns_batch=returns_batch, optimizer=optimizer)
+        # getting return statistics before padding.
+        return_batch = [r[-1] for r in returns_batch]
+        batch_avg_return = sum(return_batch) / len(return_batch)
+        batch_max_return, max_id = max(return_batch), np.asarray(return_batch).argmax()
+        max_dialog, closest_question = episodes_batch[max_id].dialog, episodes_batch[max_id].closest_question
+
+        log_probs_batch = padder_batch(log_probs_batch) # shape (bs, max_len, 1)
+        returns_batch = padder_batch(returns_batch) # shape (bs, max_len, 1)
+        values_batch = padder_batch(values_batch)
+        loss = reinforce.train_batch(returns=returns_batch, log_probs=log_probs_batch, values=values_batch)
         sum_loss += loss
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
 
         if i % log_interval == log_interval - 1:
-            # writing metrics to tensorboard.
-            writer.add_scalar('batch return',batch_avg_return,i)
-            writer.add_scalar('running return', running_return,i)
-            if store_episodes and i == log_interval - 1:
-                writer.add_text('episode_questions(10tokens)', ('...').join(decoded_questions))
-
-        if i % (10*log_interval) == (10*log_interval - 1):
-            logger.info('train loss for training step {}: {:5.3f}'.format(i, loss))
+            logger.info('train loss for training step {}: {:5.3f}'.format(i, sum_loss / log_interval))
             logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
-            logger.info('running return for training step {}: {:8.3f}'.format(i, loss / (i + 1)))
-            writer.add_scalar('training loss', sum_loss / (i + 1), i)
-            dialog_batch = [list(ep.dialog) for ep in episodes_batch]
-            decoded_dialog_batch = [train_dataset.idx2word(dialog, stop_at_end=True) for dialog in dialog_batch]
-            writer.add_text('dialog_batch', ('...\t').join(decoded_dialog_batch), global_step=i)
+            logger.info('running return for training step {}: {:8.3f}'.format(i, running_return))
+
+            # writing metrics to tensorboard.
+            writer.add_scalar('batch return', batch_avg_return, i + 1)
+            writer.add_scalar('running return', running_return, i + 1)
+            writer.add_scalar('training loss', sum_loss / log_interval, i+1)
+            writer.add_text('best current dialog and closest question:',
+                            ('------------------------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
+                            global_step=i+1)
 
             sum_loss = 0. #resetting loss.
+
             with open(model_path, 'wb') as f:
                 torch.save(policy_network, f)
             # save loss and return information.
-            loss_hist.append(loss / (i + 1))
+            loss_hist.append(loss / log_interval)
             batch_return_hist.append(batch_avg_return)
             running_return_hist.append(running_return)
-
-        if store_episodes:
             all_episodes.append(episodes_batch)
 
     hist_keys = ['loss', 'return_batch', 'running_return']
