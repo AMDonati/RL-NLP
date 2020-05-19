@@ -25,32 +25,9 @@ def preprocess_final_state(state_text, dataset, EOS_idx):
         decoded_dialog = dataset.idx2word(list(dialog), stop_at_end=True)
     return decoded_dialog
 
-def preprocess_ep_questions(ep_questions, dataset, PAD_idx, max_len=None):
-    ep_questions = ep_questions.data.numpy()
-    if max_len is not None:
-        ep_questions = ep_questions[:, :max_len]
-    masks = [list(np.where(ep_questions[i,:] != PAD_idx)[0]) for i in range(ep_questions.shape[0])] # removing padding.
-    ep_questions = [list(ep_questions[i,m]) for i,m in enumerate(masks)]
-    decoded_questions = [dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
-    return decoded_questions
-
-
-def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, max_len=None, select='greedy', seed=None):
-    if max_len is None:
-        max_len = clevr_dataset.input_questions.size(1)  # max_length set-up to max length of questions dataset (or avg len?)
-    max_len = 10  # FOR DEBUGGING.
-    # sample initial state
-    if seed is not None:
-        np.random.seed(seed)
-    img_idx = np.random.randint(0, len(clevr_dataset))
-    img_idx = 0  # FOR DEBUGGING.
-    ep_questions = clevr_dataset.get_questions_from_img_idx(img_idx)  # shape (10, S-1) # used to compute the final reward of the episode.
-    img_feats = clevr_dataset.get_feats_from_img_idx(img_idx)  # shape (1024, 14, 14)
-    initial_state = State(torch.LongTensor([special_tokens.SOS_idx]).view(1, 1), img_feats.unsqueeze(0))
-
-    state = initial_state
+def generate_one_episode(env, policy_network, device, select='greedy'):
+    state = env.reset()
     done = False
-    step = 0
     rewards, log_probs = [], []
     while not done:
         if select == 'sampling':
@@ -58,26 +35,16 @@ def generate_one_episode(clevr_dataset, policy_network, special_tokens, device, 
         elif select == 'greedy':
             action, log_prob = select_action(policy_network, state, device, mode='greedy')
         # compute next state, done, reward from the action.
-        next_state = State(torch.cat([state.text, action], dim=1), state.img)
-        done = True if action.item() == special_tokens.EOS_idx or step == (max_len - 1) else False
-        if done:
-            ep_questions_decoded = preprocess_ep_questions(ep_questions=ep_questions, dataset=clevr_dataset, PAD_idx=special_tokens.PAD_idx, max_len=max_len)
-            dialog = preprocess_final_state(state_text=next_state.text, dataset=clevr_dataset, EOS_idx=special_tokens.EOS_idx)
-            reward_fn = Levenshtein(path=None)
-            reward, closest_question = reward_fn.get(question=dialog, ep_questions_decoded=ep_questions_decoded)
-        else:
-            reward = 0.
-            step += 1
+        state, (reward, closest_question), done, _ = env.step(action)
         rewards.append(reward)
         log_probs.append(log_prob)
-        state = next_state
 
-    episode = Episode(img_idx, img_feats.data.numpy(), ep_questions_decoded, closest_question, dialog, rewards)
+    episode = Episode(env.img_idx, env.img_feats.data.numpy(), env.ref_questions_decoded, closest_question, env.dialog, rewards)
     return_ep = sum(rewards)
-    returns = [return_ep] * (step + 1)
+    returns = [return_ep] * (env.step_idx)
 
-    if len(returns) < max_len:
-        assert state.text[:, -1] == special_tokens.EOS_idx
+    if len(returns) < env.max_len:
+        assert state.text[:, -1] == env.special_tokens.EOS_idx
 
     return log_probs, returns, episode
 

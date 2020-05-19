@@ -36,10 +36,6 @@ class Levenshtein(Reward):
     def __init__(self, path):
         Reward.__init__(self, path)
 
-    def get_old(self, question, ep_questions_decoded):
-        distances = [nltk.edit_distance(question.split(), true_question.split()) for true_question in ep_questions_decoded]
-        return -min(distances)
-
     def get(self, question, ep_questions_decoded):
         if question is None:
             return 0., None

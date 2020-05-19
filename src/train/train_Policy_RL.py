@@ -4,11 +4,10 @@ import os
 import torch
 import numpy as np
 import argparse
-from collections import namedtuple
 from models.Policy_network import PolicyLSTM, PolicyMLP
-from data_provider.CLEVR_Dataset import CLEVR_Dataset
+from envs.clevr_env import ClevrEnv
 from utils.utils_train import create_logger, write_to_csv
-from RL_toolbox.RL_functions import generate_one_episode, preprocess_ep_questions, padder_batch, train_episodes_batch
+from RL_toolbox.RL_functions import generate_one_episode, padder_batch, train_episodes_batch
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -45,27 +44,11 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ###############################################################################
-    # Build CLEVR DATASET
+    # Load CLEVR ENVIRONMENT
     ###############################################################################
 
-    h5_questions_path = os.path.join(args.data_path, 'train_questions.h5')
-    h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
-    vocab_path = os.path.join(args.data_path, 'vocab.json')
-    train_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
-                                  h5_feats_path=h5_feats_path,
-                                  vocab_path=vocab_path,
-                                  max_samples=20)
-
-    num_tokens = train_dataset.len_vocab
-    feats_shape = train_dataset.feats_shape
-    SOS_idx = train_dataset.vocab_questions["<SOS>"]
-    EOS_idx = train_dataset.vocab_questions["<EOS>"]
-    PAD_idx = train_dataset.vocab_questions["<PAD>"]
-
-    Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', 'PAD_idx'))
-    special_tokens = Special_Tokens(SOS_idx, EOS_idx, PAD_idx)
-    State = namedtuple('State', ('text', 'img'))
-    Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'closest_question', 'dialog', 'rewards'))
+    env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=None)
+    num_tokens = env.num_tokens
 
     ##################################################################################################################
     # Build the Policy Network and define hparams
@@ -75,7 +58,6 @@ if __name__ == '__main__':
         assert args.model_path is not None
         with open(args.model_path, 'rb') as f:
             policy_network = torch.load(f, map_location=device).to(device)
-            policy_network.project = False
     else:
         if args.model == 'mlp':
             policy_network = PolicyMLP(num_tokens=num_tokens,
@@ -104,7 +86,7 @@ if __name__ == '__main__':
     csv_out_file = os.path.join(output_path, 'train_history.csv')
     model_path = os.path.join(output_path, 'model.pt')
 
-    log_interval = 10
+    log_interval = 100
 
     #####################################################################################################################
     # REINFORCE Algo.
@@ -116,19 +98,13 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
     # Get and print set of questions for the fixed img.
-    ep_questions = train_dataset.get_questions_from_img_idx(0)
-    ep_questions_decoded = preprocess_ep_questions(ep_questions=ep_questions, dataset=train_dataset, PAD_idx=special_tokens.PAD_idx)
     logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 10')
-    logger.info("episode questions (full length):")
-    logger.info('{}'.format('\n').join(ep_questions_decoded))
 
     for i in range(args.num_training_steps):
         log_probs_batch, returns_batch, episodes_batch = [], [], []
         for batch in range(args.bs):
-            log_probs, returns, episode = generate_one_episode(clevr_dataset=train_dataset,
+            log_probs, returns, episode = generate_one_episode(env=env,
                                                                policy_network=policy_network,
-                                                               special_tokens=special_tokens,
-                                                               max_len=args.max_len,
                                                                device=device,
                                                                select=args.action_selection)
             log_probs_batch.append(log_probs)
@@ -148,28 +124,32 @@ if __name__ == '__main__':
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
 
         if i % log_interval == log_interval - 1:
-            # writing metrics to tensorboard.
-            writer.add_scalar('batch return',batch_avg_return,i+1)
-            writer.add_scalar('running return', running_return,i+1)
-            if i == log_interval - 1:
-                writer.add_text('episode_questions', ('...').join(ep_questions_decoded))
-
-        if i % (10*log_interval) == (10*log_interval - 1):
             logger.info('train loss for training step {}: {:5.3f}'.format(i, (sum_loss / (10*log_interval))))
             logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
             logger.info('running return for training step {}: {:8.3f}'.format(i, running_return))
 
-            writer.add_scalar('training loss', sum_loss / (10*log_interval), i)
+            # writing metrics to tensorboard.
+            writer.add_scalar('batch return', batch_avg_return, i + 1)
+            writer.add_scalar('running return', running_return, i + 1)
+            writer.add_scalar('training loss', sum_loss / log_interval, i+1)
             writer.add_text('best current dialog and closest question:',
                             ('------------------------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
                             global_step=i+1)
-            #writer.add_text('closest question', closest_question, global_step=i+1)
+
+            if i == log_interval - 1:
+                ep_questions_decoded = [
+                    env.clevr_dataset.idx2word(question, idx_to_token=env.clevr_dataset.idx_to_token,
+                                               stop_at_end=True).replace(" <PAD>", "")
+                    for question in env.ref_questions.numpy()]
+                writer.add_text('episode_questions', ('...').join(ep_questions_decoded))
+                logger.info("episode questions (full length):")
+                logger.info('{}'.format('\n').join(ep_questions_decoded))
 
             sum_loss = 0. #resetting loss.
             with open(model_path, 'wb') as f:
                 torch.save(policy_network, f)
             # save loss and return information.
-            loss_hist.append(loss / (i + 1))
+            loss_hist.append(loss / log_interval)
             batch_return_hist.append(batch_avg_return)
             running_return_hist.append(running_return)
             all_episodes.append(episodes_batch)
