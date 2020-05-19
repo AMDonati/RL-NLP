@@ -8,6 +8,7 @@ from models.Policy_network import PolicyLSTM, PolicyMLP
 from envs.clevr_env import ClevrEnv
 from utils.utils_train import create_logger, write_to_csv
 from RL_toolbox.RL_functions import generate_one_episode, padder_batch, train_episodes_batch
+from RL_toolbox.reinforce import REINFORCE
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     # Load CLEVR ENVIRONMENT
     ###############################################################################
 
-    env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=None)
+    env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=20)
     num_tokens = env.num_tokens
 
     ##################################################################################################################
@@ -58,6 +59,7 @@ if __name__ == '__main__':
         assert args.model_path is not None
         with open(args.model_path, 'rb') as f:
             policy_network = torch.load(f, map_location=device).to(device)
+            #TODO: add the value_head layer.
     else:
         if args.model == 'mlp':
             policy_network = PolicyMLP(num_tokens=num_tokens,
@@ -69,7 +71,8 @@ if __name__ == '__main__':
                                     emb_size=args.word_emb_size + args.word_emb_size*7*7,
                                     hidden_size=args.hidden_size,
                                     num_layers=args.num_layers,
-                                    p_drop=args.p_drop).to(device)
+                                    p_drop=args.p_drop,
+                                    value_fn=True).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
     output_path = os.path.join(args.out_path, "RL_lv_reward_{}_emb_{}_hid_{}_lr_{}_bs_{}_{}steps_mode_{}".format(args.model,
@@ -92,6 +95,8 @@ if __name__ == '__main__':
     # REINFORCE Algo.
     #####################################################################################################################
 
+    reinforce = REINFORCE(env=env, model=policy_network, optimizer=optimizer, device=device, mode=args.action_selection)
+
     running_return, sum_loss = 0., 0.
     all_episodes = []
     loss_hist, batch_return_hist, running_return_hist = [], [], []
@@ -101,14 +106,12 @@ if __name__ == '__main__':
     logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 10')
 
     for i in range(args.num_training_steps):
-        log_probs_batch, returns_batch, episodes_batch = [], [], []
+        log_probs_batch, returns_batch, values_batch, episodes_batch = [], [], [], []
         for batch in range(args.bs):
-            log_probs, returns, episode = generate_one_episode(env=env,
-                                                               policy_network=policy_network,
-                                                               device=device,
-                                                               select=args.action_selection)
+            log_probs, returns, values, episode = reinforce.generate_one_episode()
             log_probs_batch.append(log_probs)
             returns_batch.append(returns)
+            values_batch.append(values)
             episodes_batch.append(episode)
 
         # getting return statistics before padding.
@@ -119,12 +122,13 @@ if __name__ == '__main__':
 
         log_probs_batch = padder_batch(log_probs_batch) # shape (bs, max_len, 1)
         returns_batch = padder_batch(returns_batch) # shape (bs, max_len, 1)
-        loss = train_episodes_batch(log_probs_batch=log_probs_batch, returns_batch=returns_batch, optimizer=optimizer)
+        values_batch = padder_batch(values_batch)
+        loss = reinforce.train_batch(returns=returns_batch, log_probs=log_probs_batch, values=values_batch)
         sum_loss += loss
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
 
         if i % log_interval == log_interval - 1:
-            logger.info('train loss for training step {}: {:5.3f}'.format(i, (sum_loss / (10*log_interval))))
+            logger.info('train loss for training step {}: {:5.3f}'.format(i, sum_loss / log_interval))
             logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
             logger.info('running return for training step {}: {:8.3f}'.format(i, running_return))
 
@@ -136,16 +140,8 @@ if __name__ == '__main__':
                             ('------------------------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
                             global_step=i+1)
 
-            if i == log_interval - 1:
-                ep_questions_decoded = [
-                    env.clevr_dataset.idx2word(question, idx_to_token=env.clevr_dataset.idx_to_token,
-                                               stop_at_end=True).replace(" <PAD>", "")
-                    for question in env.ref_questions.numpy()]
-                writer.add_text('episode_questions', ('...').join(ep_questions_decoded))
-                logger.info("episode questions (full length):")
-                logger.info('{}'.format('\n').join(ep_questions_decoded))
-
             sum_loss = 0. #resetting loss.
+
             with open(model_path, 'wb') as f:
                 torch.save(policy_network, f)
             # save loss and return information.

@@ -13,7 +13,7 @@ def select_action(policy_network, state, device, mode='greedy'):
     policy_network.train()
     state.text.to(device)
     state.img.to(device)
-    logits, _ = policy_network(state.text, state.img) # logits > shape (s*num_samples, num_tokens)
+    logits, hidden, value = policy_network(state.text, state.img) # logits > shape (s*num_samples, num_tokens)
     logits = logits.view(bs, seq_len, -1)
     probas = F.softmax(logits, dim=-1) # (num samples, s, num_tokens)
     if mode == 'sampling':
@@ -23,7 +23,7 @@ def select_action(policy_network, state, device, mode='greedy'):
         _, action = probas[:,-1,:].max(dim=-1)
         action = action.squeeze(-1)
     log_prob = F.log_softmax(logits, dim=-1)[:,-1,action]
-    return action.view(1, 1), log_prob
+    return action.view(1, 1), log_prob, value
 
 
 def select_action_batch(policy_network, state, device, mode='greedy'):

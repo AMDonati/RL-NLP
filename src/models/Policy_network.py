@@ -11,7 +11,7 @@ import numpy as np
 
 class PolicyLSTM(nn.Module):
     def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0,
-                 pooling=True):
+                 pooling=True, value_fn=False):
         super(PolicyLSTM, self).__init__()
         self.num_tokens = num_tokens
         self.emb_size = emb_size
@@ -33,7 +33,11 @@ class PolicyLSTM(nn.Module):
                                 num_layers=num_layers,
                                 dropout=p_drop,
                                 batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_tokens)
+        self.action_head = nn.Linear(hidden_size, num_tokens)
+        if value_fn:
+            self.value_head = nn.Linear(hidden_size, 1)
+        else:
+            self.value_head = None
 
     def forward(self, text_inputs, img_feat):
         '''
@@ -55,10 +59,16 @@ class PolicyLSTM(nn.Module):
         vis_text_emb = torch.cat([words_emb, img_feat], axis=-1)
         output, hidden = self.lstm(vis_text_emb)
         output = self.dropout(output)
-        logits = self.fc(output)  # (S,B,num_tokens)
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
 
-        return logits, hidden
+        logits = self.action_head(output)  # (S,B,num_tokens)
+        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        if self.value_head is not None:
+            value = self.value_head(output)
+            value = value.view(-1, 1)
+        else:
+            value = None
+
+        return logits, hidden, value
 
 
 class PolicyMLP(nn.Module):
@@ -119,9 +129,9 @@ if __name__ == '__main__':
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0,
-                       project=True)
+                       value_fn=True)
 
-    output, hidden = model(dummy_text_input, img_feat)  # shape (B*S, num_tokens)
+    output, hidden, value = model(dummy_text_input, img_feat)  # shape (B*S, num_tokens)
     output = output.view(-1, seq_len, num_tokens)
     print('output shape', output.shape)
     # print("sample output", output[0, :, :])

@@ -28,25 +28,24 @@ def preprocess_final_state(state_text, dataset, EOS_idx):
 def generate_one_episode(env, policy_network, device, select='greedy'):
     state = env.reset()
     done = False
-    rewards, log_probs = [], []
+    rewards, log_probs, values = [], []
     while not done:
         if select == 'sampling':
-            action, log_prob = select_action(policy_network, state, device, mode='sampling')
+            action, log_prob, value = select_action(policy_network, state, device, mode='sampling')
         elif select == 'greedy':
-            action, log_prob = select_action(policy_network, state, device, mode='greedy')
+            action, log_prob, value = select_action(policy_network, state, device, mode='greedy')
         # compute next state, done, reward from the action.
         state, (reward, closest_question), done, _ = env.step(action)
         rewards.append(reward)
         log_probs.append(log_prob)
+        values.append(values)
 
     episode = Episode(env.img_idx, env.img_feats.data.numpy(), env.ref_questions_decoded, closest_question, env.dialog, rewards)
-    return_ep = sum(rewards)
-    returns = [return_ep] * (env.step_idx)
 
-    if len(returns) < env.max_len:
+    if len(rewards) < env.max_len:
         assert state.text[:, -1] == env.special_tokens.EOS_idx
 
-    return log_probs, returns, episode
+    return log_probs, rewards, episode
 
 # def generate_episodes_batch(clevr_dataset, policy_network, special_tokens, device, BATCH_SIZE, max_len=None, select='greedy', seed=None):
 #     if max_len is None:
@@ -109,7 +108,7 @@ def padder_batch(batch):
                      batch]  # tensors of shape (len_ep, 1)
     batch_tensors_padded = [torch.cat([t, t.new_zeros(max_len - len, t.size(-1))]) for (t, len) in
                             zip(batch_tensors, len_episodes)]
-    batch = torch.stack(batch_tensors_padded, dim=0)
+    batch = torch.stack(batch_tensors_padded, dim=0).squeeze(dim=-1)
     return batch
 
 
