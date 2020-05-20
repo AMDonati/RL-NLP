@@ -6,13 +6,14 @@ import torch
 
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
+from models.rl_basic import PolicyGRUWord, PolicyGRU
 
 
 def train(env, agent, log_interval=10, num_episodes=100):
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
-        ref_question = env.ref_questions[random.randint(0,len(env.ref_questions)-1)]
+        ref_question = env.ref_questions[random.randint(0, len(env.ref_questions) - 1)]
         for t in range(0, env.max_len + 1):
             action, log_probs, value = agent.select_action(state, forced=ref_question[t])
             state, (reward, _), done, _ = env.step(action)
@@ -76,7 +77,7 @@ if __name__ == '__main__':
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-debug_len_vocab', type=int, default=None, help="learning rate")
+    parser.add_argument('-model', type=str, default="word", help="model")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,7 +89,12 @@ if __name__ == '__main__':
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward)
     # debug_true_questions=[[7, 8, 10, 12, 14]]
 
-    agent = REINFORCE(args.hidden_size, args.word_emb_size, env.clevr_dataset.len_vocab, gamma=args.gamma, lr=args.lr)
+    if args.model == "word":
+        model = PolicyGRUWord(env.clevr_dataset.len_vocab,args.word_emb_size,args.hidden_size  )
+    else:
+        model = PolicyGRU(env.clevr_dataset.len_vocab,args.word_emb_size,args.hidden_size)
+
+    agent = REINFORCE(model=model, gamma=args.gamma, lr=args.lr)
 
     train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes)
     print("-" * 20)
