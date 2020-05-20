@@ -41,7 +41,7 @@ class ClevrEnv(gym.Env):
         self.max_len = max_len
         # self.ref_questions = torch.randint(0, self.debug_len_vocab,
         #                                  (3, self.max_len)) if self.debug_len_vocab is not None else None
-        #self.reset()
+        # self.reset()
 
         self.reward_func = rewards[reward_type](reward_path)
         self.step_idx = 0
@@ -69,15 +69,15 @@ class ClevrEnv(gym.Env):
         self.img_idx = np.random.randint(0, len(self.clevr_dataset))
         self.img_idx = 0  # for debugging.
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45)
-        self.ref_questions = self.ref_questions[:10,:5]  # shape (10, 45)
+        self.ref_questions = self.ref_questions[:10, :5]  # shape (10, 45)
 
-        #if self.debug:
-        #self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
+        # if self.debug:
+        # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
         self.ref_questions_decoded = [
             self.clevr_dataset.idx2word(question, clean=True)
             for question in self.ref_questions.numpy()]
         print("Questions : {}".format(self.ref_questions_decoded))
-        #self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
+        # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
@@ -90,17 +90,6 @@ class ClevrEnv(gym.Env):
         reduced_vocab = [i for l in reduced_vocab for i in l]
         reduced_vocab = list(set(reduced_vocab))
         unique_tokens = self.clevr_dataset.word2idx(seq_tokens=reduced_vocab)
-        dict_tokens = dict(zip([i for i in range(len(unique_tokens))], unique_tokens))
-        return dict_tokens, reduced_vocab
-
-
-    def get_valid_actions(self, ref_questions):
-        ref_questions = self.ref_questions[:, :].reshape(-1)
-        ref_questions = ref_questions.data.numpy()
-        idx_tokens = np.where(ref_questions != 0)[0]
-        ref_questions = list(ref_questions[idx_tokens])
-        unique_tokens = list(set(ref_questions))
-        reduced_vocab = self.clevr_dataset.idx2word(unique_tokens, delim=',')
         dict_tokens = dict(zip([i for i in range(len(unique_tokens))], unique_tokens))
         return dict_tokens, reduced_vocab
 
