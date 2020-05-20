@@ -41,7 +41,7 @@ def tokenize(s, add_start_token, add_end_token, punct_to_keep, punct_to_remove, 
 
     tokens = s.split(delim)
     start_token_upper = tokens[0]
-    tokens = [w.lower() for w in tokens] # lower all letters.
+    tokens = [w.lower() for w in tokens]  # lower all letters.
     if add_start_token:
         tokens.insert(0, '<SOS>')
     if add_end_token:
@@ -54,11 +54,11 @@ def build_vocab(sequences, min_token_count, punct_to_keep, punct_to_remove, deli
     start_tokens = []
     for seq in sequences:
         seq_tokens, start_token_upper = tokenize(s=seq,
-                              delim=delim,
-                              punct_to_keep=punct_to_keep,
-                              punct_to_remove=punct_to_remove,
-                              add_start_token=False,
-                              add_end_token=False)
+                                                 delim=delim,
+                                                 punct_to_keep=punct_to_keep,
+                                                 punct_to_remove=punct_to_remove,
+                                                 add_start_token=False,
+                                                 add_end_token=False)
 
         for token in seq_tokens:
             if token not in token_to_count:
@@ -91,12 +91,14 @@ def encode(seq_tokens, token_to_idx, allow_unk):
     return seq_idx
 
 
-def decode(seq_idx, idx_to_token, stop_at_end, delim=' '):
+def decode(seq_idx, idx_to_token, stop_at_end, delim=' ', clean=False, ignored=["<SOS>", "PAD"]):
     tokens = []
     for idx in seq_idx:
-        tokens.append(idx_to_token[idx])
-        if stop_at_end and tokens[-1] == '<EOS>':
-            break
+        token = idx_to_token[idx]
+        if not (clean and token in ignored ):
+            if stop_at_end and token == '<EOS>':
+                break
+            tokens.append(token)
     if delim is None:
         return tokens
     else:

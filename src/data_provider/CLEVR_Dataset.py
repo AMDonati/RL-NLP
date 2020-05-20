@@ -1,12 +1,14 @@
 # https://github.com/facebookresearch/clevr-iep/blob/master/iep/data.py
 # collate_fn in image captioning tuto: https://github.com/yunjey/pytorch-tutorial/blob/master/tutorials/03-advanced/image_captioning/data_loader.py
 # https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning/blob/master/datasets.py
-import torch
-from torch.utils.data import Dataset, DataLoader
 import json
+import os
+
 import h5py
 import numpy as np
-import os
+import torch
+from torch.utils.data import Dataset, DataLoader
+
 from preprocessing.text_functions import decode
 
 
@@ -24,7 +26,7 @@ class CLEVR_Dataset(Dataset):
 
         # load feats in memory.
         feats_hf = h5py.File(self.features_path, 'r')
-        self.all_feats = feats_hf.get('features') #TODO: eventually add max pool here.
+        self.all_feats = feats_hf.get('features')  # TODO: eventually add max pool here.
 
         # load dataset objects in memory except img:
         questions_hf = h5py.File(self.questions_path, 'r')
@@ -66,14 +68,10 @@ class CLEVR_Dataset(Dataset):
         idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
         return idx_to_token
 
-    def idx2word(self, seq_idx, delim=' ', stop_at_end=False):
-        tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
+    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, clean=False, ignored=["<SOS>"]):
+        tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim,
+                        clean=clean, ignored=ignored)
         return tokens
-
-    def decode(self, seq_idx, stop_at_end=True, delim=' '):
-        decoded = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim)
-        decoded = decoded.replace(" <SOS>", "")
-        return decoded
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]
@@ -113,7 +111,7 @@ if __name__ == '__main__':
     ep_questions = clevr_dataset.get_questions_from_img_idx(0)
     print('questions subset', ep_questions.shape)
 
-    #-----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     # test max samples case.
     clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                   h5_feats_path=h5_feats_path,
@@ -125,8 +123,8 @@ if __name__ == '__main__':
 
     for batch, ((inp, tar), feats, _) in enumerate(clevr_loader):
         if batch == 0:
-            print('inp', inp[0,:])
-            print('tar', tar[0,:])
+            print('inp', inp[0, :])
+            print('tar', tar[0, :])
             print('feats shape', feats.shape)
     print('number of samples', batch)
     # ----------------------------------------------- test get_questions_from_img_idx------------

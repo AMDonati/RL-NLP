@@ -33,7 +33,7 @@ def train(env, agent, log_interval=10, num_episodes=100, max_len=3):
         # diff_df=df.diff(periods=5)
         diff_df = (df.iloc[-1] - df.iloc[0]).abs()
         top_words = diff_df.nlargest(4)
-        print("top words changed in the policy : {}".format(env.clevr_dataset.decode(top_words.index)))
+        print("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
 
 
 if __name__ == '__main__':
