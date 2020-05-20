@@ -5,11 +5,10 @@ from torch.distributions import Categorical
 
 
 class PolicyGRU(nn.Module):
-    def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1,
-                 pooling=True, cat_size=64 + 7 * 7 * 32):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_filters=None, num_layers=1,
+                 pooling=True):
         super(PolicyGRU, self).__init__()
         self.num_tokens = num_tokens
-        self.emb_size = emb_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         if num_filters is None:
@@ -19,7 +18,7 @@ class PolicyGRU(nn.Module):
         self.pooling = pooling
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.gru = nn.GRU(word_emb_size, self.hidden_size, batch_first=True)
-        self.fc = nn.Linear(cat_size, num_tokens+1)
+        self.fc = nn.Linear(12*14*14+self.hidden_size, num_tokens+1)
         self.saved_log_probs = []
         self.rewards = []
         self.values = []
@@ -27,7 +26,7 @@ class PolicyGRU(nn.Module):
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
         self.last_policy = []
 
-    def forward(self, text_inputs, img_feat):
+    def forward(self, text_inputs, img_feat,valid_actions=None):
         '''
         :param text_inputs: shape (S, B)
         :param img_feat: shape (B, C, H, W)
@@ -37,7 +36,8 @@ class PolicyGRU(nn.Module):
         '''
         embed_text = self._get_embed_text(text_inputs)
 
-        img_feat = F.relu(self.conv(img_feat)).view(img_feat.size(0), -1)
+        img_feat_ = F.relu(self.conv(img_feat))
+        img_feat=img_feat_.view(img_feat.size(0), -1)
 
         embedding = torch.cat((img_feat, embed_text.view(embed_text.size(0), -1)), dim=1)
         out = self.fc(embedding)  # (S,B,num_tokens)
