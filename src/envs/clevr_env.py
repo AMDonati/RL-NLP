@@ -23,10 +23,9 @@ class ClevrEnv(gym.Env):
         vocab_path = os.path.join(data_path, 'vocab.json')
         # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
         self.debug = debug
-        self.debug_len_vocab = debug_len_vocab
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
-                                           vocab_path=vocab_path, debug_len_vocab=self.debug_len_vocab,
+                                           vocab_path=vocab_path,
                                            max_samples=max_samples)
 
         # num_tokens = self.clevr_dataset.len_vocab
