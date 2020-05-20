@@ -36,7 +36,7 @@ class ClevrEnv(gym.Env):
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
         self.State = namedtuple('State', ('text', 'img'))
         self.Episode = namedtuple('Episode', (
-            'img_idx', 'img_feats', 'GD_questions','closest_question', 'dialog', 'rewards'))  # TODO: Build an Episode Dataset instead.
+            'img_idx', 'img_feats', 'GD_questions','closest_question', 'dialog', 'rewards'))
 
         self.max_len = max_len
         self.reward_func = rewards[reward_type](reward_path)
@@ -61,15 +61,38 @@ class ClevrEnv(gym.Env):
     def reset(self):
         self.img_idx = np.random.randint(0, len(self.clevr_dataset))
         self.img_idx = 0  # for debugging.
-        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45) # used to compute the final reward of the episode.
+        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45)
         self.ref_questions_decoded = [
             decode(question, idx_to_token=self.clevr_dataset.idx_to_token, stop_at_end=True).replace(" <PAD>", "")
             for question in self.ref_questions.numpy()[:, :self.max_len]]
+        self.ref_questions_decoded = [self.ref_questions_decoded[0]] # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
         return self.state
 
+    def get_reduced_action_space(self):
+        assert self.ref_questions is not None
+        ref_questions = self.ref_questions[:, :self.max_len].reshape(-1)
+        ref_questions = ref_questions.data.numpy()
+        idx_tokens = np.where(ref_questions!=0)[0]
+        ref_questions = list(ref_questions[idx_tokens])
+        unique_tokens = list(set(ref_questions))
+        reduced_vocab = self.clevr_dataset.idx2word(unique_tokens, delim=',')
+        dict_tokens = dict(zip([i for i in range(len(unique_tokens))], unique_tokens))
+        return dict_tokens, reduced_vocab
+
     def render(self, mode='human', close=False):
         pass
+
+if __name__ == '__main__':
+    env = ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
+    state = env.reset()
+    dict_tokens, reduced_vocab = env.get_reduced_action_space()
+    print(dict_tokens)
+    print(list(dict_tokens.values()))
+    print('len', len(dict_tokens))
+    act_idx = 5
+    action = dict_tokens[5]
+    print(act_idx, action)

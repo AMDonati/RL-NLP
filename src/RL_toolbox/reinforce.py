@@ -2,39 +2,48 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from collections import namedtuple
-
 
 class REINFORCE:
-    def __init__(self, env, model, optimizer, device, gamma=1, mode='sampling'):
+    def __init__(self, env, model, optimizer, device, gamma=1, mode='sampling', debug=True):
         self.model = model
         self.optimizer = optimizer
         self.gamma = gamma
         self.device = device
         self.mode = mode
         self.env = env
+        self.debug = debug
+        if debug:
+            print('reducing action space for debugging...')
+        self.action_space = None
 
     def select_action(self, state):
-        # TODO, here: add an action space.
         bs, seq_len = state.text.size(0), state.text.size(1)
         self.model.train()
         state.text.to(self.device)
         state.img.to(self.device)
-        logits, hidden, values = self.model(state.text, state.img)  # logits > shape (s*num_samples, num_tokens)
-        logits = logits.view(bs, seq_len, -1)  # TODO: prune action space.
+        logits, _, values = self.model(state.text, state.img)  # logits > shape (s*num_samples, num_tokens)
+        if self.action_space is not None:
+            list_actions = list(self.action_space.values())
+            logits = logits[:, list_actions]
+        logits = logits.view(bs, seq_len, -1)
         values = values.view(bs, seq_len, -1)
         probas = F.softmax(logits, dim=-1)  # (num samples, s, num_tokens)
         if self.mode == 'sampling':
-            m = Categorical(probas[:, -1, :])  # multinomial distribution with weights = probas.
+            m = Categorical(probas[:, -1, :]) # multinomial distribution with weights = probas.
             action = m.sample()
         elif self.mode == 'greedy':
             _, action = probas[:, -1, :].max(dim=-1)
             action = action.squeeze(-1)
         log_prob = F.log_softmax(logits, dim=-1)[:, -1, action]
+        if self.action_space is not None:
+            action = self.action_space[action.item()]
         return action, log_prob, values[:, -1, :]
+
 
     def generate_one_episode(self):
         state = self.env.reset()
+        if self.debug:
+            self.action_space, _ = self.env.get_reduced_action_space()
         done = False
         rewards, log_probs, values = [], [], []
         while not done:

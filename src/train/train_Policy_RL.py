@@ -7,7 +7,7 @@ import argparse
 from models.Policy_network import PolicyLSTM, PolicyMLP
 from envs.clevr_env import ClevrEnv
 from utils.utils_train import create_logger, write_to_csv
-from RL_toolbox.RL_functions import generate_one_episode, padder_batch, train_episodes_batch
+from RL_toolbox.RL_functions import padder_batch
 from RL_toolbox.reinforce import REINFORCE
 from torch.utils.tensorboard import SummaryWriter
 
@@ -32,9 +32,9 @@ if __name__ == '__main__':
     parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
     parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
-    parser.add_argument("-lr", type=float, default=0.001)
-    parser.add_argument("-bs", type=int, default=16, help="batch size")
-    parser.add_argument("-max_len", type=int, default=10, help="max episode length")
+    parser.add_argument("-lr", type=float, default=0.0005)
+    parser.add_argument("-bs", type=int, default=1, help="batch size")
+    parser.add_argument("-max_len", type=int, default=5, help="max episode length")
     parser.add_argument("-num_training_steps", type=int, default=100000, help="number of training_steps")
     parser.add_argument("-action_selection", type=str, default='sampling', help='mode to select action (greedy or sampling)')
     parser.add_argument("-data_path", type=str, required=True, help="data folder containing questions embeddings and img features")
@@ -75,12 +75,12 @@ if __name__ == '__main__':
                                     value_fn=True).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
-    output_path = os.path.join(args.out_path, "RL_lv_reward_{}_emb_{}_hid_{}_lr_{}_bs_{}_{}steps_mode_{}".format(args.model,
+    output_path = os.path.join(args.out_path, "RL_lv_reward_{}_emb_{}_hid_{}_lr_{}_bs_{}_maxlen_{}_mode_{}".format(args.model,
                                                                                         args.word_emb_size,
                                                                                         args.hidden_size,
                                                                                         args.lr,
                                                                                         args.bs,
-                                                                                        args.num_training_steps,
+                                                                                        args.max_len,
                                                                                         args.action_selection))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
     # Get and print set of questions for the fixed img.
-    logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 10')
+    logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 5 and reduce action space of 23 tokens')
 
     for i in range(args.num_training_steps):
         log_probs_batch, returns_batch, values_batch, episodes_batch = [], [], [], []
@@ -126,6 +126,11 @@ if __name__ == '__main__':
         loss = reinforce.train_batch(returns=returns_batch, log_probs=log_probs_batch, values=values_batch)
         sum_loss += loss
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
+
+        if i == 0:
+            logger.info('ep questions(5 tokens):')
+            logger.info('\n'.join(env.ref_questions_decoded))
+            writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
 
         if i % log_interval == log_interval - 1:
             logger.info('train loss for training step {}: {:5.3f}'.format(i, sum_loss / log_interval))
@@ -154,12 +159,3 @@ if __name__ == '__main__':
     hist_dict = dict(zip(hist_keys, [loss_hist, batch_return_hist, running_return_hist]))
     write_to_csv(csv_out_file, hist_dict)
 
-    # ------------------------------------------------------------
-    # all_episodes, hist_dict = REINFORCE(train_dataset=clevr_dataset,
-    #                          policy_network=policy_network,
-    #                          special_tokens=special_tokens,
-    #                          batch_size=args.bs,
-    #                          optimizer=optimizer,
-    #                          device=device,
-    #                          num_training_steps=args.num_training_steps,
-    #                          logger=logger)

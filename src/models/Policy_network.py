@@ -59,7 +59,6 @@ class PolicyLSTM(nn.Module):
         vis_text_emb = torch.cat([words_emb, img_feat], axis=-1)
         output, hidden = self.lstm(vis_text_emb)
         output = self.dropout(output)
-
         logits = self.action_head(output)  # (S,B,num_tokens)
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
         if self.value_head is not None:
@@ -119,7 +118,7 @@ if __name__ == '__main__':
 
     img_feat = torch.tensor(img_feat, dtype=torch.float32)
     seq_len = 10
-    num_tokens = 20
+    num_tokens = 85
     hidden_size = 128
     dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
 
