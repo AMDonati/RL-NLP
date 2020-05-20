@@ -5,11 +5,13 @@ import torch
 import numpy as np
 import argparse
 from models.Policy_network import PolicyLSTM, PolicyMLP
+from models.rl_basic import PolicyGRUWord
 from envs.clevr_env import ClevrEnv
 from utils.utils_train import create_logger, write_to_csv
 from RL_toolbox.RL_functions import padder_batch
 from RL_toolbox.reinforce import REINFORCE
 from torch.utils.tensorboard import SummaryWriter
+import pandas as pd
 
 
 #  trick for boolean parser args.
@@ -26,13 +28,9 @@ def str2bool(v):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-model", type=str, default="lstm", help="lstm or mlp")
-    parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
-    parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
-    parser.add_argument("-grad_clip", type=float)
-    parser.add_argument("-lr", type=float, default=0.0005)
+    parser.add_argument("-word_emb_size", type=int, default=16, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=32, help="dimension of the hidden state")
+    parser.add_argument("-lr", type=float, default=0.005)
     parser.add_argument("-bs", type=int, default=1, help="batch size")
     parser.add_argument("-max_len", type=int, default=5, help="max episode length")
     parser.add_argument("-num_training_steps", type=int, default=100000, help="number of training_steps")
@@ -49,34 +47,16 @@ if __name__ == '__main__':
     ###############################################################################
 
     env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=20)
-    num_tokens = env.num_tokens
+    num_tokens = env.clevr_dataset.len_vocab
 
     ##################################################################################################################
     # Build the Policy Network and define hparams
     ##################################################################################################################
-    if args.pre_train:
-        print('pre-training phase...')
-        assert args.model_path is not None
-        with open(args.model_path, 'rb') as f:
-            policy_network = torch.load(f, map_location=device).to(device)
-            #TODO: add the value_head layer.
-    else:
-        if args.model == 'mlp':
-            policy_network = PolicyMLP(num_tokens=num_tokens,
-                                   word_emb_size=args.word_emb_size,
-                                   units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
-        elif args.model == 'lstm':
-            policy_network = PolicyLSTM(num_tokens=num_tokens,
-                                    word_emb_size=args.word_emb_size,
-                                    emb_size=args.word_emb_size + args.word_emb_size*7*7,
-                                    hidden_size=args.hidden_size,
-                                    num_layers=args.num_layers,
-                                    p_drop=args.p_drop,
-                                    value_fn=True).to(device)
+
+    policy_network = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=args.word_emb_size, hidden_size=args.hidden_size).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
-    output_path = os.path.join(args.out_path, "RL_lv_reward_{}_emb_{}_hid_{}_lr_{}_bs_{}_maxlen_{}_mode_{}".format(args.model,
-                                                                                        args.word_emb_size,
+    output_path = os.path.join(args.out_path, "RL_lv_reward_emb_{}_hid_{}_lr_{}_bs_{}_maxlen_{}_mode_{}".format(args.word_emb_size,
                                                                                         args.hidden_size,
                                                                                         args.lr,
                                                                                         args.bs,
@@ -103,7 +83,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
     # Get and print set of questions for the fixed img.
-    logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 5 and reduce action space of 23 tokens')
+    logger.info('RL from scratch with word-level levenshtein reward on Image #0, with episode max length = 5')
 
     for i in range(args.num_training_steps):
         log_probs_batch, returns_batch, values_batch, episodes_batch = [], [], [], []
@@ -127,10 +107,17 @@ if __name__ == '__main__':
         sum_loss += loss
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
 
-        if i == 0:
-            logger.info('ep questions(5 tokens):')
-            logger.info('\n'.join(env.ref_questions_decoded))
-            writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
+        # monitoring of change in most probable words.
+        df = pd.DataFrame(reinforce.model.last_policy[-3:])
+        # diff_df=df.diff(periods=5)
+        diff_df = (df.iloc[-1] - df.iloc[0]).abs()
+        top_words = diff_df.nlargest(4)
+        logger.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
+
+        # if i == 0:
+        #     logger.info('ep questions(5 tokens):')
+        #     logger.info('\n'.join(env.ref_questions_decoded))
+        #     writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
 
         if i % log_interval == log_interval - 1:
             logger.info('train loss for training step {}: {:5.3f}'.format(i, sum_loss / log_interval))
@@ -142,9 +129,8 @@ if __name__ == '__main__':
             writer.add_scalar('running return', running_return, i + 1)
             writer.add_scalar('training loss', sum_loss / log_interval, i+1)
             writer.add_text('best current dialog and closest question:',
-                            ('------------------------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
+                            ('---------------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
                             global_step=i+1)
-
             sum_loss = 0. #resetting loss.
 
             with open(model_path, 'wb') as f:

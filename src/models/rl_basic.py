@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
+import h5py
+import numpy as np
 
 
 class PolicyGRU(nn.Module):
@@ -99,3 +101,21 @@ class PolicyGRUWord(nn.Module):
     def _get_embed_text(self, text):
         _, hidden = self.gru(self.word_embedding(text))
         return hidden[-1]
+
+if __name__ == '__main__':
+    train_features_path = '../../data/train_features.h5'
+    hf = h5py.File(train_features_path, 'r')
+    img_feat = hf.get('features')
+    img_feat = np.array(img_feat)
+    print('features shape', img_feat.shape)  # shape (num_samples, 1024, 14, 14).
+
+    img_feat = torch.tensor(img_feat, dtype=torch.float32)
+    seq_len = 10
+    num_tokens = 85
+    word_emb_size = 64
+    hidden_size = 128
+    dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
+    model = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
+    policy_dist, value = model(dummy_text_input, img_feat)
+    print('policy dist', policy_dist.shape)
+    print('value', value.shape)

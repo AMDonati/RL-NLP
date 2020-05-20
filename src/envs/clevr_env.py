@@ -15,7 +15,7 @@ class ClevrEnv(gym.Env):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
                  reward_path=None,
-                 debug_len_vocab=None, max_samples=None, debug=False):
+                 max_samples=None, debug=False):
         super(ClevrEnv, self).__init__()
         self.data_path = data_path
         h5_questions_path = os.path.join(data_path, 'train_questions.h5')
@@ -69,13 +69,13 @@ class ClevrEnv(gym.Env):
         self.img_idx = np.random.randint(0, len(self.clevr_dataset))
         self.img_idx = 0  # for debugging.
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45)
-        if self.debug:
-            self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
+        # if self.debug:
+        #     self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
         self.ref_questions_decoded = [
             self.clevr_dataset.idx2word(question, clean=True)
             for question in self.ref_questions.numpy()[:, :self.max_len]]
         print("Questions : {}".format(self.ref_questions_decoded))
-        #self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
+        self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0

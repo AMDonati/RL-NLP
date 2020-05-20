@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
-    parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
+    parser.add_argument('-reward', type=str, default="levenshtein", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-debug_len_vocab', type=int, default=None, help="learning rate")
 
