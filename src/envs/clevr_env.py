@@ -69,7 +69,7 @@ class ClevrEnv(gym.Env):
         self.img_idx = np.random.randint(0, len(self.clevr_dataset))
         self.img_idx = 0  # for debugging.
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45)
-        self.ref_questions = self.ref_questions[:10, :5]  # shape (10, 45)
+        self.ref_questions = self.ref_questions[:10, :self.max_len]  # shape (10, 45)
 
         # if self.debug:
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])

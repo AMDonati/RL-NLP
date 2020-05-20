@@ -11,11 +11,13 @@ class REINFORCE:
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma
 
-    def select_action(self, state, valid_actions):
-        m, value = self.model(state.text, state.img, list(valid_actions.values()))
-        valid_action = m.sample()
-        action=torch.tensor(valid_actions[valid_action.item()]).view(1)
-        return action.item(), m.log_prob(valid_action).view(1), value
+    def select_action(self, state, valid_actions=None, forced=None):
+        m, value = self.model(state.text, state.img, valid_actions)
+        action = m.sample() if forced is None else forced
+        log_prob=m.log_prob(action).view(1)
+        if isinstance(valid_actions,dict):
+            action=torch.tensor(valid_actions[action.item()]).view(1)
+        return action.item(), log_prob, value
 
     def finish_episode(self):
         R = 0
