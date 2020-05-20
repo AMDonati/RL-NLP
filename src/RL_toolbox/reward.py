@@ -40,15 +40,51 @@ class Levenshtein(Reward):
         if question is None:
             return 0., None
         else:
-            distances = [nltk.edit_distance(question.split(), true_question.split()) / (max(len(question.split()), len(true_question.split()))) for true_question in
+            distances = [nltk.edit_distance(question.split(), true_question.split()) / (
+                max(len(question.split()), len(true_question.split()))) for true_question in
                          ep_questions_decoded]
-            similarities = [1-dist for dist in distances]
+            similarities = [1 - dist for dist in distances]
             sim_question_idx = np.asarray(similarities).argmax()
             closest_question = ep_questions_decoded[sim_question_idx]
 
             return max(similarities), closest_question
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein}
+
+class PerWord(Reward):
+    def __init__(self, path=None):
+        Reward.__init__(self, path)
+
+    def get(self, question, ep_questions_decoded):
+        similarities = np.asarray(
+            [self.compare(question.split(), true_question.split()) for true_question in ep_questions_decoded])
+        return max(similarities), ep_questions_decoded[similarities.argmax()]
+
+    @staticmethod
+    def compare(question, true_question):
+        return sum([question[i + 1] == true_question[i] for i in range(len(true_question)) if
+                    i < len(question) - 1])
+
+
+class Levenshtein_(Reward):
+    def __init__(self, path=None):
+        Reward.__init__(self, path)
+
+    def get(self, question, ep_questions_decoded):
+        if question is None:
+            print("no")
+        distances = np.array([nltk.edit_distance(question.split()[1:], true_question.split()) for true_question in
+                              ep_questions_decoded])
+        self.last_reward = -min(distances)
+        return self.last_reward, ep_questions_decoded[distances.argmin()]
+
+    def get_diff(self, question, ep_questions_decoded):
+        prev_reward = self.last_reward
+        reward = self.get(question, ep_questions_decoded)
+        return reward - prev_reward
+
+
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "per_word": PerWord}
+
 
 def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
     next_state_text = next_state_text[:, 1:]  # removing sos token.
@@ -57,7 +93,7 @@ def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
     # trunc state:
     state_len = next_state_text.size(1)
     if state_len == 0:
-        #print('no final reward...')
+        # print('no final reward...')
         return 0.
     else:
         # max_len = ep_questions.size(1)
@@ -70,6 +106,7 @@ def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
         reward = mask_same_tokens.sum(dim=-1).max().numpy()
         reward = reward / state_len
     return reward
+
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
@@ -101,7 +138,6 @@ if __name__ == '__main__':
 
     str_1 = "is it red ?"
     str_2 = "is it blue ?"
-
 
     rew = reward_func.get_old(str_1, [str_2])
     rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
