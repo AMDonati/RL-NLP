@@ -14,7 +14,8 @@ class ClevrEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
-                 reward_path=None, max_samples=None, debug=False):
+                 reward_path=None,
+                 debug_len_vocab=None, max_samples=None, debug=False):
         super(ClevrEnv, self).__init__()
         self.data_path = data_path
         h5_questions_path = os.path.join(data_path, 'train_questions.h5')
@@ -84,13 +85,11 @@ class ClevrEnv(gym.Env):
         return self.state
 
     def get_reduced_action_space(self):
-        assert self.ref_questions is not None
-        ref_questions = self.ref_questions[:, :self.max_len].reshape(-1)
-        ref_questions = ref_questions.data.numpy()
-        idx_tokens = np.where(ref_questions != 0)[0]
-        ref_questions = list(ref_questions[idx_tokens])
-        unique_tokens = list(set(ref_questions))
-        reduced_vocab = self.clevr_dataset.idx2word(unique_tokens, delim=',')
+        assert self.ref_questions_decoded is not None
+        reduced_vocab = [q.split() for q in self.ref_questions_decoded]
+        reduced_vocab = [i for l in reduced_vocab for i in l]
+        reduced_vocab = list(set(reduced_vocab))
+        unique_tokens = self.clevr_dataset.word2idx(seq_tokens=reduced_vocab)
         dict_tokens = dict(zip([i for i in range(len(unique_tokens))], unique_tokens))
         return dict_tokens, reduced_vocab
 
