@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from preprocessing.text_functions import decode
+from preprocessing.text_functions import decode, encode
 
 
 class CLEVR_Dataset(Dataset):
@@ -72,6 +72,10 @@ class CLEVR_Dataset(Dataset):
         tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim,
                         clean=clean, ignored=ignored)
         return tokens
+
+    def word2idx(self, seq_tokens, allow_unk=True):
+        idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_questions, allow_unk=allow_unk)
+        return idx
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]

@@ -127,10 +127,10 @@ if __name__ == '__main__':
     str_1 = "is it blue and tiny ?"
     str_2 = "is it blue ?"
 
-    rew = reward_func.get_old(str_1, [str_2])
-    rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
-    print('rew negative ', rew)
-    print('rew norm negative', rew_norm)
+    #rew = reward_func.get_old(str_1, [str_2])
+    #rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
+    #print('rew negative ', rew)
+    #print('rew norm negative', rew_norm)
 
     rew_norm_pos, sim_q = reward_func.get(str_1, [str_2])
     print('rew norm positive', rew_norm_pos)
@@ -139,11 +139,11 @@ if __name__ == '__main__':
     str_1 = "is it red ?"
     str_2 = "is it blue ?"
 
-    rew = reward_func.get_old(str_1, [str_2])
-    rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
-    print('rew', rew)
-    print('rew norm', rew_norm)
+    #rew = reward_func.get_old(str_1, [str_2])
+    #rew_norm = rew / max(len(str_1.split()), len(str_2.split()))
+    #print('rew', rew)
+    #print('rew norm', rew_norm)
 
-    rew_norm_pos, sim_q = reward_func.get(str_1, [str_2])
+    rew_norm_pos, sim_q = reward_func.get("", [str_2])
     print('rew norm positive', rew_norm_pos)
     print('similar question', sim_q)
