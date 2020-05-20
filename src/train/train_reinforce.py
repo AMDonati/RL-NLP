@@ -62,7 +62,7 @@ if __name__ == '__main__':
     h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
     vocab_path = os.path.join(args.data_path, 'vocab.json')
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, debug_len_vocab=args.debug_len_vocab)
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward)
     # debug_true_questions=[[7, 8, 10, 12, 14]]
 
     agent = REINFORCE(args.hidden_size, args.word_emb_size, env.clevr_dataset.len_vocab, gamma=args.gamma, lr=args.lr)
