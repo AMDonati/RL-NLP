@@ -1,3 +1,4 @@
+import logging
 import os
 from collections import namedtuple
 
@@ -14,12 +15,12 @@ class ClevrEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
-                 reward_path=None,
-                 debug_len_vocab=None, max_samples=None, debug=False):
+                 reward_path=None, max_samples=None, debug=False, mode="train"):
         super(ClevrEnv, self).__init__()
+        self.mode = mode
         self.data_path = data_path
-        h5_questions_path = os.path.join(data_path, 'train_questions.h5')
-        h5_feats_path = os.path.join(data_path, 'train_features.h5')
+        h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(self.mode))
+        h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(self.mode))
         vocab_path = os.path.join(data_path, 'vocab.json')
         # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
         self.debug = debug
@@ -62,11 +63,12 @@ class ClevrEnv(gym.Env):
         self.step_idx += 1
         if done:
             self.dialog = question
-            print(question)
+            logging.info(question)
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        self.img_idx = np.random.randint(0, 128)
+        self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[0])
+
         # self.img_idx = 0  # for debugging.
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
@@ -77,7 +79,7 @@ class ClevrEnv(gym.Env):
         self.ref_questions_decoded = [
             self.clevr_dataset.idx2word(question, clean=True)
             for question in self.ref_questions.numpy()]
-        print("Questions : {}".format(self.ref_questions_decoded))
+        logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
         # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))

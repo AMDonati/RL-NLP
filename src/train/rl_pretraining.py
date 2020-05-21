@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import random
 
@@ -7,6 +8,7 @@ import torch
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyGRUWord, PolicyGRU
+from utils.utils_train import create_logger
 
 
 def train(env, agent, log_interval=10, num_episodes=100):
@@ -27,7 +29,7 @@ def train(env, agent, log_interval=10, num_episodes=100):
         running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
         agent.finish_episode()
         if i_episode % log_interval == 0:
-            print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
+            logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
         # df = pd.DataFrame(agent.model.last_policy[-max_len:])
         # diff_df=df.diff(periods=5)
@@ -37,7 +39,7 @@ def train(env, agent, log_interval=10, num_episodes=100):
     return agent
 
 
-def test(env, agent, log_interval=10, num_episodes=10):
+def test(env, agent, log_interval=1, num_episodes=10):
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
@@ -56,7 +58,7 @@ def test(env, agent, log_interval=10, num_episodes=10):
         running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
         # agent.finish_episode()
         if i_episode % log_interval == 0:
-            print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
+            logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
 
 
@@ -82,17 +84,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    logger = create_logger("train.log", level=args.logger_level)
+
     h5_questions_path = os.path.join(args.data_path, 'train_questions.h5')
     h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
     vocab_path = os.path.join(args.data_path, 'vocab.json')
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward)
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
     # debug_true_questions=[[7, 8, 10, 12, 14]]
 
     if args.model == "word":
-        model = PolicyGRUWord(env.clevr_dataset.len_vocab,args.word_emb_size,args.hidden_size  )
+        model = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     else:
-        model = PolicyGRU(env.clevr_dataset.len_vocab,args.word_emb_size,args.hidden_size)
+        model = PolicyGRU(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
 
     agent = REINFORCE(model=model, gamma=args.gamma, lr=args.lr)
 
@@ -100,4 +104,6 @@ if __name__ == '__main__':
     print("-" * 20)
     print("TEST")
     print("-" * 20)
+
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="test")
     test(env=env, agent=agent)

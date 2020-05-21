@@ -1,9 +1,5 @@
-import os
 import csv
-import shutil
-import pickle as pkl
 import logging
-import numpy as np
 
 
 def write_to_csv(output_dir, dic):
@@ -14,14 +10,16 @@ def write_to_csv(output_dir, dic):
             writer.writerow([key, value])
 
 
-def create_logger(out_file_log):
-    logging.basicConfig(filename=out_file_log, level=logging.INFO)
+def create_logger(out_file_log, level="INFO"):
+    levels = {"INFO": logging.INFO, "DEBUG": logging.DEBUG, "ERROR": logging.ERROR}
+    level = levels[level]
+    logging.basicConfig(filename=out_file_log, level=level, filemode='w')
     # create logger
     logger = logging.getLogger('training log')
-    logger.setLevel(logging.INFO)
-    # create console handler and set level to debug
+    logger.setLevel(level)
+    # create console handler and set level
     ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
+    ch.setLevel(level)
     # create formatter
     formatter = logging.Formatter("%(asctime)s;%(levelname)s;%(message)s",
                                   "%Y-%m-%d %H:%M:%S")
