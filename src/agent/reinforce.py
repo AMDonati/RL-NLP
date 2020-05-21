@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from models.rl_basic import PolicyGRUWord
-
 
 class REINFORCE:
     def __init__(self, model, gamma=0.9, lr=1e-2):
@@ -14,9 +12,9 @@ class REINFORCE:
     def select_action(self, state, valid_actions=None, forced=None):
         m, value = self.model(state.text, state.img, valid_actions)
         action = m.sample() if forced is None else forced
-        log_prob=m.log_prob(action).view(1)
-        if isinstance(valid_actions,dict):
-            action=torch.tensor(valid_actions[action.item()]).view(1)
+        log_prob = m.log_prob(action).view(1)
+        if isinstance(valid_actions, dict):
+            action = torch.tensor(valid_actions[action.item()]).view(1)
         return action.item(), log_prob, value
 
     def finish_episode(self):
