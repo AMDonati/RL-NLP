@@ -5,6 +5,7 @@ import random
 import datetime
 
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
@@ -32,6 +33,9 @@ def train(env, agent, log_interval=10, num_episodes=100):
         if i_episode % log_interval == 0:
             logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
+            writer.add_text('episode_questions', '\n'.join(env.ref_questions_decoded))
+            writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+
         # df = pd.DataFrame(agent.model.last_policy[-max_len:])
         # diff_df=df.diff(periods=5)
         # diff_df = (df.iloc[-1] - df.iloc[0]).abs()
@@ -61,7 +65,8 @@ def test(env, agent, log_interval=1, num_episodes=10):
         if i_episode % log_interval == 0:
             logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
-
+            writer.add_text('episode_questions', '\n'.join(env.ref_questions_decoded))
+            writer.add_scalar('test_running_return', running_reward, i_episode + 1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -85,17 +90,21 @@ if __name__ == '__main__':
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    output_path = os.path.join(args.out_path, "rl_train_{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    output_path = os.path.join(args.out_path,"train", "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     logger = create_logger(out_file_log, level=args.logger_level)
+
+    writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
+
     # csv_out_file = os.path.join(output_path, 'train_history.csv')
     # model_path = os.path.join(output_path, 'model.pt')
     # logger = create_logger("train.log", level=args.logger_level)
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
     # debug_true_questions=[[7, 8, 10, 12, 14]]
+
 
     models = {"gru_word": PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size),
               "gru": PolicyGRU(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)}
