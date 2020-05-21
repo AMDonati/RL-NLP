@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import random
+import datetime
 
 import torch
 
@@ -79,31 +80,35 @@ if __name__ == '__main__':
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="word", help="model")
+    parser.add_argument('-model', type=str, default="gru_word", help="model")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    logger = create_logger("train.log", level=args.logger_level)
-
-    h5_questions_path = os.path.join(args.data_path, 'train_questions.h5')
-    h5_feats_path = os.path.join(args.data_path, 'train_features.h5')
-    vocab_path = os.path.join(args.data_path, 'vocab.json')
+    output_path = os.path.join(args.out_path, "rl_train_{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    if not os.path.isdir(output_path):
+        os.makedirs(output_path)
+    out_file_log = os.path.join(output_path, 'RL_training_log.log')
+    logger = create_logger(out_file_log, level=args.logger_level)
+    # csv_out_file = os.path.join(output_path, 'train_history.csv')
+    # model_path = os.path.join(output_path, 'model.pt')
+    # logger = create_logger("train.log", level=args.logger_level)
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
     # debug_true_questions=[[7, 8, 10, 12, 14]]
 
-    if args.model == "word":
-        model = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
-    else:
-        model = PolicyGRU(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
+    models = {"gru_word": PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size),
+              "gru": PolicyGRU(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)}
+
+    model = models[args.model]
 
     agent = REINFORCE(model=model, gamma=args.gamma, lr=args.lr)
 
     train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes)
-    print("-" * 20)
-    print("TEST")
-    print("-" * 20)
+    logging.info("-" * 20)
+    logging.info("TEST")
+    logging.info("-" * 20)
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="test")
+    # using val because no answer in test set -> bug
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="val")
     test(env=env, agent=agent)

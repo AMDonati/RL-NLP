@@ -13,11 +13,10 @@ from preprocessing.text_functions import decode, encode
 
 
 class CLEVR_Dataset(Dataset):
-    def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None, debug_len_vocab=None):
+    def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None):
         self.questions_path = h5_questions_path
         self.features_path = h5_feats_path
         self.vocab_path = vocab_path
-        self.debug_len_vocab = debug_len_vocab
         self.vocab_questions = self.get_vocab('question_token_to_idx')
         self.vocab_answers = self.get_vocab('answer_token_to_idx')
         self.len_vocab = len(self.vocab_questions)
