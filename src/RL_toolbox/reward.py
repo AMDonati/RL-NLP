@@ -38,7 +38,7 @@ class Levenshtein(Reward):
 
     def get(self, question, ep_questions_decoded):
         if question is None:
-            return 0., None
+            return 0., "N/A"
         else:
             distances = [nltk.edit_distance(question.split(), true_question.split()) / (
                 max(len(question.split()), len(true_question.split()))) for true_question in
@@ -71,7 +71,7 @@ class Levenshtein_(Reward):
 
     def get(self, question, ep_questions_decoded):
         if question is None:
-            print("no")
+            return 0., "N/A"
         distances = np.array([nltk.edit_distance(question.split()[1:], true_question.split()) for true_question in
                               ep_questions_decoded])
         self.last_reward = -min(distances)

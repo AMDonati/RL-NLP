@@ -13,7 +13,6 @@ from RL_toolbox.reinforce import REINFORCE
 from torch.utils.tensorboard import SummaryWriter
 import pandas as pd
 
-
 #  trick for boolean parser args.
 def str2bool(v):
     if isinstance(v, bool):
@@ -46,14 +45,18 @@ if __name__ == '__main__':
     # Load CLEVR ENVIRONMENT
     ###############################################################################
 
-    env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=20)
+    env = ClevrEnv(data_path=args.data_path, reward_type='levenshtein', max_len=args.max_len, max_samples=20)
     num_tokens = env.clevr_dataset.len_vocab
 
     ##################################################################################################################
     # Build the Policy Network and define hparams
     ##################################################################################################################
 
-    policy_network = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=args.word_emb_size, hidden_size=args.hidden_size).to(device)
+    #policy_network = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=args.word_emb_size, hidden_size=args.hidden_size).to(device)
+    policy_network = PolicyLSTM(num_tokens=num_tokens,
+                                word_emb_size=args.word_emb_size,
+                                emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
+                                hidden_size=args.hidden_size, rl=True).to(device)
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
     output_path = os.path.join(args.out_path, "RL_lv_reward_emb_{}_hid_{}_lr_{}_bs_{}_maxlen_{}_mode_{}".format(args.word_emb_size,
@@ -69,7 +72,7 @@ if __name__ == '__main__':
     csv_out_file = os.path.join(output_path, 'train_history.csv')
     model_path = os.path.join(output_path, 'model.pt')
 
-    log_interval = 100
+    log_interval = 10
 
     #####################################################################################################################
     # REINFORCE Algo.
@@ -99,11 +102,14 @@ if __name__ == '__main__':
         batch_avg_return = sum(return_batch) / len(return_batch)
         batch_max_return, max_id = max(return_batch), np.asarray(return_batch).argmax()
         max_dialog, closest_question = episodes_batch[max_id].dialog, episodes_batch[max_id].closest_question
+        if max_dialog is None:
+            max_dialog = ""
 
-        log_probs_batch = padder_batch(log_probs_batch) # shape (bs, max_len, 1)
-        returns_batch = padder_batch(returns_batch) # shape (bs, max_len, 1)
-        values_batch = padder_batch(values_batch)
-        loss = reinforce.train_batch(returns=returns_batch, log_probs=log_probs_batch, values=values_batch)
+        # log_probs_batch = padder_batch(log_probs_batch) # shape (bs, max_len, 1)
+        # returns_batch = padder_batch(returns_batch) # shape (bs, max_len, 1)
+        # values_batch = padder_batch(values_batch)
+        #loss = reinforce.train_batch(returns=returns_batch, log_probs=log_probs_batch, values=values_batch)
+        loss = reinforce.finish_episode()
         sum_loss += loss
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
 
@@ -114,15 +120,17 @@ if __name__ == '__main__':
         top_words = diff_df.nlargest(4)
         logger.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
 
-        # if i == 0:
-        #     logger.info('ep questions(5 tokens):')
-        #     logger.info('\n'.join(env.ref_questions_decoded))
-        #     writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
+        if i == 0:
+            logger.info('ep questions(5 tokens):')
+            logger.info('\n'.join(env.ref_questions_decoded))
+            writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
 
         if i % log_interval == log_interval - 1:
             logger.info('train loss for training step {}: {:5.3f}'.format(i, sum_loss / log_interval))
             logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
             logger.info('running return for training step {}: {:8.3f}'.format(i, running_return))
+            logger.info('current dialog')
+            logger.info(max_dialog)
 
             # writing metrics to tensorboard.
             writer.add_scalar('batch return', batch_avg_return, i + 1)

@@ -17,17 +17,15 @@ class REINFORCE:
         self.action_space = None
 
     def select_action(self, state):
-        m, value = self.model(state.text, state.img)
+        m, _, value = self.model(state.text, state.img)
         action = m.sample()
-        return action.item(), m.log_prob(action).view(1), value
+        return action.item(), m.log_prob(action).view(1), value.view(1)
 
     def generate_one_episode(self):
         state, ep_reward = self.env.reset(), 0
         for t in range(0, self.env.max_len + 1):
             action, log_probs, value = self.select_action(state)
             state, (reward, closest_question), done, _ = self.env.step(action)
-            # if args.render:
-            # env.render()
             self.model.rewards.append(reward)
             self.model.values.append(value)
             self.model.saved_log_probs.append(log_probs)
@@ -55,6 +53,32 @@ class REINFORCE:
         del self.model.saved_log_probs[:]
         del self.model.values[:]
         return loss
+
+    def finish_episode(self):
+        R = 0
+        policy_loss = []
+        returns = []
+        mse = nn.MSELoss()
+        for r in self.model.rewards[::-1]:
+            R = r + self.gamma * R
+            returns.insert(0, R)
+        returns = torch.tensor(returns).float()
+
+        for log_prob, R, value in zip(self.model.saved_log_probs, returns, self.model.values):
+            policy_loss.append(-log_prob * (R - value))
+            ms = mse(value, R)
+            policy_loss.append(ms.view(1))
+
+        self.optimizer.zero_grad()
+        policy_loss = torch.cat(policy_loss).sum()
+        policy_loss.backward()
+        self.optimizer.step()
+
+        del self.model.rewards[:]
+        del self.model.saved_log_probs[:]
+        del self.model.values[:]
+
+        return policy_loss
 
     def compute_returns(self, rewards):
         R = 0
