@@ -4,7 +4,7 @@ import torch.optim as optim
 
 
 class REINFORCE:
-    def __init__(self, model, gamma=0.9, lr=1e-2):
+    def __init__(self, model, gamma=1., lr=1e-2):
         self.model = model
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma
