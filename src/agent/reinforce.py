@@ -4,12 +4,23 @@ import torch.optim as optim
 
 
 class REINFORCE:
-    def __init__(self, model, gamma=1., lr=1e-2):
+    def __init__(self, model, gamma=1., lr=1e-2, pretrained_lm=None):
         self.model = model
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma
+        self.pretrained_lm = pretrained_lm
 
-    def select_action(self, state, valid_actions=None, forced=None):
+    def get_top_k_words(self, state, top_k=10):
+        if self.pretrained_lm is None:
+            return None
+        dist, value = self.pretrained_lm(state.text, state.img, None)
+        probs = dist.probs
+        top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
+        valid_actions={i:token for i,token in enumerate(top_k_indices.numpy()[0])}
+        return valid_actions
+
+    def select_action(self, state, forced=None):
+        valid_actions = self.get_top_k_words(state)
         m, value = self.model(state.text, state.img, valid_actions)
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action).view(1)
