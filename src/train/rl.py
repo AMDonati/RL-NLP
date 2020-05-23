@@ -6,12 +6,11 @@ import pandas as pd
 import torch
 
 
-def train(env, agent, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False, reduced_vocab=False):
+def train(env, agent, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False):
     # writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
-        # dict_tokens, reduced_vocab = env.get_reduced_action_space() if reduced_vocab else None, None
         ref_question = env.ref_questions[random.randint(0, len(env.ref_questions) - 1)]
         for t in range(0, env.max_len + 1):
             forced = ref_question[t] if pretrain else None
@@ -47,16 +46,13 @@ def train(env, agent, writer, output_path="lm", log_interval=10, num_episodes=10
     return agent
 
 
-def test(env, agent, writer, log_interval=1, num_episodes=10, reduced_vocab=False, pretrained_model=None):
+def test(env, agent, writer, log_interval=1, num_episodes=10):
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
-        # dict_tokens, reduced_vocab = env.get_reduced_action_space() if reduced_vocab else None, None
         for t in range(0, env.max_len + 1):
             action, log_probs, value = agent.select_action(state)
             state, (reward, _), done, _ = env.step(action)
-            # if args.render:
-            # env.render()
             agent.model.rewards.append(reward)
             agent.model.values.append(value)
             agent.model.saved_log_probs.append(log_probs)
@@ -65,7 +61,6 @@ def test(env, agent, writer, log_interval=1, num_episodes=10, reduced_vocab=Fals
                 break
 
         running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-        # agent.finish_episode()
         if i_episode % log_interval == 0:
             logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
