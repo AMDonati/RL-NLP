@@ -31,8 +31,6 @@ if __name__ == '__main__':
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="gru_word", help="model")
-    parser.add_argument('-pretrain', type=str2bool, default=0, help="pretraining with rl")
-    parser.add_argument('-reduced_vocab', type=str2bool, default=False, help="reducing vocab")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -53,9 +51,9 @@ if __name__ == '__main__':
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
     # debug_true_questions=[[7, 8, 10, 12, 14]]
 
-    models = {"gru_word": PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)}
+    models = {"gru_word": PolicyGRUWord}
 
-    model = models[args.model]
+    model = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
 
     # Training language model
     pretraining_model = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size).to(device)

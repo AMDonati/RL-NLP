@@ -28,11 +28,9 @@ if __name__ == '__main__':
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
-    parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
+    parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="gru_word", help="model")
-    parser.add_argument('-pretrain', type=str2bool, default=0, help="pretraining with rl")
-    parser.add_argument('-reduced_vocab', type=str2bool, default=False, help="reducing vocab")
     parser.add_argument('-pretrained_path', type=str, default="lm", help="pretrained path")
 
     args = parser.parse_args()
