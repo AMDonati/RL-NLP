@@ -18,7 +18,6 @@ if __name__ == '__main__':
     parser.add_argument("-word_emb_size", type=int, default=12, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
-    # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
     parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
@@ -44,12 +43,7 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
-    # csv_out_file = os.path.join(output_path, 'train_history.csv')
-    # model_path = os.path.join(output_path, 'model.pt')
-    # logger = create_logger("train.log", level=args.logger_level)
-
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
-    # debug_true_questions=[[7, 8, 10, 12, 14]]
 
     models = {"gru_word": PolicyGRUWord}
 

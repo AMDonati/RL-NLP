@@ -45,12 +45,7 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
-    # csv_out_file = os.path.join(output_path, 'train_history.csv')
-    # model_path = os.path.join(output_path, 'model.pt')
-    # logger = create_logger("train.log", level=args.logger_level)
-
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
-    # debug_true_questions=[[7, 8, 10, 12, 14]]
 
     models = {"gru_word": PolicyGRUWord,
               "gru": PolicyGRU}

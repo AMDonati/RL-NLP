@@ -10,7 +10,7 @@ from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyGRUWord, PolicyGRU
 from train.rl import train, test
-from utils.utils_train import create_logger, str2bool
+from utils.utils_train import create_logger
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -45,19 +45,10 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
-    # csv_out_file = os.path.join(output_path, 'train_history.csv')
-    # model_path = os.path.join(output_path, 'model.pt')
-    # logger = create_logger("train.log", level=args.logger_level)
-
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
-    # debug_true_questions=[[7, 8, 10, 12, 14]]
 
     pretrained_lm = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
-    # pretrained_lm = torch.load(args.pretrained_path)
     pretrained_lm.load_state_dict(torch.load(args.pretrained_path))
-    # with open(args.pretrained_path, 'rb') as f:
-    #    pretrained_lm = torch.load(f, map_location=device).to(device)
-
     pretrained_lm.eval()
 
     models = {"gru_word": PolicyGRUWord, "gru": PolicyGRU}
