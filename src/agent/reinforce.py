@@ -16,7 +16,7 @@ class REINFORCE:
         dist, value = self.pretrained_lm(state.text, state.img, None)
         probs = dist.probs
         top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
-        valid_actions={i:token for i,token in enumerate(top_k_indices.numpy()[0])}
+        valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy()[0])}
         return valid_actions
 
     def select_action(self, state, forced=None):
@@ -26,7 +26,7 @@ class REINFORCE:
         log_prob = m.log_prob(action).view(1)
         if isinstance(valid_actions, dict):
             action = torch.tensor(valid_actions[action.item()]).view(1)
-        return action.item(), log_prob, value
+        return action.item(), log_prob, value, valid_actions, m
 
     def finish_episode(self):
         R = 0

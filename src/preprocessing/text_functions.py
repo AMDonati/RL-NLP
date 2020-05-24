@@ -95,7 +95,7 @@ def decode(seq_idx, idx_to_token, stop_at_end, delim=' ', clean=False, ignored=[
     tokens = []
     for idx in seq_idx:
         token = idx_to_token[idx]
-        if not (clean and token in ignored ):
+        if not (clean and token in ignored):
             if stop_at_end and token == '<EOS>':
                 break
             tokens.append(token)

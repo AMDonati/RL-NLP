@@ -57,12 +57,12 @@ if __name__ == '__main__':
 
     agent = REINFORCE(model=model, gamma=args.gamma, lr=args.lr, pretrained_lm=pretrained_lm)
 
-    train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes_train,
-          pretrain=False, writer=writer, output_path=output_path)
+    _, saved_path = train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes_train,
+                          pretrain=False, writer=writer, output_path=output_path)
     logging.info("-" * 20)
     logging.info("TEST")
     logging.info("-" * 20)
 
     # using val set because no answer in test set -> bug
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="val")
-    test(writer=writer, env=env, agent=agent, num_episodes=args.num_episodes_test)
+    test(writer=writer, env=env, agent=agent, num_episodes=args.num_episodes_test, saved_path=saved_path)
