@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
-from models.rl_basic import PolicyGRUWord
+from models.rl_basic import PolicyGRU
 from train.rl import train, test
 from utils.utils_train import create_logger
 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="gru_word", help="model")
+    parser.add_argument('-model', type=str, default="gru", help="model")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
 
-    models = {"gru_word": PolicyGRUWord}
+    models = {"gru": PolicyGRU}
 
     model = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
 
