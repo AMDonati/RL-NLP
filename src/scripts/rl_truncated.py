@@ -8,8 +8,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
+from eval.rl import test
 from models.rl_basic import PolicyGRUWord, PolicyGRU
-from train.rl import train, test
+from train.rl import train
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
