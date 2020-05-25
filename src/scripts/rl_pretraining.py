@@ -35,7 +35,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    output_path = os.path.join(args.out_path, "lm", "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    output_path = os.path.join(args.out_path, "experiments", "lm",
+                               "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')

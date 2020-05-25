@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 
 
-def train(env, agent, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False):
+def train(env, agent, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False, num_truncated=10):
     # writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
     running_reward = 0
     for i_episode in range(num_episodes):

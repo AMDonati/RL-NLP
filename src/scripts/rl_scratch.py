@@ -31,13 +31,13 @@ if __name__ == '__main__':
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="gru_word", help="model")
-    parser.add_argument('-reduced_vocab', type=str2bool, default=False, help="reducing vocab")
+    parser.add_argument('-model', type=str, default="gru", help="model")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    output_path = os.path.join(args.out_path, "train", "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    output_path = os.path.join(args.out_path, "experiments", "train",
+                               "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
 
     models = {"gru_word": PolicyGRUWord,
               "gru": PolicyGRU}
@@ -56,12 +56,12 @@ if __name__ == '__main__':
     agent = REINFORCE(model=model, gamma=args.gamma, lr=args.lr)
 
     _, saved_path = train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes_train,
-                          reduced_vocab=args.reduced_vocab, writer=writer, output_path=output_path)
+                           writer=writer, output_path=output_path)
     logging.info("-" * 20)
     logging.info("TEST")
     logging.info("-" * 20)
 
     # using val set because no answer in test set -> bug
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="val")
-    test(env=env, agent=agent, reduced_vocab=args.reduced_vocab, num_episodes=args.num_episodes_test, writer=writer,
+    test(env=env, agent=agent, num_episodes=args.num_episodes_test, writer=writer,
          saved_path=saved_path)

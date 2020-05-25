@@ -33,11 +33,13 @@ if __name__ == '__main__':
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="gru_word", help="model")
     parser.add_argument('-pretrained_path', type=str, default="lm", help="pretrained path")
+    parser.add_argument('-num_truncated', type=int, default=10, help="number of top words for action space")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    output_path = os.path.join(args.out_path, "train", "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    output_path = os.path.join(args.out_path, "experiments", "train",
+                               "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
@@ -46,7 +48,7 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train")
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
 
     pretrained_lm = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     pretrained_lm.load_state_dict(torch.load(args.pretrained_path))
@@ -59,11 +61,11 @@ if __name__ == '__main__':
     agent = REINFORCE(model=model, gamma=args.gamma, lr=args.lr, pretrained_lm=pretrained_lm)
 
     _, saved_path = train(env=env, agent=agent, log_interval=args.log_interval, num_episodes=args.num_episodes_train,
-                          pretrain=False, writer=writer, output_path=output_path)
+                          pretrain=False, writer=writer, output_path=output_path, num_truncated=args.num_truncated)
     logging.info("-" * 20)
     logging.info("TEST")
     logging.info("-" * 20)
 
     # using val set because no answer in test set -> bug
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="val")
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="val", debug=True)
     test(writer=writer, env=env, agent=agent, num_episodes=args.num_episodes_test, saved_path=saved_path)

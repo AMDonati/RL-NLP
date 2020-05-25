@@ -9,8 +9,15 @@ class REINFORCE:
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
+        #self.max_reward = 0
 
     def get_top_k_words(self, state, top_k=10):
+        """
+        Truncate the action space with the top k words of a pretrained language model
+        :param state: state
+        :param top_k: number of words
+        :return: top k words
+        """
         if self.pretrained_lm is None:
             return None
         dist, value = self.pretrained_lm(state.text, state.img, None)
@@ -19,8 +26,8 @@ class REINFORCE:
         valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy()[0])}
         return valid_actions
 
-    def select_action(self, state, forced=None):
-        valid_actions = self.get_top_k_words(state)
+    def select_action(self, state, forced=None, num_truncated=10):
+        valid_actions = self.get_top_k_words(state, num_truncated)
         m, value = self.model(state.text, state.img, valid_actions)
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action).view(1)
@@ -33,6 +40,8 @@ class REINFORCE:
         policy_loss = []
         returns = []
         mse = nn.MSELoss()
+        #if self.max_reward<sum(self.model.rewards) :
+        #    self.max_reward = sum(self.model.rewards)
         for r in self.model.rewards[::-1]:
             R = r + self.gamma * R
             returns.insert(0, R)
@@ -40,6 +49,7 @@ class REINFORCE:
         for log_prob, R, value in zip(self.model.saved_log_probs, returns, self.model.values):
             policy_loss.append(-log_prob * (R - value))
             ms = mse(value, R)
+            #ms = mse(value, torch.tensor(self.max_reward).float())
             policy_loss.append(ms.view(1))
         self.optimizer.zero_grad()
         policy_loss = torch.cat(policy_loss).sum()
