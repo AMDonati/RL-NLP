@@ -138,7 +138,7 @@ if __name__ == '__main__':
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0,
-                       rl=True)
+                       rl=False)
 
     output, hidden, value = model(dummy_text_input, img_feat)  # shape (B*S, num_tokens)
     output = output.view(-1, seq_len, num_tokens)

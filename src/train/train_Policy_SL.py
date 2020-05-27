@@ -31,10 +31,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-model", type=str, default="lstm", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
+    parser.add_argument("-word_emb_size", type=int, default=16, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=32, help="dimension of the hidden state")
     parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
     parser.add_argument("-lr", type=float, default=0.001)
@@ -86,18 +85,13 @@ if __name__ == '__main__':
     ###############################################################################
     # Build the model
     ###############################################################################
-    if args.model == 'mlp':
-        policy_network = PolicyMLP(num_tokens=num_tokens,
-                                   word_emb_size=args.word_emb_size,
-                                   units=args.word_emb_size + args.word_emb_size * 7 * 7).to(device)
-    elif args.model == 'lstm':
-        policy_network = PolicyLSTM(num_tokens=num_tokens,
+    policy_network = PolicyLSTM(num_tokens=num_tokens,
                                     word_emb_size=args.word_emb_size,
                                     emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
                                     hidden_size=args.hidden_size,
                                     num_layers=args.num_layers,
                                     p_drop=args.p_drop,
-                                    project=True).to(device)
+                                    rl=False).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
@@ -111,7 +105,7 @@ if __name__ == '__main__':
     # Create logger, output_path and config file.
     ###############################################################################
 
-    out_path = 'SL2_{}_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}'.format(args.model, args.num_layers,
+    out_path = 'SL_LSTM_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}'.format(args.num_layers,
                                                                                        args.word_emb_size, args.hidden_size,
                                                                                        args.p_drop, args.grad_clip,
                                                                                        args.bs, learning_rate)
@@ -125,7 +119,6 @@ if __name__ == '__main__':
     config_path = os.path.join(out_path, 'config.json')
 
     hparams = {}
-    hparams["model"] = args.model
     hparams["emb_size"] = args.word_emb_size
     hparams["hidden_size"] = args.hidden_size
     hparams["p_drop"] = args.p_drop
