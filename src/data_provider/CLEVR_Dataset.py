@@ -39,8 +39,8 @@ class CLEVR_Dataset(Dataset):
     def get_vocab(self, key):
         with open(self.vocab_path, 'r') as f:
             vocab = json.load(f)[key]
-        if self.debug_len_vocab is not None:
-            vocab = {k: vocab[k] for k in list(vocab.keys())[:self.debug_len_vocab]}
+        #if self.debug_len_vocab is not None:
+        #vocab = {k: vocab[k] for k in list(vocab.keys())[:30]}
         return vocab
 
     def load_data_from_h5(self, dataset):

@@ -80,18 +80,12 @@ class PolicyGRUWord(nn.Module):
         self.last_policy = []
         self.optimizer = None
 
-    def forward(self, text_inputs, img_feat):
-        '''
-        :param text_inputs: shape (S, B)
-        :param img_feat: shape (B, C, H, W)
-        :param hidden: shape (num_layers, B, hidden_size)
-        :return:
-        log_probas: shape (S*B, num_tokens), hidden (num_layers, B, hidden_size)
-        '''
+    def forward(self, text_inputs, img_feat, valid_actions):
         embed_text = self._get_embed_text(text_inputs)
         out = self.fc(embed_text)  # (S,B,num_tokens)
         logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        logits = logits[:, valid_actions]
         probs = F.softmax(logits, dim=1)
         policy_dist = Categorical(probs)
         probs_ = policy_dist.probs.clone()

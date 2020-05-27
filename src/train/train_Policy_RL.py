@@ -29,9 +29,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-word_emb_size", type=int, default=16, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=32, help="dimension of the hidden state")
-    parser.add_argument("-lr", type=float, default=0.005)
+    parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-bs", type=int, default=1, help="batch size")
-    parser.add_argument("-max_len", type=int, default=5, help="max episode length")
+    parser.add_argument("-max_len", type=int, default=3, help="max episode length")
     parser.add_argument("-num_training_steps", type=int, default=100000, help="number of training_steps")
     parser.add_argument("-action_selection", type=str, default='sampling', help='mode to select action (greedy or sampling)')
     parser.add_argument("-data_path", type=str, required=True, help="data folder containing questions embeddings and img features")
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     # Load CLEVR ENVIRONMENT
     ###############################################################################
 
-    env = ClevrEnv(data_path=args.data_path, reward_type='levenshtein', max_len=args.max_len, max_samples=20)
+    env = ClevrEnv(data_path=args.data_path, max_len=args.max_len, max_samples=20)
     num_tokens = env.clevr_dataset.len_vocab
 
     ##################################################################################################################
@@ -115,7 +115,6 @@ if __name__ == '__main__':
 
         # monitoring of change in most probable words.
         df = pd.DataFrame(reinforce.model.last_policy[-3:])
-        # diff_df=df.diff(periods=5)
         diff_df = (df.iloc[-1] - df.iloc[0]).abs()
         top_words = diff_df.nlargest(4)
         logger.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))

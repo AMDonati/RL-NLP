@@ -1,20 +1,20 @@
 import argparse
 import os
 
-import pandas as pd
 import torch
 
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 
 
-def train(env, agent, log_interval=10, num_episodes=100, max_len=3):
+def train(env, agent, log_interval=10, num_episodes=100):
     running_reward = 0
     for i_episode in range(num_episodes):
         state, ep_reward = env.reset(), 0
-        for t in range(0, env.max_len+1):
-            action, log_probs, value = agent.select_action(state)
-            state, (reward,_), done, _ = env.step(action)
+        dict_tokens, reduced_vocab = env.get_reduced_action_space()
+        for t in range(0, env.max_len + 1):
+            action, log_probs, value = agent.select_action(state, valid_actions=dict_tokens)
+            state, (reward, _), done, _ = env.step(action)
             # if args.render:
             # env.render()
             agent.model.rewards.append(reward)
@@ -29,11 +29,11 @@ def train(env, agent, log_interval=10, num_episodes=100, max_len=3):
         if i_episode % log_interval == 0:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                 i_episode, ep_reward, running_reward))
-        df = pd.DataFrame(agent.model.last_policy[-max_len:])
+        # df = pd.DataFrame(agent.model.last_policy[-max_len:])
         # diff_df=df.diff(periods=5)
-        diff_df = (df.iloc[-1] - df.iloc[0]).abs()
-        top_words = diff_df.nlargest(4)
-        print("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
+        # diff_df = (df.iloc[-1] - df.iloc[0]).abs()
+        # top_words = diff_df.nlargest(4)
+        # print("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
 
 
 if __name__ == '__main__':
