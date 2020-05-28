@@ -1,0 +1,2 @@
+python src/train/train_Policy_RL.py -out_path "output/policy_pre_training/SL_32_64/RL" \
+ -data_path "data" -max_len 15 -lr 0.001 -max_samples 200 -pre_train True -model_path "output/SL_32_64/model.pt"

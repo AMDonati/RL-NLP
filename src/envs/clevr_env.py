@@ -38,7 +38,7 @@ class ClevrEnv(gym.Env):
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
         self.State = namedtuple('State', ('text', 'img'))
         self.Episode = namedtuple('Episode',
-                                  ('img_idx', 'closest_question', 'dialog', 'rewards', 'valid_actions'), defaults=[None, None, None, None])
+                                  ('img_idx', 'closest_question', 'dialog', 'rewards', 'valid_actions'))
         self.max_len = max_len
         # self.ref_questions = torch.randint(0, self.debug_len_vocab,
         #                                  (3, self.max_len)) if self.debug_len_vocab is not None else None
@@ -86,7 +86,7 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
-        self.current_episode = self.Episode(self.img_idx)
+        self.current_episode = self.Episode(self.img_idx, None, None, None)
 
         return self.state
 
