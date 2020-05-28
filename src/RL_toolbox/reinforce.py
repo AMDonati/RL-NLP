@@ -32,6 +32,8 @@ class REINFORCE:
         return valid_actions
 
     def select_action(self, state, valid_actions=None):
+        state.text = state.text.to(self.device)
+        state.img = state.text.to(self.device)
         m, _, value = self.model(state.text, state.img, valid_actions)
         if self.mode == 'sampling':
             action = m.sample()
