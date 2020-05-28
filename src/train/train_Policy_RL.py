@@ -58,9 +58,10 @@ if __name__ == '__main__':
         print('pre-training phase...')
         assert args.model_path is not None
         with open(args.model_path, 'rb') as f:
-            policy_network = torch.load(f, map_location=device).to(device)
+            policy_network = torch.load(f, map_location=device)
         policy_network.rl = True
         policy_network.value_head = nn.Linear(policy_network.hidden_size, 1)
+        policy_network.to(device)
     else:
         policy_network = PolicyLSTM(num_tokens=num_tokens,
                                 word_emb_size=args.word_emb_size,
