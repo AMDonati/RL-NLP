@@ -95,8 +95,8 @@ class REINFORCE:
         returns = torch.tensor(returns).float()
 
         for log_prob, R, value in zip(self.model.saved_log_probs, returns, self.model.values):
-            R = R.to(self.device)
-            #value = value.to(self.device)
+            #R = R.to(self.device)
+            value = value.to(self.device)
             #log_prob = value.to(self.device)
             policy_loss.append(-log_prob * (R - value))
             ms = mse(value, R).to(self.device)
@@ -104,7 +104,7 @@ class REINFORCE:
 
         self.optimizer.zero_grad()
         policy_loss = torch.cat(policy_loss).sum()
-        policy_loss = policy_loss.to(self.device)
+        #policy_loss = policy_loss.to(self.device)
         policy_loss.backward()
         self.optimizer.step()
 
