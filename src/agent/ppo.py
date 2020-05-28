@@ -23,14 +23,16 @@ class Memory:
 
 
 class PPO(REINFORCE):
-    def __init__(self, policy, policy_old, env, gamma=1., lr=1e-2, pretrained_lm=None, update_timestep=50, K_epochs=10):
-        REINFORCE.__init__(self, policy, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm)
+    def __init__(self, policy, policy_old, env, gamma=1., eps_clip=0.2, pretrained_lm=None, update_timestep=100,
+                 K_epochs=10, entropy_coeff=0.01):
+        REINFORCE.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm)
         self.policy_old = policy_old
         self.memory = Memory()
         self.update_timestep = update_timestep
-        self.K_epoch = K_epochs
+        self.K_epochs = K_epochs
         self.MSE_loss = nn.MSELoss()
-        self.eps_clip = 0.2
+        self.eps_clip = eps_clip
+        self.entropy_coeff = entropy_coeff
         self.K_epochs = K_epochs
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -50,7 +52,7 @@ class PPO(REINFORCE):
         dist_entropy = m.entropy()
 
         # action = m.sample()
-        actions=action.view(-1)
+        actions = action.view(-1)
         log_prob = m.log_prob(actions)
         return log_prob, value, dist_entropy
 
@@ -79,14 +81,18 @@ class PPO(REINFORCE):
             logprobs, state_values, dist_entropy = self.evaluate(old_states, old_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(logprobs - old_logprobs.detach())
+            ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5 * self.MSE_loss(state_values, rewards) - 0.01 * dist_entropy
-
+            loss = -torch.min(surr1, surr2) + 0.5 * self.MSE_loss(state_values,
+                                                                  rewards) - self.entropy_coeff * dist_entropy
+            logging.info(
+                "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
+                                                            -torch.min(surr1, surr2).mean(),
+                                                            self.MSE_loss(state_values, rewards).mean()))
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
@@ -109,14 +115,13 @@ class PPO(REINFORCE):
                 self.memory.rewards.append(reward)
                 self.memory.is_terminals.append(done)
 
-                timestep+=1
+                timestep += 1
 
                 # update if its time
                 if timestep % self.update_timestep == 0:
                     self.update()
                     self.memory.clear_memory()
                     timestep = 0
-
 
                 ep_reward += reward
                 if done:

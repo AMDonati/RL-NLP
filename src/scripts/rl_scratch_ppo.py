@@ -29,6 +29,10 @@ if __name__ == '__main__':
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="gru", help="model")
+    parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
+    parser.add_argument('-update_timestep', type=int, default=100, help="update_timestep")
+    parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
+    parser.add_argument('-eps_clip', type=float, default=0.2, help="eps clip")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -52,7 +56,8 @@ if __name__ == '__main__':
     policy_old = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old.load_state_dict(policy.state_dict())
 
-    agent = PPO(policy=policy, policy_old=policy_old, env=env, gamma=args.gamma, lr=args.lr)
+    agent = PPO(policy=policy, policy_old=policy_old, env=env, gamma=args.gamma, K_epochs=args.K_epochs,
+                update_timestep=args.update_timestep, entropy_coeff=args.entropy_coeff, eps_clip=args.eps_clip)
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)

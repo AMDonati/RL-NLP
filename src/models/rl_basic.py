@@ -120,14 +120,14 @@ class PolicyGRU_Custom(nn.Module):
 
     def act(self, state):
 
+        # text_inputs, img_feat=state.text, state.img
+        # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
+        texts = [state_.text[0] for state_ in state]
 
-        #text_inputs, img_feat=state.text, state.img
-        #states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
-        texts=[state_.text[0] for state_ in state]
+        texts.sort(key=lambda x: x.size(), reverse=True)
+        text_inputs = torch.nn.utils.rnn.pack_sequence(texts)
 
-        text_inputs = torch.nn.utils.rnn.pack_sequence(texts, enforce_sorted=False)
-
-        img_feat=torch.cat([state_.img for state_ in state])
+        img_feat = torch.cat([state_.img for state_ in state])
 
         embed_text = self._get_embed_text(text_inputs)
 
@@ -186,11 +186,11 @@ class PolicyGRU_Custom(nn.Module):
         self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist, value
 
-    def simple_elementwise_apply(self,fn, packed_sequence):
+    def simple_elementwise_apply(self, fn, packed_sequence):
         """applies a pointwise function fn to each element in packed_sequence"""
         return torch.nn.utils.rnn.PackedSequence(fn(packed_sequence.data), packed_sequence.batch_sizes)
 
     def _get_embed_text(self, text):
-        embs=self.simple_elementwise_apply(self.word_embedding, text)
+        embs = self.simple_elementwise_apply(self.word_embedding, text)
         _, hidden = self.gru(embs)
         return hidden[-1]
