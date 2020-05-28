@@ -44,7 +44,9 @@ class PolicyLSTM(nn.Module):
         self.saved_log_probs, self.rewards, self.values = [], [], []
         self.last_policy = []
 
-    def forward(self, text_inputs, img_feat):
+        #TODO: add a function: value_head.
+
+    def forward(self, text_inputs, img_feat, valid_actions=None):
         '''
         :param text_inputs: shape (S, B)
         :param img_feat: shape (B, C, H, W)
@@ -66,6 +68,8 @@ class PolicyLSTM(nn.Module):
         output = self.dropout(output)
         logits = self.action_head(output)  # (B,S,num_tokens)
         if self.rl:
+            if isinstance(valid_actions, dict):
+                logits = logits[:, :, list(valid_actions.values())]
             logits = logits[:,-1,:]
             probs = F.softmax(logits, dim=-1)
             policy_dist = Categorical(probs)

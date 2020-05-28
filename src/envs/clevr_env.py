@@ -15,7 +15,7 @@ class ClevrEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
-                 reward_path=None,
+                 reward_path=None, correct_vocab=False,
                  max_samples=None, debug=False):
         super(ClevrEnv, self).__init__()
         self.data_path = data_path
@@ -38,15 +38,13 @@ class ClevrEnv(gym.Env):
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
         self.State = namedtuple('State', ('text', 'img'))
         self.Episode = namedtuple('Episode',
-                                  ('img_idx', 'img_feats', 'GD_questions', 'closest_question', 'dialog', 'rewards'))
+                                  ('img_idx', 'closest_question', 'dialog', 'rewards', 'valid_actions'), defaults=[None, None, None, None])
         self.max_len = max_len
         # self.ref_questions = torch.randint(0, self.debug_len_vocab,
         #                                  (3, self.max_len)) if self.debug_len_vocab is not None else None
         self.reset()
 
-        #self.reward_func_1 = rewards[reward_type[0]](reward_path)
-        #self.reward_func_2 = rewards[reward_type[1]](reward_path)
-        self.reward_func = rewards["levenshtein"](correct_vocab=True)
+        self.reward_func = rewards[reward_type](path=reward_path, correct_vocab=correct_vocab)
         self.step_idx = 0
         self.state, self.dialog = None, None
         self.ref_questions, self.ref_questions_decoded = None, None
@@ -62,31 +60,47 @@ class ClevrEnv(gym.Env):
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded) if done else (
             0, None)
-        #reward_2 = self.reward_func_2.get(question=question,
-                                        #ep_questions_decoded=self.ref_questions_decoded)
-        #reward = (1 - 0.1) * reward_1 + 0.1 * reward_2
+
         self.step_idx += 1
         if done:
             self.dialog = question
-            print(question)
+            #print(question)
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
         self.img_idx = np.random.randint(0, len(self.clevr_dataset))
-        self.img_idx = 0  # for debugging.
+        #self.img_idx = 0  # for debugging.
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45)
         if self.debug:
             self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
+        # self.ref_questions_decoded = [
+        #     self.clevr_dataset.idx2word(question, clean=True)
+        #     for question in self.ref_questions.numpy()[:, :self.max_len]]
         self.ref_questions_decoded = [
             self.clevr_dataset.idx2word(question, clean=True)
-            for question in self.ref_questions.numpy()[:, :self.max_len]]
+            for question in self.ref_questions.numpy()]
+        self.clean_ref_questions()
         #print("Questions : {}".format(self.ref_questions_decoded))
         #self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
+        self.current_episode = self.Episode(self.img_idx)
+
         return self.state
+
+    def decode_current_episode(self):
+        valid_actions = self.current_episode.valid_actions
+        assert valid_actions is not None
+        valid_actions_decoded = [self.clevr_dataset.idx2word(actions, delim=',') for actions in valid_actions]
+        dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
+        return dict(zip(dialog_split, valid_actions_decoded))
+
+    def clean_ref_questions(self):
+        questions_decoded = [tokens.replace('<PAD>', '') for tokens in self.ref_questions_decoded]
+        questions_decoded = [q.strip() for q in questions_decoded]
+        self.ref_questions_decoded = questions_decoded
 
     def get_reduced_action_space(self):
         assert self.ref_questions_decoded is not None

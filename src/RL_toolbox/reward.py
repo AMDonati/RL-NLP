@@ -84,8 +84,8 @@ class CorrectVocab(Reward):
 
 class CombinedReward(Reward):
     def __init__(self, reward_func_1, reward_func_2, alpha, path):
-        self.reward_func_1 = rewards[reward_func_1]
-        self.reward_func_2 = rewards[reward_func_2]
+        self.reward_func_1 = rewards[reward_func_1]()
+        self.reward_func_2 = rewards[reward_func_2]()
         self.alpha = alpha
         Reward.__init__(self, path)
 
