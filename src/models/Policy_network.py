@@ -74,7 +74,7 @@ class PolicyLSTM(nn.Module):
             probs = F.softmax(logits, dim=-1)
             policy_dist = Categorical(probs)
             probs_ = policy_dist.probs.clone()
-            self.last_policy.append(probs_.detach().numpy()[0])
+            self.last_policy.append(probs_.detach().cpu().numpy()[0])
             value = self.value_head(output)
             value = value[:,-1,:]
             return policy_dist, hidden, value
