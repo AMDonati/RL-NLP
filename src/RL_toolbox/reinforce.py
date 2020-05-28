@@ -88,7 +88,7 @@ class REINFORCE:
         R = 0
         policy_loss = []
         returns = []
-        mse = nn.MSELoss()
+        mse = nn.MSELoss().to(self.device)
         for r in self.model.rewards[::-1]:
             R = r + self.gamma * R
             returns.insert(0, R)
