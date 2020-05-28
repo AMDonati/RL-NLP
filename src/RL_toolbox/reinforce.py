@@ -88,7 +88,7 @@ class REINFORCE:
         R = 0
         policy_loss = []
         returns = []
-        mse = nn.MSELoss().to(self.device)
+        mse = nn.MSELoss()
         for r in self.model.rewards[::-1]:
             R = r + self.gamma * R
             returns.insert(0, R)
@@ -96,7 +96,7 @@ class REINFORCE:
 
         for log_prob, R, value in zip(self.model.saved_log_probs, returns, self.model.values):
             policy_loss.append(-log_prob * (R - value))
-            ms = mse(value, R)
+            ms = mse(value, R).to(self.device)
             policy_loss.append(ms.view(1))
 
         self.optimizer.zero_grad()
