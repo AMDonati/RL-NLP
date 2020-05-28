@@ -88,13 +88,16 @@ class REINFORCE:
         R = 0
         policy_loss = []
         returns = []
-        mse = nn.MSELoss()
+        mse = nn.MSELoss().to(self.device)
         for r in self.model.rewards[::-1]:
             R = r + self.gamma * R
             returns.insert(0, R)
         returns = torch.tensor(returns).float()
 
         for log_prob, R, value in zip(self.model.saved_log_probs, returns, self.model.values):
+            R = R.to(self.device)
+            value = value.to(self.device)
+            log_prob = value.to(self.device)
             policy_loss.append(-log_prob * (R - value))
             ms = mse(value, R).to(self.device)
             policy_loss.append(ms.view(1))
