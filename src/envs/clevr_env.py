@@ -86,7 +86,7 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
-        self.current_episode = self.Episode(self.img_idx, None, None, None)
+        self.current_episode = self.Episode(self.img_idx, None, None, None, None)
 
         return self.state
 
