@@ -52,8 +52,9 @@ if __name__ == '__main__':
     #make_env_fn = lambda: ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
     #envs = VectorEnv(make_env_fn, n=2)
 
-    models = {"gru_word": PolicyGRUWordBatch,
-              "gru": PolicyGRU_Custom,
+    models = {
+        #"gru_word": PolicyGRUWordBatch,
+              #"gru": PolicyGRU_Custom,
               "lstm": PolicyLSTMWordBatch}
 
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
