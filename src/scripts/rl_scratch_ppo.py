@@ -6,8 +6,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from agent.ppo import PPO
-from envs.clevr_env import ClevrEnv
-from models.rl_basic import PolicyGRUWord, PolicyGRU_Custom
+from envs.clevr_env import VectorEnv, ClevrEnv
+from models.rl_basic import PolicyGRU_Custom, PolicyGRUWordBatch, PolicyLSTMWordBatch
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="gru", help="model")
+    parser.add_argument('-model', type=str, default="gru_word", help="model")
     parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
     parser.add_argument('-update_timestep', type=int, default=100, help="update_timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
@@ -49,14 +49,18 @@ if __name__ == '__main__':
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
 
-    models = {"gru_word": PolicyGRUWord,
-              "gru": PolicyGRU_Custom}
+    make_env_fn = lambda: ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
+    envs = VectorEnv(make_env_fn, n=2)
+
+    models = {"gru_word": PolicyGRUWordBatch,
+              "gru": PolicyGRU_Custom,
+              "lstm": PolicyLSTMWordBatch}
 
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old.load_state_dict(policy.state_dict())
 
-    agent = PPO(policy=policy, policy_old=policy_old, env=env, gamma=args.gamma, K_epochs=args.K_epochs,
+    agent = PPO(policy=policy, policy_old=policy_old, env=envs, gamma=args.gamma, K_epochs=args.K_epochs,
                 update_timestep=args.update_timestep, entropy_coeff=args.entropy_coeff, eps_clip=args.eps_clip)
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,

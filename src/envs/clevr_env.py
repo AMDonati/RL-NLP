@@ -5,6 +5,7 @@ from collections import namedtuple
 import gym
 import numpy as np
 import torch
+#from stable_baselines.common.vec_env import DummyVecEnv
 
 from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
@@ -99,6 +100,42 @@ class ClevrEnv(gym.Env):
         pass
 
 
+class VectorEnv:
+    def __init__(self, make_env_fn, n):
+        self.envs = tuple(make_env_fn() for _ in range(n))
+
+    # Call this only once at the beginning of training (optional):
+    def seed(self, seeds):
+        assert len(self.envs) == len(seeds)
+        return tuple(env.seed(s) for env, s in zip(self.envs, seeds))
+
+    # Call this only once at the beginning of training:
+    def reset(self):
+        return tuple(env.reset() for env in self.envs)
+
+    # Call this on every timestep:
+    def step(self, actions):
+        assert len(self.envs) == len(actions)
+        # return_values = []
+        obs_batch, rew_batch, done_batch, info_batch = [], [], [], []
+        for env, a in zip(self.envs, actions):
+            observation, (reward,_), done, info = env.step(a)
+            if done:
+                observation = env.reset()
+            obs_batch.append(observation)
+            rew_batch.append(reward)
+            done_batch.append(done)
+            info_batch.append(info)
+            # return_values.append((observation, reward, done, info))
+        return obs_batch, rew_batch, done_batch, info_batch
+        # return tuple(return_values)
+
+    # Call this at the end of training:
+    def close(self):
+        for env in self.envs:
+            env.close()
+
+
 if __name__ == '__main__':
     env = ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
     state = env.reset()
@@ -109,3 +146,7 @@ if __name__ == '__main__':
     act_idx = 5
     action = dict_tokens[5]
     print(act_idx, action)
+
+    make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
+    # env = VectorEnv(make_env_fn, n=4)
+    #env = DummyVecEnv([make_env_fn])
