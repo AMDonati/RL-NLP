@@ -7,10 +7,13 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agent.ppo import PPO
 from envs.clevr_env import ClevrEnv
-from models.rl_basic import PolicyLSTMWordBatch
+from models.rl_basic import PolicyLSTMWordBatch, PolicyGRUWord
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
+    # -data_path /Users/guillaumequispe/PycharmProjects/RL-NLP/data -out_path /Users/guillaumequispe/PycharmProjects/RL-NLP/output
+    # -max_len 7 -logger_level DEBUG -num_episodes_train 4000 -log_interval 1 -reward "levenshtein_"
+    # -model lstm -update_timestep 50 -K_epochs 10 -entropy_coeff 0.01 -eps_clip 0.02
     parser = argparse.ArgumentParser()
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=12, help="dimension of the embedding layer")
@@ -33,6 +36,9 @@ if __name__ == '__main__':
     parser.add_argument('-update_timestep', type=int, default=100, help="update_timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.2, help="eps clip")
+    parser.add_argument('-pretrained_path', type=str, default=None, help="pretrained path")
+    parser.add_argument('-pretrain', type=int, default=0, help="pretrained")
+    parser.add_argument('-debug', type=int, default=1, help="debug mode")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,22 +53,29 @@ if __name__ == '__main__':
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug)
 
-    #make_env_fn = lambda: ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
-    #envs = VectorEnv(make_env_fn, n=2)
+    # make_env_fn = lambda: ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
+    # envs = VectorEnv(make_env_fn, n=2)
+
+    pretrained_lm = None
+    if args.pretrained_path is not None:
+        pretrained_lm = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
+        pretrained_lm.load_state_dict(torch.load(args.pretrained_path))
+        pretrained_lm.eval()
 
     models = {
-        #"gru_word": PolicyGRUWordBatch,
-              #"gru": PolicyGRU_Custom,
-              "lstm": PolicyLSTMWordBatch}
+        # "gru_word": PolicyGRUWordBatch,
+        # "gru": PolicyGRU_Custom,
+        "lstm": PolicyLSTMWordBatch}
 
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old.load_state_dict(policy.state_dict())
 
     agent = PPO(policy=policy, policy_old=policy_old, env=env, gamma=args.gamma, K_epochs=args.K_epochs,
-                update_timestep=args.update_timestep, entropy_coeff=args.entropy_coeff, eps_clip=args.eps_clip)
+                update_timestep=args.update_timestep, entropy_coeff=args.entropy_coeff, eps_clip=args.eps_clip,
+                pretrained_lm=pretrained_lm, pretrain=args.pretrain)
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)

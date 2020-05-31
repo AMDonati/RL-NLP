@@ -94,10 +94,6 @@ class PolicyGRUWord(nn.Module):
         return hidden[-1]
 
 
-
-
-
-
 class PolicyLSTMWordBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1):
@@ -117,14 +113,10 @@ class PolicyLSTMWordBatch(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def act(self, state):
+    def act(self, state, valid_actions=None):
         # text_inputs, img_feat=state.text, state.img
         # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
         texts = [state_.text[0] for state_ in state]
-
-        # texts.sort(key=lambda x: x.size(), reverse=True)
-        #text_inputs = torch.nn.utils.rnn.pack_sequence(texts, enforce_sorted=False)
-
         # img_feat = torch.cat([state_.img for state_ in state])
 
         embed_text = self._get_embed_text(texts)
@@ -137,6 +129,8 @@ class PolicyLSTMWordBatch(nn.Module):
         logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
 
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        if isinstance(valid_actions, dict):
+            logits = logits[:, list(valid_actions.values())]
         probs = F.softmax(logits, dim=1)
         # sumprobs = probs.sum().detach().numpy()
         # if math.isnan(sumprobs):
@@ -157,13 +151,7 @@ class PolicyLSTMWordBatch(nn.Module):
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def update(self, text_inputs, img_feat, valid_actions=None):
-        '''
-        :param text_inputs: shape (S, B)
-        :param img_feat: shape (B, C, H, W)
-        :param hidden: shape (num_layers, B, hidden_size)
-        :return:
-        log_probas: shape (S*B, num_tokens), hidden (num_layers, B, hidden_size)
-        '''
+
         embed_text = self._get_embed_text(text_inputs)
 
         img_feat_ = F.relu(self.conv(img_feat))
@@ -177,28 +165,20 @@ class PolicyLSTMWordBatch(nn.Module):
         if isinstance(valid_actions, dict):
             logits = logits[:, list(valid_actions.values())]
         probs = F.softmax(logits, dim=1)
-        # sumprobs = probs.sum().detach().numpy()
-        # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
         self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist, value
 
     def _get_embed_text(self, text):
-        #embs = self.simple_elementwise_apply(self.word_embedding, text)
-        #texts=torch.stack(text)
+
         padded = pad_sequence(text,batch_first=True, padding_value=0)
         lens = list(map(len, text))
 
         pad_embed = self.word_embedding(padded)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
-        #lstm_inputs = torch.nn.utils.rnn.pack_sequence(pad_embed_pack, enforce_sorted=False)
-
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         return ht[-1]
 
-    def simple_elementwise_apply(self, fn, packed_sequence):
-        """applies a pointwise function fn to each element in packed_sequence"""
-        return torch.nn.utils.rnn.PackedSequence(fn(packed_sequence.data), packed_sequence.batch_sizes)
