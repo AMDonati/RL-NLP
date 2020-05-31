@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-from torch.nn.utils.rnn import pad_packed_sequence
+from torch.nn.utils.rnn import pad_packed_sequence, pad_sequence, pack_padded_sequence
 
 
 class PolicyGRU(nn.Module):
@@ -382,11 +382,16 @@ class PolicyLSTMWordBatch(nn.Module):
 
     def _get_embed_text(self, text):
         #embs = self.simple_elementwise_apply(self.word_embedding, text)
-        texts=torch.stack(text)
-        embs = self.word_embedding(texts)
-        lstm_inputs = torch.nn.utils.rnn.pack_sequence(embs, enforce_sorted=False)
+        #texts=torch.stack(text)
+        padded = pad_sequence(text,batch_first=True, padding_value=0)
+        lens = list(map(len, text))
 
-        packed_output, (ht, ct) = self.lstm(lstm_inputs)
+        pad_embed = self.word_embedding(padded)
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+
+        #lstm_inputs = torch.nn.utils.rnn.pack_sequence(pad_embed_pack, enforce_sorted=False)
+
+        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         return ht[-1]
 

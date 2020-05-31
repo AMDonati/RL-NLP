@@ -38,7 +38,7 @@ class PPO(REINFORCE):
 
     def select_action(self, state):
         # valid_actions = self.get_top_k_words(state, num_truncated)
-        m, value = self.policy_old.act(state)
+        m, value = self.policy_old.act([state])
         action = m.sample()
         log_prob = m.log_prob(action).view(-1)
         self.memory.states.append(state)
@@ -60,23 +60,24 @@ class PPO(REINFORCE):
 
         # Monte Carlo estimate of state rewards:
         rewards = []
-        discounted_reward = np.zeros((len(self.env.envs)))
+        #discounted_reward = np.zeros((len(self.env.envs)))
+        discounted_reward = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):
-            #if is_terminal:
-                #discounted_reward = 0
-            discounted_reward = reward + (self.gamma * discounted_reward*(1-np.array(is_terminal)))
+            if is_terminal:
+                discounted_reward = 0
+            discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
         # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         rewards = torch.tensor(rewards).to(self.device).float()
 
         # convert list to tensor
         # old_states = torch.stack(self.memory.states).to(self.device).detach()
-        #old_states = self.memory.states
-        #old_actions = torch.stack(self.memory.actions).to(self.device).detach()
-        #old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
-        old_states= [item for sublist in self.memory.states for item in sublist]
-        old_actions= torch.cat(self.memory.actions).to(self.device).detach()
-        old_logprobs=torch.cat(self.memory.logprobs).to(self.device).detach()
+        old_states = self.memory.states
+        old_actions = torch.stack(self.memory.actions).to(self.device).detach()
+        old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
+        #old_states= [item for sublist in self.memory.states for item in sublist]
+        #old_actions= torch.cat(self.memory.actions).to(self.device).detach()
+        #old_logprobs=torch.cat(self.memory.logprobs).to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
@@ -111,9 +112,9 @@ class PPO(REINFORCE):
         timestep = 0
         for i_episode in range(num_episodes):
             state, ep_reward = self.env.reset(), 0
-            for t in range(0, self.env.envs[0].max_len + 1):
+            for t in range(0, self.env.max_len + 1):
                 action, log_probs, value, _, _ = self.select_action(state)
-                state, reward, done, _ = self.env.step(action)
+                state, (reward,_), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:
                 self.memory.rewards.append(reward)
                 self.memory.is_terminals.append(done)
@@ -126,12 +127,12 @@ class PPO(REINFORCE):
                     self.memory.clear_memory()
                     timestep = 0
 
-                ep_reward +=np.mean(reward)
+                ep_reward +=reward
                 if done:
                     break
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
-                writer.add_text('episode_questions', '  \n'.join(self.env.envs[0].ref_questions_decoded))
+                writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 writer.add_scalar('train_running_return', running_reward, i_episode + 1)

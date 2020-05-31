@@ -49,8 +49,8 @@ if __name__ == '__main__':
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
 
-    make_env_fn = lambda: ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
-    envs = VectorEnv(make_env_fn, n=2)
+    #make_env_fn = lambda: ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=True)
+    #envs = VectorEnv(make_env_fn, n=2)
 
     models = {"gru_word": PolicyGRUWordBatch,
               "gru": PolicyGRU_Custom,
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     policy_old = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old.load_state_dict(policy.state_dict())
 
-    agent = PPO(policy=policy, policy_old=policy_old, env=envs, gamma=args.gamma, K_epochs=args.K_epochs,
+    agent = PPO(policy=policy, policy_old=policy_old, env=env, gamma=args.gamma, K_epochs=args.K_epochs,
                 update_timestep=args.update_timestep, entropy_coeff=args.entropy_coeff, eps_clip=args.eps_clip)
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
