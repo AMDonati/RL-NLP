@@ -6,8 +6,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from agent.ppo import PPO
-from envs.clevr_env import VectorEnv, ClevrEnv
-from models.rl_basic import PolicyGRU_Custom, PolicyGRUWordBatch, PolicyLSTMWordBatch
+from envs.clevr_env import ClevrEnv
+from models.rl_basic import PolicyLSTMWordBatch
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
