@@ -78,4 +78,6 @@ if __name__ == '__main__':
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)
+    agent.test(log_interval=args.log_interval, num_episodes=args.num_episodes_test,
+                writer=writer)
     agent.save(out_policy_file)

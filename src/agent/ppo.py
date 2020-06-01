@@ -1,32 +1,15 @@
 import logging
-import random
 
 import torch
 import torch.nn as nn
 
-from agent.reinforce import REINFORCE
+from agent.agent import Memory, Agent
 
 
-class Memory:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-
-    def clear_memory(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.is_terminals[:]
-
-
-class PPO(REINFORCE):
+class PPO(Agent):
     def __init__(self, policy, policy_old, env, gamma=1., eps_clip=0.2, pretrained_lm=None, update_timestep=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False):
-        REINFORCE.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm)
+        Agent.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm)
         self.policy_old = policy_old
         self.memory = Memory()
         self.update_timestep = update_timestep
@@ -38,8 +21,7 @@ class PPO(REINFORCE):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.pretrain = pretrain
 
-
-    def  select_action(self, state, num_truncated=10, forced=None):
+    def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words(state, num_truncated)
         m, value = self.policy_old.act([state], valid_actions)
         action = m.sample() if forced is None else forced
@@ -109,40 +91,3 @@ class PPO(REINFORCE):
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
-
-    def learn(self, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
-              num_truncated=10):
-
-        running_reward = 0
-        timestep = 0
-        for i_episode in range(num_episodes):
-            state, ep_reward = self.env.reset(), 0
-            ref_question = random.choice(self.env.ref_questions)
-            for t in range(0, self.env.max_len + 1):
-                forced = ref_question[t] if self.pretrain else None
-                action, log_probs, value, _, _ = self.select_action(state=state, forced=forced)
-                state, (reward, _), done, _ = self.env.step(action)
-                # Saving reward and is_terminal:
-                self.memory.rewards.append(reward)
-                self.memory.is_terminals.append(done)
-
-                timestep += 1
-
-                # update if its time
-                if timestep % self.update_timestep == 0:
-                    self.update()
-                    self.memory.clear_memory()
-                    timestep = 0
-
-                ep_reward += reward
-                if done:
-                    break
-            running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-            if i_episode % log_interval == 0:
-                logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
-                    i_episode, ep_reward, running_reward))
-                writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
-                writer.add_scalar('train_running_return', running_reward, i_episode + 1)
-
-
-
