@@ -9,16 +9,13 @@ from agent.agent import Memory, Agent
 class PPO(Agent):
     def __init__(self, policy, policy_old, env, gamma=1., eps_clip=0.2, pretrained_lm=None, update_timestep=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False):
-        Agent.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm)
+        Agent.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm, pretrain=pretrain,
+                       update_timestep=update_timestep)
         self.policy_old = policy_old
-        self.memory = Memory()
-        self.update_timestep = update_timestep
         self.K_epochs = K_epochs
         self.MSE_loss = nn.MSELoss()
         self.eps_clip = eps_clip
         self.entropy_coeff = entropy_coeff
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.pretrain = pretrain
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words([state], num_truncated)
@@ -27,7 +24,7 @@ class PPO(Agent):
         log_prob = m.log_prob(action).view(-1)
         self.memory.actions.append(action)
         if valid_actions is not None:
-            action=torch.gather(valid_actions,1,action.view(1,1))
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
         self.memory.states.append(state)
         self.memory.logprobs.append(log_prob)
         return action.numpy(), log_prob, value, None, m

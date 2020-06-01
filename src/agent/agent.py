@@ -12,6 +12,7 @@ class Memory:
         self.logprobs = []
         self.rewards = []
         self.is_terminals = []
+        self.values = []
 
     def clear_memory(self):
         del self.actions[:]
@@ -19,15 +20,21 @@ class Memory:
         del self.logprobs[:]
         del self.rewards[:]
         del self.is_terminals[:]
+        del self.values[:]
 
 
 class Agent:
-    def __init__(self, model, env, gamma=1., lr=1e-2, pretrained_lm=None):
+    def __init__(self, model, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
+                 update_timestep=50):
         self.policy = model
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
         self.env = env
+        self.pretrain = pretrain
+        self.update_timestep = update_timestep
+        self.memory = Memory()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def get_top_k_words(self, state, top_k=10):
         """
@@ -41,7 +48,7 @@ class Agent:
         dist, value = self.pretrained_lm.act(state)
         probs = dist.probs
         top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
-        #valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy())}
+        # valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy())}
         return top_k_indices
 
     def select_action(self, state, forced=None, num_truncated=10):
@@ -50,7 +57,7 @@ class Agent:
     def finish_episode(self):
         pass
 
-    #def learn(self, env, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
+    # def learn(self, env, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
     #          num_truncated=10):
     #    pass
 
@@ -91,8 +98,8 @@ class Agent:
                 writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 writer.add_scalar('train_running_return', running_reward, i_episode + 1)
 
-    def test(self, writer,log_interval=1, num_episodes=10):
-        #trained_model.load_state_dict(torch.load(saved_path))
+    def test(self, writer, log_interval=1, num_episodes=10):
+        # trained_model.load_state_dict(torch.load(saved_path))
         self.policy.eval()
 
         running_reward = 0
@@ -119,7 +126,6 @@ class Agent:
                 writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 writer.add_scalar('test_running_return', running_reward, i_episode + 1)
                 writer.add_text('language_model', '  \n'.join(top_words))
-
 
     def learn(self, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
               num_truncated=10):
