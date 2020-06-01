@@ -17,7 +17,6 @@ class PPO(Agent):
         self.MSE_loss = nn.MSELoss()
         self.eps_clip = eps_clip
         self.entropy_coeff = entropy_coeff
-        self.K_epochs = K_epochs
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.pretrain = pretrain
 
