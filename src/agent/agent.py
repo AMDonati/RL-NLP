@@ -38,11 +38,11 @@ class Agent:
         """
         if self.pretrained_lm is None:
             return None
-        dist, value = self.pretrained_lm(state.text, state.img, None)
+        dist, value = self.pretrained_lm.act(state)
         probs = dist.probs
         top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
-        valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy()[0])}
-        return valid_actions
+        #valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy())}
+        return top_k_indices
 
     def select_action(self, state, forced=None, num_truncated=10):
         pass

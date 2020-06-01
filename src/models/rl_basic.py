@@ -129,8 +129,9 @@ class PolicyLSTMWordBatch(nn.Module):
         logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
 
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        if isinstance(valid_actions, dict):
-            logits = logits[:, list(valid_actions.values())]
+        if valid_actions is not None:
+            logits=torch.gather(logits,1,valid_actions)
+            #logits = logits[:, valid_actions]
         probs = F.softmax(logits, dim=1)
         # sumprobs = probs.sum().detach().numpy()
         # if math.isnan(sumprobs):

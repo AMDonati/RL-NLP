@@ -36,9 +36,11 @@ if __name__ == '__main__':
     parser.add_argument('-update_timestep', type=int, default=100, help="update_timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.2, help="eps clip")
-    parser.add_argument('-pretrained_path', type=str, default=None, help="pretrained path")
-    parser.add_argument('-pretrain', type=int, default=0, help="pretrained")
-    parser.add_argument('-debug', type=int, default=1, help="debug mode")
+    parser.add_argument('-pretrained_path', type=str, default=None,
+                        help="if specified, the language model truncate the action space")
+    parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    parser.add_argument('-debug', type=int, default=1,
+                        help="debug mode: train on just one question from the first image")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,6 +80,5 @@ if __name__ == '__main__':
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)
-    agent.test(log_interval=args.log_interval, num_episodes=args.num_episodes_test,
-                writer=writer)
     agent.save(out_policy_file)
+    agent.test(log_interval=args.log_interval, num_episodes=args.num_episodes_test, writer=writer)

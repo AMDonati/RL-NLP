@@ -22,14 +22,17 @@ class PPO(Agent):
         self.pretrain = pretrain
 
     def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions = self.get_top_k_words(state, num_truncated)
+        valid_actions = self.get_top_k_words([state], num_truncated)
         m, value = self.policy_old.act([state], valid_actions)
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action).view(-1)
-        if isinstance(valid_actions, dict):
-            action = torch.tensor(valid_actions[action.item()]).view(1)
-        self.memory.states.append(state)
+        #action=action.numpy()
         self.memory.actions.append(action)
+        if valid_actions is not None:
+            #action=torch.tensor([valid_actions[i, action[i]] for i in range(len(valid_actions))])
+            action=torch.gather(valid_actions,1,action.view(1,1))
+            #action = torch.tensor(valid_actions[action.item()]).view(1)
+        self.memory.states.append(state)
         self.memory.logprobs.append(log_prob)
         return action.numpy(), log_prob, value, None, m
 
@@ -37,10 +40,13 @@ class PPO(Agent):
         valid_actions = self.get_top_k_words(state, num_truncated)
         m, value = self.policy.act(state, valid_actions)
         dist_entropy = m.entropy()
+        log_prob = m.log_prob(action.view(-1))
+
+        #if valid_actions is not None:
+        #    action = torch.gather(valid_actions, 1, action)
 
         # action = m.sample()
-        actions = action.view(-1)
-        log_prob = m.log_prob(actions)
+        #actions = action.view(-1)
         return log_prob, value, dist_entropy
 
     def update(self):
@@ -75,11 +81,11 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach()
+            advantages = rewards - state_values.detach() if not self.pretrain else 1
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5 * self.MSE_loss(state_values,
-                                                                  rewards) - self.entropy_coeff * dist_entropy
+            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else 0
+            loss = -torch.min(surr1, surr2) + vf_loss - self.entropy_coeff * dist_entropy
             logging.info(
                 "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
                                                             -torch.min(surr1, surr2).mean(),
