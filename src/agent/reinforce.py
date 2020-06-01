@@ -43,8 +43,6 @@ class REINFORCE(Agent):
         policy_loss = []
         returns = []
         mse = nn.MSELoss()
-        # if self.max_reward<sum(self.model.rewards) :
-        #    self.max_reward = sum(self.model.rewards)
         for r in self.model.rewards[::-1]:
             R = r + self.gamma * R
             returns.insert(0, R)
@@ -89,11 +87,11 @@ class REINFORCE(Agent):
                 writer.add_text('episode_questions', '  \n'.join(env.ref_questions_decoded))
                 writer.add_scalar('train_running_return', running_reward, i_episode + 1)
 
-            df = pd.DataFrame(self.model.last_policy[-env.max_len:])
+            #df = pd.DataFrame(self.model.last_policy[-env.max_len:])
             # diff_df = df.diff(periods=5)
-            diff_df = (df.iloc[-1] - df.iloc[0]).abs()
-            top_words = diff_df.nlargest(4)
-            logging.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
+            #diff_df = (df.iloc[-1] - df.iloc[0]).abs()
+            #top_words = diff_df.nlargest(4)
+            #logging.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
 
         out_file = os.path.join(output_path, 'model.pth')
         # with open(out_file, 'wb') as f:

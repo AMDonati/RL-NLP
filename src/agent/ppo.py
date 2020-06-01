@@ -26,12 +26,9 @@ class PPO(Agent):
         m, value = self.policy_old.act([state], valid_actions)
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action).view(-1)
-        #action=action.numpy()
         self.memory.actions.append(action)
         if valid_actions is not None:
-            #action=torch.tensor([valid_actions[i, action[i]] for i in range(len(valid_actions))])
             action=torch.gather(valid_actions,1,action.view(1,1))
-            #action = torch.tensor(valid_actions[action.item()]).view(1)
         self.memory.states.append(state)
         self.memory.logprobs.append(log_prob)
         return action.numpy(), log_prob, value, None, m
@@ -42,35 +39,22 @@ class PPO(Agent):
         dist_entropy = m.entropy()
         log_prob = m.log_prob(action.view(-1))
 
-        #if valid_actions is not None:
-        #    action = torch.gather(valid_actions, 1, action)
-
-        # action = m.sample()
-        #actions = action.view(-1)
         return log_prob, value, dist_entropy
 
     def update(self):
 
-        # Monte Carlo estimate of state rewards:
         rewards = []
-        # discounted_reward = np.zeros((len(self.env.envs)))
         discounted_reward = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-        # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         rewards = torch.tensor(rewards).to(self.device).float()
 
-        # convert list to tensor
-        # old_states = torch.stack(self.memory.states).to(self.device).detach()
         old_states = self.memory.states
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
         old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
-        # old_states= [item for sublist in self.memory.states for item in sublist]
-        # old_actions= torch.cat(self.memory.actions).to(self.device).detach()
-        # old_logprobs=torch.cat(self.memory.logprobs).to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
