@@ -38,22 +38,8 @@ class PPO(REINFORCE):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.pretrain = pretrain
 
-    def get_top_k_words(self, state, top_k=10):
-        """
-        Truncate the action space with the top k words of a pretrained language model
-        :param state: state
-        :param top_k: number of words
-        :return: top k words
-        """
-        if self.pretrained_lm is None:
-            return None
-        dist, value = self.pretrained_lm(state.text, state.img, None)
-        probs = dist.probs
-        top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
-        valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy()[0])}
-        return valid_actions
 
-    def select_action(self, state, num_truncated=10, forced=None):
+    def  select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words(state, num_truncated)
         m, value = self.policy_old.act([state], valid_actions)
         action = m.sample() if forced is None else forced

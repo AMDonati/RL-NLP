@@ -150,29 +150,8 @@ class PolicyLSTMWordBatch(nn.Module):
 
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
-    def update(self, text_inputs, img_feat, valid_actions=None):
-
-        embed_text = self._get_embed_text(text_inputs)
-
-        img_feat_ = F.relu(self.conv(img_feat))
-        img_feat = img_feat_.view(img_feat.size(0), -1)
-
-        embedding = torch.cat((img_feat, embed_text.view(embed_text.size(0), -1)), dim=1)
-        out = self.fc(embedding)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
-
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        if isinstance(valid_actions, dict):
-            logits = logits[:, list(valid_actions.values())]
-        probs = F.softmax(logits, dim=1)
-        policy_dist = Categorical(probs)
-        probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
-        return policy_dist, value
-
     def _get_embed_text(self, text):
-
-        padded = pad_sequence(text,batch_first=True, padding_value=0)
+        padded = pad_sequence(text, batch_first=True, padding_value=0)
         lens = list(map(len, text))
 
         pad_embed = self.word_embedding(padded)
@@ -182,3 +161,52 @@ class PolicyLSTMWordBatch(nn.Module):
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         return ht[-1]
 
+
+class PolicyLSTMBatch(PolicyLSTMWordBatch):
+
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=None, pooling=True):
+        # super(PolicyLSTMBatch, self).__init__()
+        PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
+        self.num_filters = word_emb_size if num_filters is None else num_filters
+        self.fc = nn.Linear(12 * 14 * 14 + self.hidden_size, num_tokens + 1)
+        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
+
+    def forward(self):
+        raise NotImplementedError
+
+    def act(self, state, valid_actions=None):
+        # text_inputs, img_feat=state.text, state.img
+        # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
+        texts = [state_.text[0] for state_ in state]
+        embed_text = self._get_embed_text(texts)
+
+        img_feat = torch.cat([state_.img for state_ in state])
+
+        img_feat_ = F.relu(self.conv(img_feat))
+        img_feat__ = img_feat_.view(img_feat.size(0), -1)
+
+        embedding = torch.cat((img_feat__, embed_text.view(embed_text.size(0), -1)), dim=1)
+        out = self.fc(embedding)  # (S,B,num_tokens)
+        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
+
+        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        if isinstance(valid_actions, dict):
+            logits = logits[:, list(valid_actions.values())]
+        probs = F.softmax(logits, dim=1)
+        # sumprobs = probs.sum().detach().numpy()
+        # if math.isnan(sumprobs):
+        policy_dist = Categorical(probs)
+        probs = policy_dist.probs.clone()
+        self.last_policy.append(probs.detach().numpy()[0])
+        return policy_dist, value
+
+    def evaluate(self, state, action):
+        action_probs = self.action_layer(state)
+        dist = Categorical(action_probs)
+
+        action_logprobs = dist.log_prob(action)
+        dist_entropy = dist.entropy()
+
+        state_value = self.value_layer(state)
+
+        return action_logprobs, torch.squeeze(state_value), dist_entropy

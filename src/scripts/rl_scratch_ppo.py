@@ -7,13 +7,13 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agent.ppo import PPO
 from envs.clevr_env import ClevrEnv
-from models.rl_basic import PolicyLSTMWordBatch, PolicyGRUWord
+from models.rl_basic import PolicyLSTMWordBatch, PolicyGRUWord, PolicyLSTMBatch
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
     # -data_path /Users/guillaumequispe/PycharmProjects/RL-NLP/data -out_path /Users/guillaumequispe/PycharmProjects/RL-NLP/output
     # -max_len 7 -logger_level DEBUG -num_episodes_train 4000 -log_interval 1 -reward "levenshtein_"
-    # -model lstm -update_timestep 50 -K_epochs 10 -entropy_coeff 0.01 -eps_clip 0.02
+    # -model lstm_word -update_timestep 50 -K_epochs 10 -entropy_coeff 0.01 -eps_clip 0.02
     parser = argparse.ArgumentParser()
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=12, help="dimension of the embedding layer")
@@ -67,7 +67,8 @@ if __name__ == '__main__':
     models = {
         # "gru_word": PolicyGRUWordBatch,
         # "gru": PolicyGRU_Custom,
-        "lstm": PolicyLSTMWordBatch}
+        "lstm": PolicyLSTMBatch,
+        "lstm_word": PolicyLSTMWordBatch}
 
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
     policy_old = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
