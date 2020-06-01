@@ -34,3 +34,6 @@ class Agent:
     def learn(self, env, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
               num_truncated=10):
         pass
+
+    def save(self, out_file):
+        torch.save(self.policy, out_file)

@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agent.ppo import PPO
 from envs.clevr_env import ClevrEnv
-from models.rl_basic import PolicyLSTMWordBatch, PolicyGRUWord, PolicyLSTMBatch
+from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
@@ -48,6 +48,7 @@ if __name__ == '__main__':
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
+    out_policy_file = os.path.join(output_path, 'model.pth')
 
     logger = create_logger(out_file_log, level=args.logger_level)
 
@@ -60,13 +61,10 @@ if __name__ == '__main__':
 
     pretrained_lm = None
     if args.pretrained_path is not None:
-        pretrained_lm = PolicyGRUWord(env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
-        pretrained_lm.load_state_dict(torch.load(args.pretrained_path))
+        pretrained_lm = torch.load(args.pretrained_path)
         pretrained_lm.eval()
 
     models = {
-        # "gru_word": PolicyGRUWordBatch,
-        # "gru": PolicyGRU_Custom,
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
@@ -80,3 +78,4 @@ if __name__ == '__main__':
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)
+    agent.save(out_policy_file)
