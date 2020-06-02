@@ -3,7 +3,7 @@ import logging
 import torch
 import torch.nn as nn
 
-from agent.agent import Memory, Agent
+from agent.agent import Agent
 
 
 class PPO(Agent):
@@ -16,6 +16,7 @@ class PPO(Agent):
         self.MSE_loss = nn.MSELoss()
         self.eps_clip = eps_clip
         self.entropy_coeff = entropy_coeff
+        self.update_mode = "step"
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words([state], num_truncated)
