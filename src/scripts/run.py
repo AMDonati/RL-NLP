@@ -72,16 +72,19 @@ if __name__ == '__main__':
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
-    policy_old = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size)
-    policy_old.load_state_dict(policy.state_dict())
+    ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
+                  "K_epochs": args.K_epochs,
+                  "update_timestep": args.update_timestep, "entropy_coeff": args.entropy_coeff,
+                  "eps_clip": args.eps_clip,
+                  "pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
+                  "hidden_size": args.hidden_size}
+    reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
+                        "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
+    kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
 
-    agents = {"PPO": PPO(policy=policy, policy_old=policy_old, env=env, gamma=args.gamma, K_epochs=args.K_epochs,
-                         update_timestep=args.update_timestep, entropy_coeff=args.entropy_coeff, eps_clip=args.eps_clip,
-                         pretrained_lm=pretrained_lm, pretrain=args.pretrain),
-              "REINFORCE": REINFORCE(env=env,model=policy, gamma=args.gamma, lr=args.lr)}
+    agents = {"PPO": PPO, "REINFORCE": REINFORCE}
 
-    agent = agents[args.agent]
+    agent = agents[args.agent](**kwargs[args.agent])
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)

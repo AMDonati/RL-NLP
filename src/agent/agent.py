@@ -24,9 +24,9 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, model, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
-                 update_timestep=50):
-        self.policy = model
+    def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
+                 update_timestep=50, word_emb_size=8, hidden_size=24):
+        self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm

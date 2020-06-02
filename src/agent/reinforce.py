@@ -5,8 +5,10 @@ from agent.agent import Agent
 
 
 class REINFORCE(Agent):
-    def __init__(self, model, env, gamma=1., lr=1e-2, pretrained_lm=None, update_episode=1):
-        Agent.__init__(self, model, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm, )
+    def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, update_episode=1, word_emb_size=8,
+                 hidden_size=24):
+        Agent.__init__(self, policy, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm, word_emb_size=word_emb_size,
+                       hidden_size=hidden_size)
         self.update_episode = update_episode
         self.MSE_loss = nn.MSELoss()
         self.update_mode = "episode"
