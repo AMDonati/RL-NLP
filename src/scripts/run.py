@@ -74,16 +74,17 @@ if __name__ == '__main__':
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
+                      "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride}
+
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
                   "update_timestep": args.update_timestep, "entropy_coeff": args.entropy_coeff,
-                  "eps_clip": args.eps_clip,
-                  "pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
-                  "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride}
+                  "eps_clip": args.eps_clip}
     reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
-                        "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size,
-                        "kernel_size": args.conv_kernel, "stride": args.stride}
+                        "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
     kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
+    kwargs = {**kwargs, **generic_kwargs}
 
     agents = {"PPO": PPO, "REINFORCE": REINFORCE}
 

@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
 
 class PolicyGRU(nn.Module):
@@ -100,7 +100,7 @@ class PolicyGRUWord(nn.Module):
 
 class PolicyLSTMWordBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, kernel_size=1, stride=5):
         super(PolicyLSTMWordBatch, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
@@ -164,7 +164,7 @@ class PolicyLSTMWordBatch(nn.Module):
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        #output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+        # output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         return ht[-1]
 
 
