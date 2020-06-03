@@ -83,12 +83,12 @@ if __name__ == '__main__':
                   "eps_clip": args.eps_clip}
     reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
-    kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
-    kwargs = {**kwargs, **generic_kwargs}
+    algo_kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
+    kwargs = {**algo_kwargs[args.agent], **generic_kwargs}
 
     agents = {"PPO": PPO, "REINFORCE": REINFORCE}
 
-    agent = agents[args.agent](**kwargs[args.agent])
+    agent = agents[args.agent](**kwargs)
 
     agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
                 writer=writer, output_path=output_path)
