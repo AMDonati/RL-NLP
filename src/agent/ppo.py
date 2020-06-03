@@ -30,7 +30,7 @@ class PPO(Agent):
             action = torch.gather(valid_actions, 1, action.view(1, 1))
         self.memory.states.append(state)
         self.memory.logprobs.append(log_prob)
-        return action.numpy(), log_prob, value, None, m
+        return action.cpu().numpy(), log_prob, value, None, m
 
     def evaluate(self, state, action, num_truncated=10):
         valid_actions = self.get_top_k_words(state, num_truncated)
