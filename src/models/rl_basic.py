@@ -1,9 +1,9 @@
+import h5py
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-import h5py
-import numpy as np
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 
 
@@ -57,7 +57,7 @@ class PolicyGRU(nn.Module):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        #self.last_policy.append(probs.detach().numpy()[0])
+        # self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist
 
     def _get_embed_text(self, text):
@@ -90,7 +90,7 @@ class PolicyGRUWord(nn.Module):
         probs = F.softmax(logits, dim=1)
         policy_dist = Categorical(probs)
         probs_ = policy_dist.probs.clone()
-        #self.last_policy.append(probs_.detach().numpy()[0])
+        # self.last_policy.append(probs_.detach().numpy()[0])
         return policy_dist, value
 
     def _get_embed_text(self, text):
@@ -142,7 +142,7 @@ class PolicyLSTMWordBatch(nn.Module):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        #self.last_policy.append(probs.detach().cpu().numpy()[0])
+        # self.last_policy.append(probs.detach().cpu().numpy()[0])
         return policy_dist, value
 
     def evaluate(self, state, action):
@@ -164,18 +164,29 @@ class PolicyLSTMWordBatch(nn.Module):
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+        #output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         return ht[-1]
 
 
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=None, pooling=True):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
+                 kernel_size=1, stride=5):
         # super(PolicyLSTMBatch, self).__init__()
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
-        self.fc = nn.Linear(12 * 14 * 14 + self.hidden_size, num_tokens + 1)
-        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
+        self.stride = stride
+        self.kernel_size = kernel_size
+        h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1)) / self.stride)
+        self.fc = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
+                            num_tokens + 1)
+
+        # self.fc = nn.Linear(12 * 14 * 14 + self.hidden_size, num_tokens + 1)
+
+        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
+                              stride=self.stride)
+        # self.pooling = pooling
+        # self.max_pool = nn.MaxPool2d(kernel_size=self.pool_kernel)
 
     def forward(self):
         raise NotImplementedError
@@ -203,7 +214,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        #self.last_policy.append(probs.detach().numpy()[0])
+        # self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist, value
 
     def evaluate(self, state, action):
@@ -216,6 +227,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         state_value = self.value_layer(state)
 
         return action_logprobs, torch.squeeze(state_value), dist_entropy
+
 
 if __name__ == '__main__':
     train_features_path = '../../data/train_features.h5'

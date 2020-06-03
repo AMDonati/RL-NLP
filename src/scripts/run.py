@@ -43,6 +43,8 @@ if __name__ == '__main__':
     parser.add_argument('-debug', type=int, default=1,
                         help="debug mode: train on just one question from the first image")
     parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
+    parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
+    parser.add_argument('-stride', type=int, default=2, help="stride conv")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -77,9 +79,10 @@ if __name__ == '__main__':
                   "update_timestep": args.update_timestep, "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip,
                   "pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
-                  "hidden_size": args.hidden_size}
+                  "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride}
     reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
-                        "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
+                        "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size,
+                        "kernel_size": args.conv_kernel, "stride": args.stride}
     kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
 
     agents = {"PPO": PPO, "REINFORCE": REINFORCE}
