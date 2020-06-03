@@ -102,6 +102,7 @@ class PolicyLSTMWordBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1):
         super(PolicyLSTMWordBatch, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -156,7 +157,7 @@ class PolicyLSTMWordBatch(nn.Module):
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def _get_embed_text(self, text):
-        padded = pad_sequence(text, batch_first=True, padding_value=0)
+        padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = list(map(len, text))
 
         pad_embed = self.word_embedding(padded)
