@@ -57,7 +57,7 @@ class PolicyGRU(nn.Module):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
+        #self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist
 
     def _get_embed_text(self, text):
@@ -90,7 +90,7 @@ class PolicyGRUWord(nn.Module):
         probs = F.softmax(logits, dim=1)
         policy_dist = Categorical(probs)
         probs_ = policy_dist.probs.clone()
-        self.last_policy.append(probs_.detach().numpy()[0])
+        #self.last_policy.append(probs_.detach().numpy()[0])
         return policy_dist, value
 
     def _get_embed_text(self, text):
@@ -142,7 +142,7 @@ class PolicyLSTMWordBatch(nn.Module):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().cpu().numpy()[0])
+        #self.last_policy.append(probs.detach().cpu().numpy()[0])
         return policy_dist, value
 
     def evaluate(self, state, action):
@@ -203,7 +203,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
+        #self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist, value
 
     def evaluate(self, state, action):
