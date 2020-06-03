@@ -13,6 +13,7 @@ class PPO(Agent):
                        update_timestep=update_timestep, word_emb_size=word_emb_size, hidden_size=hidden_size)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size)
         self.policy_old.load_state_dict(self.policy.state_dict())
+        self.policy_old.to(self.device)
         self.K_epochs = K_epochs
         self.MSE_loss = nn.MSELoss()
         self.eps_clip = eps_clip
