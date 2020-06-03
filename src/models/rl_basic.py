@@ -186,7 +186,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         texts = [state_.text[0] for state_ in state]
         embed_text = self._get_embed_text(texts)
 
-        img_feat = torch.cat([state_.img for state_ in state])
+        img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
 
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1)
