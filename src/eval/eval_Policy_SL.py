@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-data_path", type=str, required=True, help="path for data")
-    parser.add_argument("-model_path", type=str, required=True, help="path for saved model")
+    #parser.add_argument("-model_path", type=str, required=True, help="path for saved model")
     parser.add_argument("-out_path", type=str, required=True, help='path for outputting eval results')
     parser.add_argument("-words", type=int, default=100, help="num words to generate")
     parser.add_argument("-seed", type=int, default=123, help="seed for reproducibility")
@@ -44,10 +44,10 @@ if __name__ == '__main__':
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    with open(args.model_path, 'rb') as f:
+    model_path = os.path.join(args.out_path, 'model.pt')
+    with open(model_path, 'rb') as f:
         model = torch.load(f, map_location=device).to(device)
     model.eval()
-    model.project = False # trick to account in change in model architecture.
 
     # TODO: add a model.flatten_parameters() ?
     h5_questions_path = os.path.join(args.data_path, 'train_questions.h5') #TODO: check why uploading the test dataset does not work.
@@ -71,30 +71,31 @@ if __name__ == '__main__':
     ###############################################################################
     # generate words
     ###############################################################################
-    # Img Id O.
-    img_feats = test_dataset.get_feats_from_img_idx(0).unsqueeze(0)
-    input = torch.LongTensor([SOS_idx]).view(1,1).to(device)
-    input_word = test_dataset.idx2word([input[0].item()], delim='')
-    for temp in args.temperature:
-        logger.info("generating text with temperature: {}".format(temp))
-        out_file_generate = os.path.join(args.out_path, 'generate_words_temp_{}.txt'.format(temp, args.seed))
-        with open(out_file_generate, 'w') as f:
-            f.write(input_word + '\n')
-            with torch.no_grad():
-                for i in range(args.words):
-                    output, hidden = model(input, img_feats)  # output (1, num_tokens)
-                    if temp is not None:
-                        word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
-                        word_weights = word_weights / word_weights.sum(dim=-1).cpu()
-                        word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
-                    else:
-                        word_idx = output.squeeze().argmax()
-                    input.fill_(word_idx)
-                    word = test_dataset.idx2word(seq_idx=[word_idx.item()], delim='')
-                    f.write(word + ('\n' if i % 20 == 19 else ' '))
-                    if i % log_interval == 0:
-                        print('| Generated {}/{} words'.format(i, args.words))
-                f.close()
+    indexes = [i for i in range(5)]
+    for index in indexes:
+        img_feats = test_dataset.get_feats_from_img_idx(index).unsqueeze(0)
+        input = torch.LongTensor([SOS_idx]).view(1,1).to(device)
+        input_word = test_dataset.idx2word([input[0].item()], delim='')
+        for temp in args.temperature:
+            logger.info("generating text with temperature: {}".format(temp))
+            out_file_generate = os.path.join(args.out_path, 'generate_words_temp_{}_img_{}.txt'.format(temp, index))
+            with open(out_file_generate, 'w') as f:
+                f.write(input_word + '\n')
+                with torch.no_grad():
+                    for i in range(args.words):
+                        output, hidden, _ = model(input, img_feats)  # output (1, num_tokens)
+                        if temp is not None:
+                            word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
+                            word_weights = word_weights / word_weights.sum(dim=-1).cpu()
+                            word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
+                        else:
+                            word_idx = output.squeeze().argmax()
+                        input.fill_(word_idx)
+                        word = test_dataset.idx2word(seq_idx=[word_idx.item()], delim='')
+                        f.write(word + ('\n' if i % 20 == 19 else ' '))
+                        if i % log_interval == 0:
+                            print('| Generated {}/{} words'.format(i, args.words))
+                    f.close()
 
     # ###############################################################################
     # # Evaluate overconfidence on test set

@@ -4,6 +4,7 @@
 '''LSTM Policy Network taking as input multi-model data (img_features, words embeddings'''
 import torch
 import torch.nn as nn
+from torch.distributions import Categorical
 import torch.nn.functional as F
 import h5py
 import numpy as np
@@ -11,13 +12,14 @@ import numpy as np
 
 class PolicyLSTM(nn.Module):
     def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0,
-                 pooling=True, value_fn=False):
+                 pooling=True, rl=True):
         super(PolicyLSTM, self).__init__()
         self.num_tokens = num_tokens
         self.emb_size = emb_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.p_drop = p_drop
+        self.rl = rl
         if num_filters is None:
             self.num_filters = word_emb_size
         else:
@@ -34,12 +36,17 @@ class PolicyLSTM(nn.Module):
                                 dropout=p_drop,
                                 batch_first=True)
         self.action_head = nn.Linear(hidden_size, num_tokens)
-        if value_fn:
+        if rl:
             self.value_head = nn.Linear(hidden_size, 1)
         else:
             self.value_head = None
 
-    def forward(self, text_inputs, img_feat):
+        self.saved_log_probs, self.rewards, self.values = [], [], []
+        self.last_policy = []
+
+        #TODO: add a function: value_head.
+
+    def forward(self, text_inputs, img_feat, valid_actions=None):
         '''
         :param text_inputs: shape (S, B)
         :param img_feat: shape (B, C, H, W)
@@ -59,15 +66,22 @@ class PolicyLSTM(nn.Module):
         vis_text_emb = torch.cat([words_emb, img_feat], axis=-1)
         output, hidden = self.lstm(vis_text_emb)
         output = self.dropout(output)
-        logits = self.action_head(output)  # (S,B,num_tokens)
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        if self.value_head is not None:
+        logits = self.action_head(output)  # (B,S,num_tokens)
+        if self.rl:
+            if isinstance(valid_actions, dict):
+                logits = logits[:, :, list(valid_actions.values())]
+            logits = logits[:,-1,:]
+            probs = F.softmax(logits, dim=-1)
+            policy_dist = Categorical(probs)
+            probs_ = policy_dist.probs.clone()
+            self.last_policy.append(probs_.detach().cpu().numpy()[0])
             value = self.value_head(output)
-            value = value.view(-1, 1)
+            value = value[:,-1,:]
+            return policy_dist, hidden, value
         else:
+            logits = logits.view(-1, self.num_tokens) # (S*B, num_tokens)
             value = None
-
-        return logits, hidden, value
+            return logits, hidden, value
 
 
 class PolicyMLP(nn.Module):
@@ -128,7 +142,7 @@ if __name__ == '__main__':
                        hidden_size=128,
                        num_layers=1,
                        p_drop=0,
-                       value_fn=True)
+                       rl=False)
 
     output, hidden, value = model(dummy_text_input, img_feat)  # shape (B*S, num_tokens)
     output = output.view(-1, seq_len, num_tokens)
