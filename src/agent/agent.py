@@ -77,7 +77,7 @@ class Agent:
                 action, log_probs, value, valid_actions, dist = self.select_action(state)
                 state_decoded = self.env.clevr_dataset.idx2word(state.text.numpy()[0])
                 top_k_weights, top_k_indices = torch.topk(dist.probs, 10, sorted=True)
-                top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.numpy()[0])
+                top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
                 # top = " ".join(
                 #    ["{}/{}".format(token, weight) for token, weight in zip(top_words_decoded.split(), top_k_weights.numpy())])
                 top_words.append("next 10 possible words for {} : {}".format(state_decoded, top_words_decoded))
