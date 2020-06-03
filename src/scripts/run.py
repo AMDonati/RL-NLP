@@ -59,7 +59,9 @@ if __name__ == '__main__':
 
     logger = create_logger(out_file_log, level=args.logger_level)
 
-    writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
+    writer = SummaryWriter(log_dir=os.path.join(output_path, "runs_{}_{}_{}_{}_{}".format(args.model, args.eps_clip,
+                                                                                          args.num_filters, args.stride,
+                                                                                          args.conv_kernel)))
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug)
 
