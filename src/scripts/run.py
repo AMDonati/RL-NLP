@@ -45,6 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
+    parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
 
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,7 +76,8 @@ if __name__ == '__main__':
         "lstm_word": PolicyLSTMWordBatch}
 
     generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
-                      "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride}
+                      "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
+                      "num_filters": args.num_filters}
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,

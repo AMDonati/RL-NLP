@@ -25,10 +25,10 @@ class Memory:
 
 class Agent:
     def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
-                 update_timestep=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2):
+                 update_timestep=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride)
+                             stride=stride, num_filters=num_filters)
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma

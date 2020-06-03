@@ -9,12 +9,12 @@ from agent.agent import Agent
 class PPO(Agent):
     def __init__(self, policy, env, gamma=1., eps_clip=0.2, pretrained_lm=None, update_timestep=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
-                 stride=2):
+                 stride=2, num_filters=3):
         Agent.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm, pretrain=pretrain,
                        update_timestep=update_timestep, word_emb_size=word_emb_size, hidden_size=hidden_size,
-                       kernel_size=kernel_size, stride=stride)
+                       kernel_size=kernel_size, stride=stride, num_filters=num_filters)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                                 stride=stride)
+                                 stride=stride, num_filters=num_filters)
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
