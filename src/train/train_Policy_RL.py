@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, required=True, help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
     parser.add_argument('-pre_train', type=str2bool, default=False, help="pre-train the policy network with SL.")
-    parser.add_argument("-trunc", type=str2bool, default=False, help="action space pruning")
+    parser.add_argument("-trunc", type=str2bool, default=True, help="action space pruning")
     parser.add_argument('-model_path', type=str, default='../../output/SL_32_64_2/model.pt', help="path for the pre-trained model with SL")
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,13 +68,14 @@ if __name__ == '__main__':
                                 emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
                                 hidden_size=args.hidden_size, rl=True).to(device)
     if args.trunc:
-        pretrained_lm_path = "../../output/best_model/model.pt"
+        #pretrained_lm_path = "../../output/best_model/model.pt"
+        pretrained_lm_path = "output/best_model/model.pt"
     else:
         pretrained_lm_path = None
 
 
     optimizer = torch.optim.Adam(policy_network.parameters(), lr=args.lr)
-    output_path = os.path.join(args.out_path, "RL_lv_reward_emb_{}_hid_{}_lr_{}_bs_{}_maxlen_{}_mode_{}".format(args.word_emb_size,
+    output_path = os.path.join(args.out_path, "RL_2_lv_reward_emb_{}_hid_{}_lr_{}_bs_{}_maxlen_{}_mode_{}".format(args.word_emb_size,
                                                                                         args.hidden_size,
                                                                                         args.lr,
                                                                                         args.bs,
@@ -107,8 +108,8 @@ if __name__ == '__main__':
 
     # Get and print set of questions for the fixed img.
     logger.info('pre_train: {} - trunc: {} - max episode length: {} - number of images: {}'.format(args.pre_train,
-                                                                                       args.max_len,
-                                                                                        args.trunc,
+                                                                                       args.trunc,
+                                                                                        args.max_len,
                                                                                        args.max_samples))
 
     for i in range(args.num_training_steps):
@@ -133,28 +134,34 @@ if __name__ == '__main__':
         running_return = 0.1 * batch_avg_return + (1 - 0.1) * running_return
 
         # monitoring of change in most probable words.
-        df = pd.DataFrame(reinforce.model.last_policy[-3:])
-        diff_df = (df.iloc[-1] - df.iloc[0]).abs()
-        top_words = diff_df.nlargest(4)
+        idx = 5
+        df_changed = pd.DataFrame(reinforce.model.last_policy[-3:])
+        diff_df = (df_changed.iloc[-1] - df_changed.iloc[0]).abs()
+        top_words_changed = diff_df.nlargest(4)
 
-        if i == 0:
+        #if i == 0:
             #logger.info('ep questions(5 tokens):')
             #logger.info('\n'.join(env.ref_questions_decoded))
-            writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
+            #writer.add_text('episode_questions', ('...').join(env.ref_questions_decoded))
 
         if i % log_interval == log_interval - 1:
-            #logger.info('train loss for training step {}: {:5.3f}'.format(i, sum_loss / log_interval))
-            #logger.info('average batch return for training step {}: {:5.3f}'.format(i, batch_avg_return))
-            #logger.info('running return for training step {}: {:8.3f}'.format(i, running_return))
-            logger.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words.index)))
-            #logger.info('best current dialog and closest question:')
-            logger.info('dialog:{} \n - closest question: {} \n- reward:{:5.2f}'.format(max_dialog, closest_question, batch_avg_return))
-            #logger.info('current dialog:')
-            #logger.info(max_dialog)
-            #logger.info('closest question:')
-            #logger.info(closest_question)
+            logger.info("iteration:{}".format(i))
+            logger.info("top words changed in the policy : {}".format(env.clevr_dataset.idx2word(top_words_changed.index)))
+            logger.info('dialog:{} \n - closest question: {} \n - reward:{:5.2f}'.format(max_dialog, closest_question, batch_avg_return))
+            if args.trunc:
+                valid_actions_decoded = env.decode_current_episode()
+                len_ep = len(valid_actions_decoded)
+                #logger.info('\n'.join(valid_actions_decoded[idx]))
+                if len_ep > idx:
+                    df = pd.DataFrame(reinforce.model.last_policy[-len_ep:])
+                    top_words = df.iloc[idx].nlargest(10)
+                    top_words_decoded = env.clevr_dataset.idx2word(top_words.index)
+                    logger.info('valid actions at step {}: {}'.format(idx, valid_actions_decoded[idx]))
+                    logger.info("most probable words at step {} of the episode:{}".format(idx, top_words_decoded))
+                    writer.add_text('most probable words & valid actions at step {} of episode'.format(idx),
+                                '------'.join([top_words_decoded, valid_actions_decoded[idx]]), global_step=i+1)
             logger.info('---------------------------------------------------------------------------------------->')
-            #TODO: add the decode_episode function for action_space pruning.
+
             # writing metrics to tensorboard.
             writer.add_scalar('batch return', batch_avg_return, i + 1)
             writer.add_scalar('running return', running_return, i + 1)
@@ -162,6 +169,8 @@ if __name__ == '__main__':
             writer.add_text('best current dialog and closest question:',
                             ('--------').join([max_dialog, 'max batch return:' + str(batch_max_return), closest_question]),
                             global_step=i+1)
+
+
             sum_loss = 0. #resetting loss.
 
             with open(model_path, 'wb') as f:

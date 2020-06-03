@@ -94,8 +94,9 @@ class ClevrEnv(gym.Env):
         valid_actions = self.current_episode.valid_actions
         assert valid_actions is not None
         valid_actions_decoded = [self.clevr_dataset.idx2word(actions, delim=',') for actions in valid_actions]
-        dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
-        return dict(zip(dialog_split, valid_actions_decoded))
+        #dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
+        #return dict(zip(dialog_split, valid_actions_decoded))
+        return valid_actions_decoded
 
     def clean_ref_questions(self):
         questions_decoded = [tokens.replace('<PAD>', '') for tokens in self.ref_questions_decoded]
