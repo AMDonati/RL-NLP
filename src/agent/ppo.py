@@ -9,19 +9,19 @@ from agent.agent import Agent
 class PPO(Agent):
     def __init__(self, policy, env, gamma=1., eps_clip=0.2, pretrained_lm=None, update_timestep=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
-                 stride=2, num_filters=3):
+                 stride=2, num_filters=3, num_truncated=10):
         Agent.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm, pretrain=pretrain,
                        update_timestep=update_timestep, word_emb_size=word_emb_size, hidden_size=hidden_size,
-                       kernel_size=kernel_size, stride=stride, num_filters=num_filters)
+                       kernel_size=kernel_size, stride=stride, num_filters=num_filters, num_truncated=num_truncated)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                                 stride=stride, num_filters=num_filters)
+                                 stride=stride, num_filters=num_filters, num_truncated=num_truncated)
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
         self.MSE_loss = nn.MSELoss()
         self.eps_clip = eps_clip
         self.entropy_coeff = entropy_coeff
-        self.update_mode = "step"
+        self.update_mode = "episode"
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words([state], num_truncated)

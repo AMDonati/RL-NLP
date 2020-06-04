@@ -5,10 +5,12 @@ from collections import namedtuple
 import gym
 import numpy as np
 import torch
-#from stable_baselines.common.vec_env import DummyVecEnv
 
 from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
+
+
+# from stable_baselines.common.vec_env import DummyVecEnv
 
 
 class ClevrEnv(gym.Env):
@@ -68,17 +70,17 @@ class ClevrEnv(gym.Env):
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[0]) if not self.debug else 0
+        self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
+            0]) if not self.debug else np.random.randint(0, self.debug)
         # self.img_idx = 0
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
-        if self.debug:
+        if self.debug > 0:
             self.ref_questions = self.ref_questions[0:1]
         # if self.debug:
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
-        self.ref_questions_decoded = [
-            self.clevr_dataset.idx2word(question, clean=True)
-            for question in self.ref_questions.numpy()]
+        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, clean=True)
+                                      for question in self.ref_questions.numpy()]
         logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
         # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
@@ -119,7 +121,7 @@ class VectorEnv:
         # return_values = []
         obs_batch, rew_batch, done_batch, info_batch = [], [], [], []
         for env, a in zip(self.envs, actions):
-            observation, (reward,_), done, info = env.step(a)
+            observation, (reward, _), done, info = env.step(a)
             if done:
                 observation = env.reset()
             obs_batch.append(observation)
@@ -149,4 +151,4 @@ if __name__ == '__main__':
 
     make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
     # env = VectorEnv(make_env_fn, n=4)
-    #env = DummyVecEnv([make_env_fn])
+    # env = DummyVecEnv([make_env_fn])

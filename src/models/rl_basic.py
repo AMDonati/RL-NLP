@@ -178,14 +178,14 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.stride = stride
         self.kernel_size = kernel_size
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1)) / self.stride)
-        # self.fc = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
-        #                   num_tokens + 1)
+        self.fc = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
+                            num_tokens + 1)
 
-        self.fc = nn.Linear(1 + self.hidden_size, num_tokens + 1)
+        # self.fc = nn.Linear(self.hidden_size + self.hidden_size, num_tokens + 1)
 
-        # self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
-        #                      stride=self.stride)
-        self.img_layer = nn.Linear(1024 * 14 * 14, 1)
+        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
+                              stride=self.stride)
+        self.img_layer = nn.Linear(1024 * 14 * 14, self.hidden_size)
         # self.pooling = pooling
         # self.max_pool = nn.MaxPool2d(kernel_size=self.pool_kernel)
 
@@ -200,10 +200,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
         img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
 
-        img_feat_ = F.relu(self.img_layer(img_feat.view(img_feat.size(0), -1)))
-        # img_feat__ = img_feat_
+        img_feat_ = F.relu(self.conv(img_feat))
+        img_feat__ = img_feat_.view(img_feat.size(0), -1)
 
-        embedding = torch.cat((img_feat_, embed_text.view(embed_text.size(0), -1)), dim=1)
+        embedding = torch.cat((img_feat__, embed_text.view(embed_text.size(0), -1)), dim=1)
         out = self.fc(embedding)  # (S,B,num_tokens)
         logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
 

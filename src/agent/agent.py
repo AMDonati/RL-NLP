@@ -25,17 +25,18 @@ class Memory:
 
 class Agent:
     def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
-                 update_timestep=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3):
+                 update_timestep=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3,
+                 num_truncated=10):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters)
+                             stride=stride, num_filters=num_filters, num_truncated=num_truncated)
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
         self.env = env
         self.pretrain = pretrain
-        self.update_timestep = update_timestep
+        self.update_every = update_timestep
         self.memory = Memory()
 
     def get_top_k_words(self, state, top_k=10):
@@ -114,14 +115,14 @@ class Agent:
                 timestep += 1
 
                 # update if its time
-                if self.update_mode == "step" and timestep % self.update_timestep == 0:
+                if self.update_mode == "step" and timestep % self.update_every == 0:
                     self.update()
                     self.memory.clear_memory()
                     timestep = 0
 
                 ep_reward += reward
                 if done:
-                    if self.update_mode == "episode" and i_episode % self.update_episode == 0:
+                    if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         self.update()
                         self.memory.clear_memory()
                     break
