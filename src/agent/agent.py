@@ -38,6 +38,7 @@ class Agent:
         self.pretrain = pretrain
         self.update_every = update_timestep
         self.memory = Memory()
+        self.num_truncated = num_truncated
 
     def get_top_k_words(self, state, top_k=10):
         """
@@ -76,7 +77,7 @@ class Agent:
             state, ep_reward = self.env.reset(), 0
             top_words = []
             for t in range(0, self.env.max_len + 1):
-                action, log_probs, value, valid_actions, dist = self.select_action(state)
+                action, log_probs, value, valid_actions, dist = self.select_action(state, self.num_truncated)
                 state_decoded = self.env.clevr_dataset.idx2word(state.text.numpy()[0])
                 top_k_weights, top_k_indices = torch.topk(dist.probs, 10, sorted=True)
                 top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
@@ -106,7 +107,8 @@ class Agent:
             ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len + 1):
                 forced = ref_question[t] if self.pretrain else None
-                action, log_probs, value, _, _ = self.select_action(state=state, forced=forced)
+                action, log_probs, value, _, _ = self.select_action(state=state, forced=forced,
+                                                                    num_truncated=self.num_truncated)
                 state, (reward, _), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:
                 self.memory.rewards.append(reward)
