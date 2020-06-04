@@ -27,7 +27,7 @@ class PPO(Agent):
         valid_actions = self.get_top_k_words([state], num_truncated)
         m, value = self.policy_old.act([state], valid_actions)
         action = m.sample() if forced is None else forced
-        log_prob = m.log_prob(action).view(-1)
+        log_prob = m.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         if valid_actions is not None:
             action = torch.gather(valid_actions, 1, action.view(1, 1))
