@@ -29,7 +29,7 @@ class Agent:
                  num_truncated=10):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters, num_truncated=num_truncated)
+                             stride=stride, num_filters=num_filters)
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma

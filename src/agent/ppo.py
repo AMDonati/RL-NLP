@@ -14,7 +14,7 @@ class PPO(Agent):
                        update_timestep=update_timestep, word_emb_size=word_emb_size, hidden_size=hidden_size,
                        kernel_size=kernel_size, stride=stride, num_filters=num_filters, num_truncated=num_truncated)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                                 stride=stride, num_filters=num_filters, num_truncated=num_truncated)
+                                 stride=stride, num_filters=num_filters)
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -61,7 +61,7 @@ class PPO(Agent):
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, dist_entropy = self.evaluate(old_states, old_actions)
+            logprobs, state_values, dist_entropy = self.evaluate(old_states, old_actions, self.num_truncated)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
