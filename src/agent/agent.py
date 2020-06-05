@@ -96,8 +96,7 @@ class Agent:
                 writer.add_scalar('test_running_return', running_reward, i_episode + 1)
                 writer.add_text('language_model', '  \n'.join(top_words))
 
-    def learn(self, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
-              num_truncated=10):
+    def learn(self, writer, log_interval=10, num_episodes=100):
 
         running_reward = 0
         timestep = 0
