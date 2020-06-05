@@ -13,7 +13,8 @@ from utils.utils_train import create_logger
 
 
 def main(args):
-    output_path = os.path.join(args.out_path, "experiments", "train",
+    type_folder = "train" if args.pretrain == 0 else "pretrain"
+    output_path = os.path.join(args.out_path, "experiments", type_folder,
                                "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
@@ -43,7 +44,7 @@ def main(args):
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
-                  "update_timestep": args.update_timestep, "entropy_coeff": args.entropy_coeff,
+                  "update_every": args.update_every, "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
     reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
@@ -83,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="gru_word", help="model")
     parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
-    parser.add_argument('-update_timestep', type=int, default=100, help="update_timestep")
+    parser.add_argument('-update_every', type=int, default=100, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.2, help="eps clip")
     parser.add_argument('-pretrained_path', type=str, default=None,
