@@ -6,9 +6,12 @@ from agent.agent import Agent
 
 class REINFORCE(Agent):
     def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, update_episode=1, word_emb_size=8,
-                 hidden_size=24):
+                 hidden_size=24, pretrain=False, kernel_size=1, stride=2, num_filters=3, num_truncated=10,
+                 update_timestep=30):
         Agent.__init__(self, policy, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm, word_emb_size=word_emb_size,
-                       hidden_size=hidden_size)
+                       hidden_size=hidden_size, pretrain=pretrain,
+                       update_timestep=update_timestep, kernel_size=kernel_size, stride=stride, num_filters=num_filters,
+                       num_truncated=num_truncated)
         self.update_episode = update_episode
         self.MSE_loss = nn.MSELoss()
         self.update_mode = "episode"
