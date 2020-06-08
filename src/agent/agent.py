@@ -69,31 +69,38 @@ class Agent:
 
     def test(self, writer, log_interval=1, num_episodes=10):
         # trained_model.load_state_dict(torch.load(saved_path))
+        log_probs_ppl = []
         self.policy.eval()
-
-        running_reward = 0
+        running_reward, idx_step = 0, 0
         for i_episode in range(num_episodes):
-            state, ep_reward = self.env.reset(), 0
             top_words = []
-            for t in range(0, self.env.max_len + 1):
-                action, log_probs, value, valid_actions, dist = self.select_action(state, self.num_truncated)
-                state_decoded = self.env.clevr_dataset.idx2word(state.text.numpy()[0])
-                top_k_weights, top_k_indices = torch.topk(dist.probs, self.num_truncated, sorted=True)
-                top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
-                # top = " ".join(
-                #    ["{}/{}".format(token, weight) for token, weight in zip(top_words_decoded.split(), top_k_weights.numpy())])
-                top_words.append("next 10 possible words for {} : {}".format(state_decoded, top_words_decoded))
-                state, (reward, _), done, _ = self.env.step(action)
-                ep_reward += reward
-                if done:
-                    break
+            for ref_question in self.env.ref_questions:
+                state, ep_reward = self.env.reset(), 0
+                for t in range(0, self.env.max_len):
+                    action, log_probs, value, valid_actions, dist = self.select_action(state, self.num_truncated)
+                    state_decoded = self.env.clevr_dataset.idx2word(state.text.numpy()[0])
+                    top_k_weights, top_k_indices = torch.topk(dist.probs, self.num_truncated, sorted=True)
+                    top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
+                    # top = " ".join(
+                    #    ["{}/{}".format(token, weight) for token, weight in zip(top_words_decoded.split(), top_k_weights.numpy())])
+                    weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
+                                     zip(top_words_decoded.split(), top_k_weights[0].detach().numpy())]
+                    top_words.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
 
+                    log_probs_ppl.append(dist.log_prob(ref_question[t].to(self.device)))
+                    idx_step += 1
+                    state, (reward, _), done, _ = self.env.step(action)
+                    ep_reward += reward
+                    if done:
+                        break
+            ppl = torch.exp(-torch.stack(log_probs_ppl).sum() / idx_step)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 writer.add_scalar('test_running_return', running_reward, i_episode + 1)
+                writer.add_scalar('ppl', ppl, i_episode + 1)
                 writer.add_text('language_model', '  \n'.join(top_words))
 
     def learn(self, writer, log_interval=10, num_episodes=100):
@@ -103,7 +110,7 @@ class Agent:
         for i_episode in range(num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
-            for t in range(0, self.env.max_len + 1):
+            for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, _, _ = self.select_action(state=state, forced=forced,
                                                                     num_truncated=self.num_truncated)
