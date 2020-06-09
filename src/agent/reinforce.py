@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from agent.agent import Agent
 
 
@@ -12,7 +13,7 @@ class REINFORCE(Agent):
                        update_every=update_every, kernel_size=kernel_size, stride=stride, num_filters=num_filters,
                        num_truncated=num_truncated, writer=writer)
         self.update_every = 1
-        self.MSE_loss = nn.MSELoss()
+        self.MSE_loss = nn.MSELoss(reduction="none")
         self.update_mode = "episode"
         self.writer_iteration = 0
 

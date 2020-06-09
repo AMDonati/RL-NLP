@@ -7,10 +7,10 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, gamma=1., eps_clip=0.2, pretrained_lm=None, update_every=100,
+    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, pretrained_lm=None, update_every=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
                  stride=2, num_filters=3, num_truncated=10):
-        Agent.__init__(self, policy, env, gamma=gamma, pretrained_lm=pretrained_lm, pretrain=pretrain,
+        Agent.__init__(self, policy, env, writer, gamma=gamma, pretrained_lm=pretrained_lm, pretrain=pretrain,
                        update_every=update_every, word_emb_size=word_emb_size, hidden_size=hidden_size,
                        kernel_size=kernel_size, stride=stride, num_filters=num_filters, num_truncated=num_truncated)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
@@ -18,7 +18,7 @@ class PPO(Agent):
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
-        self.MSE_loss = nn.MSELoss()
+        self.MSE_loss = nn.MSELoss(reduction="none")
         self.eps_clip = eps_clip
         self.entropy_coeff = entropy_coeff
         self.update_mode = "episode"
