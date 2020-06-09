@@ -8,9 +8,7 @@ import torch
 
 from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-
-
-# from stable_baselines.common.vec_env import DummyVecEnv
+from RL_toolbox.RL_functions import preprocess_final_state
 
 
 class ClevrEnv(gym.Env):
@@ -41,7 +39,7 @@ class ClevrEnv(gym.Env):
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
         self.State = namedtuple('State', ('text', 'img'))
         self.Episode = namedtuple('Episode',
-                                  ('img_idx', 'img_feats', 'GD_questions', 'closest_question', 'dialog', 'rewards'))
+                                  ('img_idx', 'closest_question', 'dialog', 'rewards', 'valid_actions'))
         self.max_len = max_len
         # self.ref_questions = torch.randint(0, self.debug_len_vocab,
         #                                  (3, self.max_len)) if self.debug_len_vocab is not None else None
@@ -56,10 +54,10 @@ class ClevrEnv(gym.Env):
     def step(self, action):
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
-        question = self.clevr_dataset.idx2word(self.state.text.numpy()[0])
+        #question = self.clevr_dataset.idx2word(self.state.text.numpy()[0])
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
-        # question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
-        #                                  EOS_idx=self.special_tokens.EOS_idx)
+        question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
+                                        EOS_idx=self.special_tokens.EOS_idx)
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded) if done else (
             0, None)
@@ -87,7 +85,22 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
+        self.current_episode = self.Episode(self.img_idx, None, None, None, None)
+
         return self.state
+
+    def decode_current_episode(self):
+        valid_actions = self.current_episode.valid_actions
+        assert valid_actions is not None
+        valid_actions_decoded = [self.clevr_dataset.idx2word(actions, delim=',') for actions in valid_actions]
+        #dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
+        #return dict(zip(dialog_split, valid_actions_decoded))
+        return valid_actions_decoded
+
+    def clean_ref_questions(self):
+        questions_decoded = [tokens.replace('<PAD>', '') for tokens in self.ref_questions_decoded]
+        questions_decoded = [q.strip() for q in questions_decoded]
+        self.ref_questions_decoded = questions_decoded
 
     def get_reduced_action_space(self):
         assert self.ref_questions_decoded is not None
