@@ -40,7 +40,7 @@ def main(args):
 
     generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
-                      "num_filters": args.num_filters, "num_truncated": args.num_truncated}
+                      "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -55,10 +55,9 @@ def main(args):
 
     agent = agents[args.agent](**kwargs)
 
-    agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train,
-                writer=writer)
+    agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train)
     agent.save(out_policy_file)
-    agent.test(log_interval=args.log_interval, num_episodes=args.num_episodes_test, writer=writer)
+    agent.test(log_interval=args.log_interval, num_episodes=args.num_episodes_test)
 
 
 if __name__ == '__main__':
