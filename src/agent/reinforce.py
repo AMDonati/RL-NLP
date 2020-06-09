@@ -5,16 +5,17 @@ from agent.agent import Agent
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, word_emb_size=8,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, word_emb_size=8,
                  hidden_size=24, pretrain=False, kernel_size=1, stride=2, num_filters=3, num_truncated=10,
                  update_every=30):
         Agent.__init__(self, policy, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm, word_emb_size=word_emb_size,
                        hidden_size=hidden_size, pretrain=pretrain,
                        update_every=update_every, kernel_size=kernel_size, stride=stride, num_filters=num_filters,
-                       num_truncated=num_truncated)
+                       num_truncated=num_truncated, writer=writer)
         self.update_every = 1
         self.MSE_loss = nn.MSELoss()
         self.update_mode = "episode"
+        self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words([state], num_truncated)
@@ -44,6 +45,12 @@ class REINFORCE(Agent):
         reinforce_loss = -logprobs * advantages
         vf_loss = self.MSE_loss(values, rewards)
         loss = reinforce_loss + vf_loss
+        self.writer.add_scalar('reinforce_loss', reinforce_loss.mean(), self.writer_iteration + 1)
+        self.writer.add_scalar('vf_loss', vf_loss.mean(), self.writer_iteration + 1)
+        self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
+
+        self.writer_iteration += 1
+
         # take gradient step
         self.optimizer.zero_grad()
         loss.mean().backward()

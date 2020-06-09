@@ -24,7 +24,7 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
                  update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3,
                  num_truncated=10):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,6 +39,7 @@ class Agent:
         self.update_every = update_every
         self.memory = Memory()
         self.num_truncated = num_truncated
+        self.writer = writer
 
     def get_top_k_words(self, state, top_k=10):
         """
@@ -67,7 +68,7 @@ class Agent:
     def save(self, out_file):
         torch.save(self.policy, out_file)
 
-    def test(self, writer, log_interval=1, num_episodes=10):
+    def test(self, log_interval=1, num_episodes=10):
         # trained_model.load_state_dict(torch.load(saved_path))
         log_probs_ppl = []
         self.policy.eval()
@@ -98,12 +99,12 @@ class Agent:
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
-                writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
-                writer.add_scalar('test_running_return', running_reward, i_episode + 1)
-                writer.add_scalar('ppl', ppl, i_episode + 1)
-                writer.add_text('language_model', '  \n'.join(top_words))
+                self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
+                self.writer.add_scalar('test_running_return', running_reward, i_episode + 1)
+                self.writer.add_scalar('ppl', ppl, i_episode + 1)
+                self.writer.add_text('language_model', '  \n'.join(top_words))
 
-    def learn(self, writer, log_interval=10, num_episodes=100):
+    def learn(self, log_interval=10, num_episodes=100):
 
         running_reward = 0
         timestep = 0
@@ -137,5 +138,5 @@ class Agent:
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
-                writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
-                writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+                self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
+                self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)

@@ -22,6 +22,7 @@ class PPO(Agent):
         self.eps_clip = eps_clip
         self.entropy_coeff = entropy_coeff
         self.update_mode = "episode"
+        self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words([state], num_truncated)
@@ -70,12 +71,19 @@ class PPO(Agent):
             advantages = rewards - state_values.detach() if not self.pretrain else 1
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
+            surr = -torch.min(surr1, surr2)
             vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else 0
-            loss = -torch.min(surr1, surr2) + vf_loss - self.entropy_coeff * dist_entropy
+            loss = surr + vf_loss - self.entropy_coeff * dist_entropy
             logging.info(
                 "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
-                                                            -torch.min(surr1, surr2).mean(),
-                                                            self.MSE_loss(state_values, rewards).mean()))
+                                                            surr.mean(),
+                                                            vf_loss.mean()))
+
+            self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
+            self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
+            self.writer.add_scalar('vf_loss', vf_loss.mean(), self.writer_iteration + 1)
+            self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
+            self.writer_iteration += 1
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
