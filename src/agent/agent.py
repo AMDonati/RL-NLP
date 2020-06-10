@@ -40,6 +40,7 @@ class Agent:
         self.memory = Memory()
         self.num_truncated = num_truncated
         self.writer = writer
+        self.generated_text = []
 
     def get_top_k_words(self, state, top_k=10):
         """
@@ -68,7 +69,14 @@ class Agent:
     def save(self, out_file):
         torch.save(self.policy, out_file)
 
+    def get_metrics(self, question):
+        self.generated_text.append(question.view(-1)[1:].cpu().numpy())
+        last_text = [item for sublist in self.generated_text[-min(10, len(self.generated_text)):] for item in sublist]
+        diversity_metric = len(set(last_text)) / len(last_text)
+        return diversity_metric
+
     def test(self, log_interval=1, num_episodes=10):
+        self.generated_text=[]
         # trained_model.load_state_dict(torch.load(saved_path))
         log_probs_ppl = []
         self.policy.eval()
@@ -96,12 +104,14 @@ class Agent:
                             target_word = list(valid_actions.view(-1).cpu().numpy()).index(ref_question[t])
                             target_word_log_prob = dist.log_prob(torch.tensor([target_word]).float().to(self.device))
                         else:
+                            # case where the target word is not in the top words of the language model
                             target_word_log_prob = torch.tensor([-10]).float().to(self.device)
                     log_probs_ppl.append(target_word_log_prob)
                     idx_step += 1
                     state, (reward, _), done, _ = self.env.step(action)
                     ep_reward += reward
                     if done:
+                        self.writer.add_scalar('test_TTR', self.get_metrics(state.text), i_episode + 1)
                         break
             ppl = torch.exp(-torch.stack(log_probs_ppl).sum() / idx_step)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
@@ -139,6 +149,7 @@ class Agent:
 
                 ep_reward += reward
                 if done:
+                    self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         self.update()
                         self.memory.clear_memory()
