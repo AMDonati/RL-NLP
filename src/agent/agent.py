@@ -76,8 +76,7 @@ class Agent:
         return diversity_metric
 
     def test(self, log_interval=1, num_episodes=10):
-        self.generated_text=[]
-        # trained_model.load_state_dict(torch.load(saved_path))
+        self.generated_text = []
         log_probs_ppl = []
         self.policy.eval()
         running_reward, idx_step = 0, 0
@@ -90,16 +89,15 @@ class Agent:
                                                                                        num_truncated=self.num_truncated)
                     state_decoded = self.env.clevr_dataset.idx2word(state.text.numpy()[0])
                     top_k_weights, top_k_indices = torch.topk(dist.probs, self.num_truncated, sorted=True)
+                    if self.pretrained_lm != None:
+                        top_k_indices = torch.gather(valid_actions, 1, top_k_indices)
                     top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
-                    # top = " ".join(
-                    #    ["{}/{}".format(token, weight) for token, weight in zip(top_words_decoded.split(), top_k_weights.numpy())])
                     weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                                      zip(top_words_decoded.split(), top_k_weights[0].cpu().detach().numpy())]
                     top_words.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
                     if self.pretrained_lm is None:
                         target_word_log_prob = dist.log_prob(ref_question[t].to(self.device))
                     else:
-                        valid_actions = self.get_top_k_words([state], self.num_truncated)
                         if ref_question[t].to(self.device) in valid_actions:
                             target_word = list(valid_actions.view(-1).cpu().numpy()).index(ref_question[t])
                             target_word_log_prob = dist.log_prob(torch.tensor([target_word]).float().to(self.device))
