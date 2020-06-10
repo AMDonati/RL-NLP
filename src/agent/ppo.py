@@ -82,7 +82,7 @@ class PPO(Agent):
             #entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy
 
-            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else 0
+            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else torch.tensor([0]).float()
             loss = surr + vf_loss - entropy_loss
             logging.info(
                 "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
