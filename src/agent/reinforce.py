@@ -53,5 +53,5 @@ class REINFORCE(Agent):
 
         # take gradient step
         self.optimizer.zero_grad()
-        loss.mean().backward()
+        loss.sum().backward()
         self.optimizer.step()

@@ -1,5 +1,6 @@
 import logging
 import random
+
 import torch
 import torch.optim as optim
 
@@ -77,7 +78,8 @@ class Agent:
             for ref_question in self.env.ref_questions:
                 state, ep_reward = self.env.reset(), 0
                 for t in range(0, self.env.max_len):
-                    action, log_probs, value, valid_actions, dist = self.select_action(state, self.num_truncated)
+                    action, log_probs, value, valid_actions, dist = self.select_action(state=state,
+                                                                                       num_truncated=self.num_truncated)
                     state_decoded = self.env.clevr_dataset.idx2word(state.text.numpy()[0])
                     top_k_weights, top_k_indices = torch.topk(dist.probs, self.num_truncated, sorted=True)
                     top_words_decoded = self.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
@@ -86,8 +88,16 @@ class Agent:
                     weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                                      zip(top_words_decoded.split(), top_k_weights[0].detach().numpy())]
                     top_words.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
-
-                    log_probs_ppl.append(dist.log_prob(ref_question[t].to(self.device)))
+                    if self.pretrained_lm is None:
+                        target_word_log_prob = dist.log_prob(ref_question[t].to(self.device))
+                    else:
+                        valid_actions = self.get_top_k_words([state], self.num_truncated)
+                        if ref_question[t] in valid_actions:
+                            target_word = list(valid_actions.view(-1).numpy()).index(ref_question[t])
+                            target_word_log_prob = dist.log_prob(torch.tensor([target_word]).float().to(self.device))
+                        else:
+                            target_word_log_prob = torch.tensor([-10]).float().to(self.device)
+                    log_probs_ppl.append(target_word_log_prob)
                     idx_step += 1
                     state, (reward, _), done, _ = self.env.step(action)
                     ep_reward += reward

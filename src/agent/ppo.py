@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -48,12 +49,18 @@ class PPO(Agent):
 
         rewards = []
         discounted_reward = 0
+        entropy_coeffs = []
+        entropy_coeff = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):
             if is_terminal:
+                entropy_coeff = 0
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
+            entropy_coeffs.insert(0, entropy_coeff)
+            entropy_coeff += 1
         rewards = torch.tensor(rewards).to(self.device).float()
+        entropy_coeffs = np.array(entropy_coeffs) / (self.env.max_len - 1)
 
         old_states = self.memory.states
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
@@ -72,8 +79,11 @@ class PPO(Agent):
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)
+            #entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
+            entropy_loss = self.entropy_coeff * dist_entropy
+
             vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else 0
-            loss = surr + vf_loss - self.entropy_coeff * dist_entropy
+            loss = surr + vf_loss - entropy_loss
             logging.info(
                 "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
                                                             surr.mean(),
