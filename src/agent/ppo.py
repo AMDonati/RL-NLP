@@ -79,10 +79,11 @@ class PPO(Agent):
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)
-            #entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
+            # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy
 
-            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else torch.tensor([0]).float()
+            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else torch.tensor([0]).float().to(
+                self.device)
             loss = surr + vf_loss - entropy_loss
             logging.info(
                 "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
