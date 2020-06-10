@@ -86,7 +86,7 @@ class Agent:
                     # top = " ".join(
                     #    ["{}/{}".format(token, weight) for token, weight in zip(top_words_decoded.split(), top_k_weights.numpy())])
                     weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                                     zip(top_words_decoded.split(), top_k_weights[0].detach().numpy())]
+                                     zip(top_words_decoded.split(), top_k_weights[0].cpu().detach().numpy())]
                     top_words.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
                     if self.pretrained_lm is None:
                         target_word_log_prob = dist.log_prob(ref_question[t].to(self.device))
