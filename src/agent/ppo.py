@@ -49,18 +49,18 @@ class PPO(Agent):
 
         rewards = []
         discounted_reward = 0
-        entropy_coeffs = []
-        entropy_coeff = 0
+        #entropy_coeffs = []
+        #entropy_coeff = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):
             if is_terminal:
-                entropy_coeff = 0
+                #entropy_coeff = 0
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-            entropy_coeffs.insert(0, entropy_coeff)
-            entropy_coeff += 1
+            #entropy_coeffs.insert(0, entropy_coeff)
+            #entropy_coeff += 1
         rewards = torch.tensor(rewards).to(self.device).float()
-        entropy_coeffs = np.array(entropy_coeffs) / (self.env.max_len - 1)
+        #entropy_coeffs = np.array(entropy_coeffs) / (self.env.max_len - 1)
 
         old_states = self.memory.states
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
