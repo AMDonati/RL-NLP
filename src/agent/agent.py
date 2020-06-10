@@ -92,7 +92,7 @@ class Agent:
                         target_word_log_prob = dist.log_prob(ref_question[t].to(self.device))
                     else:
                         valid_actions = self.get_top_k_words([state], self.num_truncated)
-                        if ref_question[t] in valid_actions:
+                        if ref_question[t].to(self.device) in valid_actions:
                             target_word = list(valid_actions.view(-1).numpy()).index(ref_question[t])
                             target_word_log_prob = dist.log_prob(torch.tensor([target_word]).float().to(self.device))
                         else:
