@@ -22,12 +22,13 @@ def main(args):
     out_policy_file = os.path.join(output_path, 'model.pth')
 
     logger = create_logger(out_file_log, level=args.logger_level)
+    truncated = "basic" if args.pretrained_path is None else "truncated"
+    writer = SummaryWriter(log_dir=os.path.join(output_path,
+                                                "runs_{}_{}_{}_{}_{}".format(truncated, args.max_len, args.debug,
+                                                                             args.entropy_coeff, args.num_truncated)))
 
-    writer = SummaryWriter(log_dir=os.path.join(output_path, "runs_{}_{}_{}_{}_{}".format(args.model, args.eps_clip,
-                                                                                          args.num_filters, args.stride,
-                                                                                          args.conv_kernel)))
-
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug)
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
+                   num_questions=args.num_questions)
 
     pretrained_lm = None
     if args.pretrained_path is not None:
@@ -96,6 +97,7 @@ if __name__ == '__main__':
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
+    parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
 
     args = parser.parse_args()
     main(args)
