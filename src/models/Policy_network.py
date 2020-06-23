@@ -77,7 +77,7 @@ class PolicyLSTM(nn.Module):
             self.last_policy.append(probs_.detach().cpu().numpy()[0])
             value = self.value_head(output)
             value = value[:,-1,:]
-            return policy_dist, hidden, value
+            return policy_dist, value
         else:
             logits = logits.view(-1, self.num_tokens) # (S*B, num_tokens)
             value = None

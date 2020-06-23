@@ -24,8 +24,12 @@ class Memory:
 
 class Agent:
     def __init__(self, policy, env, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
-                 update_timestep=50, word_emb_size=8, hidden_size=24):
-        self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size)
+                 update_timestep=50, word_emb_size=8, hidden_size=24, policy_pretrain=None):
+
+        if policy_pretrain is not None:
+            self.policy = policy_pretrain
+        else:
+            self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
@@ -44,7 +48,7 @@ class Agent:
         """
         if self.pretrained_lm is None:
             return None
-        dist, value = self.pretrained_lm.act(state)
+        dist, value = self.pretrained_lm.act(state) #TODO: get the saved model.
         probs = dist.probs
         top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
         # valid_actions = {i: token for i, token in enumerate(top_k_indices.numpy())}
@@ -55,10 +59,6 @@ class Agent:
 
     def finish_episode(self):
         pass
-
-    # def learn(self, env, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
-    #          num_truncated=10):
-    #    pass
 
     def save(self, out_file):
         torch.save(self.policy, out_file)
@@ -92,7 +92,7 @@ class Agent:
                 writer.add_scalar('test_running_return', running_reward, i_episode + 1)
                 writer.add_text('language_model', '  \n'.join(top_words))
 
-    def learn(self, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
+    def learn(self, writer, log_interval=10, num_episodes=100,
               num_truncated=10):
 
         running_reward = 0
@@ -102,7 +102,9 @@ class Agent:
             ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len + 1):
                 forced = ref_question[t] if self.pretrain else None
-                action, log_probs, value, _, _ = self.select_action(state=state, forced=forced)
+                action, log_probs, value, _, _ = self.select_action(state=state,
+                                                                    forced=forced,
+                                                                    num_truncated=num_truncated)
                 state, (reward, _), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:
                 self.memory.rewards.append(reward)

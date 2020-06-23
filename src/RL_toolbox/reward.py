@@ -6,6 +6,8 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+#TODO: add the intermediate reward (diff of R(t+1)-R(t))
+
 
 class Reward:
     def __init__(self, path):

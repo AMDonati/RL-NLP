@@ -6,7 +6,8 @@ import os
 import math
 import json
 import numpy as np
-from models.Policy_network import PolicyLSTM, PolicyMLP
+from models.Policy_network import PolicyLSTM
+from models.rl_basic import PolicyLSTMBatch
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from train.train_functions import train_one_epoch_policy, evaluate_policy
 from torch.utils.data import DataLoader

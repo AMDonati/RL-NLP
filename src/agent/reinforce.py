@@ -26,7 +26,6 @@ class REINFORCE(Agent):
         return action.numpy(), log_prob, value, None, m
 
     def update(self):
-
         rewards = []
         discounted_reward = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):

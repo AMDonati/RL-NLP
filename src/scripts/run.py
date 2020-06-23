@@ -4,11 +4,13 @@ import os
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
+import torch.nn as nn
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
+from models.Policy_network import PolicyLSTM
 from utils.utils_train import create_logger
 
 if __name__ == '__main__':
@@ -23,7 +25,6 @@ if __name__ == '__main__':
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
     parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
-
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -40,6 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('-pretrained_path', type=str, default=None,
                         help="if specified, the language model truncate the action space")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    parser.add_argument("-sl_path", type=str, default=None, help="pre-trained policy with SL")
     parser.add_argument('-debug', type=int, default=1,
                         help="debug mode: train on just one question from the first image")
     parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
@@ -55,7 +57,6 @@ if __name__ == '__main__':
     out_policy_file = os.path.join(output_path, 'model.pth')
 
     logger = create_logger(out_file_log, level=args.logger_level)
-
     writer = SummaryWriter(log_dir=os.path.join(output_path, 'runs'))
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug)
@@ -70,7 +71,16 @@ if __name__ == '__main__':
 
     models = {
         "lstm": PolicyLSTMBatch,
-        "lstm_word": PolicyLSTMWordBatch}
+        "lstm_word": PolicyLSTMWordBatch
+    }
+
+
+    if args.sl_path is not None:
+        with open(args.sl_path, 'rb') as f:
+            policy_network = torch.load(f, map_location=device)
+        policy_network.rl = True
+        policy_network.value_head = nn.Linear(policy_network.hidden_size, 1) #TODO: see if there is another way of adding this for pre-training.
+        policy_network.to(device)
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,

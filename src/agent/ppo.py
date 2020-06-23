@@ -40,7 +40,6 @@ class PPO(Agent):
         return log_prob, value, dist_entropy
 
     def update(self):
-
         rewards = []
         discounted_reward = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):

@@ -45,7 +45,7 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
     for batch, ((inputs, targets), feats, _) in enumerate(train_generator):
         inputs, feats = inputs.to(device), feats.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
-        model.zero_grad()  # TODO: is there a difference between model.zero_grad() and optimizer.zero_grad()
+        model.zero_grad()
         logits, hidden, _ = model(inputs, feats)  # output (S * B, V), hidden (num_layers,B,1)
         log_probs = F.log_softmax(logits, dim=-1)
         loss = criterion(log_probs, targets)
