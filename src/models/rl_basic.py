@@ -1,10 +1,10 @@
+import h5py
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-import h5py
-import numpy as np
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
 
 class PolicyGRU(nn.Module):
@@ -57,7 +57,7 @@ class PolicyGRU(nn.Module):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
+        # self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist
 
     def _get_embed_text(self, text):
@@ -90,7 +90,7 @@ class PolicyGRUWord(nn.Module):
         probs = F.softmax(logits, dim=1)
         policy_dist = Categorical(probs)
         probs_ = policy_dist.probs.clone()
-        self.last_policy.append(probs_.detach().numpy()[0])
+        # self.last_policy.append(probs_.detach().numpy()[0])
         return policy_dist, value
 
     def _get_embed_text(self, text):
@@ -100,8 +100,9 @@ class PolicyGRUWord(nn.Module):
 
 class PolicyLSTMWordBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, rl=True):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, kernel_size=1, stride=5, num_filters=3, rl=True):
         super(PolicyLSTMWordBatch, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -131,51 +132,66 @@ class PolicyLSTMWordBatch(nn.Module):
 
         # embedding = torch.cat((img_feat, embed_text.view(embed_text.size(0), -1)), dim=1)
         out = self.fc(embed_text)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens] #TODO: is this compatible with pre-training ?
+        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
 
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
         if valid_actions is not None:
             logits = torch.gather(logits, 1, valid_actions)
             # logits = logits[:, valid_actions]
-        probs = F.softmax(logits, dim=1) #TODO: this must be ouputed for allowing a pre-training.
+        probs = F.softmax(logits, dim=1)
         # sumprobs = probs.sum().detach().numpy()
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
-        return policy_dist, value
+        # self.last_policy.append(probs.detach().cpu().numpy()[0])
+        if self.rl:
+            return policy_dist, value
+        else:
+            return logits, value
 
     def evaluate(self, state, action):
-        action_probs = self.action_layer(state)
+        action_probs = self.action_layer(state) #TODO: where this is come from?
         dist = Categorical(action_probs)
 
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
 
-        state_value = self.value_layer(state)
+        state_value = self.value_layer(state) #TODO: where this is come from?
 
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def _get_embed_text(self, text):
-        padded = pad_sequence(text, batch_first=True, padding_value=0)
+        padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = list(map(len, text))
 
         pad_embed = self.word_embedding(padded)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True) #TODO: why this is needed?
+        # output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
         return ht[-1]
 
 
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=None, rl=True):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
+                 kernel_size=1, stride=5, rl=True):
         # super(PolicyLSTMBatch, self).__init__()
-        PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers, rl=rl)
+        PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
-        self.fc = nn.Linear(12 * 14 * 14 + self.hidden_size, num_tokens + 1)
-        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
+        self.stride = stride
+        self.kernel_size = kernel_size
+        h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1)) / self.stride)
+        self.fc = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
+                            num_tokens + 1)
+
+        # self.fc = nn.Linear(self.hidden_size + self.hidden_size, num_tokens + 1)
+
+        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
+                              stride=self.stride)
+        self.img_layer = nn.Linear(1024 * 14 * 14, self.hidden_size)
+        # self.pooling = pooling
+        # self.max_pool = nn.MaxPool2d(kernel_size=self.pool_kernel)
         self.rl = rl
 
     def forward(self):
@@ -187,7 +203,8 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         texts = [state_.text[0] for state_ in state]
         embed_text = self._get_embed_text(texts)
 
-        img_feat = torch.cat([state_.img for state_ in state])
+        img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
+
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1)
 
@@ -203,23 +220,23 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        self.last_policy.append(probs.detach().numpy()[0])
+        # self.last_policy.append(probs.detach().numpy()[0])
         if self.rl:
             return policy_dist, value
         else:
             return logits, value
 
-    
     def evaluate(self, state, action):
-        action_probs = self.action_layer(state) #TODO: where this is defined?
+        action_probs = self.action_layer(state)
         dist = Categorical(action_probs)
 
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
 
-        state_value = self.value_layer(state) #TODO: where this is defined?
+        state_value = self.value_layer(state)
 
         return action_logprobs, torch.squeeze(state_value), dist_entropy
+
 
 if __name__ == '__main__':
     train_features_path = '../../data/train_features.h5'

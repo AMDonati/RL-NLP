@@ -5,11 +5,9 @@ from collections import namedtuple
 import gym
 import numpy as np
 import torch
-#from stable_baselines.common.vec_env import DummyVecEnv
 
 from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from RL_toolbox.RL_functions import preprocess_final_state
 
 
 class ClevrEnv(gym.Env):
@@ -17,7 +15,7 @@ class ClevrEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
-                 reward_path=None, max_samples=None, debug=False, mode="train"):
+                 reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10):
         super(ClevrEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
@@ -26,6 +24,7 @@ class ClevrEnv(gym.Env):
         vocab_path = os.path.join(data_path, 'vocab.json')
         # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
         self.debug = debug
+        self.num_questions = num_questions
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
                                            vocab_path=vocab_path,
@@ -55,10 +54,10 @@ class ClevrEnv(gym.Env):
     def step(self, action):
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
-        #question = self.clevr_dataset.idx2word(self.state.text.numpy()[0])
+        question = self.clevr_dataset.idx2word(self.state.text.numpy()[0])
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
-        question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
-                                        EOS_idx=self.special_tokens.EOS_idx)
+        # question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
+        #                               EOS_idx=self.special_tokens.EOS_idx)
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded) if done else (
             0, None)
@@ -69,17 +68,17 @@ class ClevrEnv(gym.Env):
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        self.img_idx = np.random.randint(0, len(self.clevr_dataset))
-        #self.img_idx = 0  # for debugging.
-        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)  # shape (10, 45)
-        if self.debug:
-            self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
-        # self.ref_questions_decoded = [
-        #     self.clevr_dataset.idx2word(question, clean=True)
-        #     for question in self.ref_questions.numpy()[:, :self.max_len]]
-        self.ref_questions_decoded = [
-            self.clevr_dataset.idx2word(question, clean=True)
-            for question in self.ref_questions.numpy()]
+        self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
+            0]) if not self.debug else np.random.randint(0, self.debug)
+        # self.img_idx = 0
+        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
+                             :self.max_len]  # shape (10, 45)
+        #if self.debug > 0:
+        self.ref_questions = self.ref_questions[0:self.num_questions]
+        # if self.debug:
+        # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
+        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, clean=True)
+                                      for question in self.ref_questions.numpy()]
         logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
         # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
@@ -94,8 +93,8 @@ class ClevrEnv(gym.Env):
         valid_actions = self.current_episode.valid_actions
         assert valid_actions is not None
         valid_actions_decoded = [self.clevr_dataset.idx2word(actions, delim=',') for actions in valid_actions]
-        #dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
-        #return dict(zip(dialog_split, valid_actions_decoded))
+        # dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
+        # return dict(zip(dialog_split, valid_actions_decoded))
         return valid_actions_decoded
 
     def clean_ref_questions(self):
@@ -135,7 +134,7 @@ class VectorEnv:
         # return_values = []
         obs_batch, rew_batch, done_batch, info_batch = [], [], [], []
         for env, a in zip(self.envs, actions):
-            observation, (reward,_), done, info = env.step(a)
+            observation, (reward, _), done, info = env.step(a)
             if done:
                 observation = env.reset()
             obs_batch.append(observation)
@@ -165,4 +164,4 @@ if __name__ == '__main__':
 
     make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
     # env = VectorEnv(make_env_fn, n=4)
-    #env = DummyVecEnv([make_env_fn])
+    # env = DummyVecEnv([make_env_fn])
