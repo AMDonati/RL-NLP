@@ -32,7 +32,7 @@ def main(args):
 
     pretrained_lm = None
     if args.pretrained_path is not None:
-        pretrained_lm = torch.load(args.pretrained_path)
+        pretrained_lm = torch.load(args.pretrained_path, map_location=torch.device('cpu'))
         pretrained_lm.eval()
 
     models = {
@@ -80,9 +80,9 @@ if __name__ == '__main__':
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
-    parser.add_argument('-reward', type=str, default="cosine", help="type of reward function")
+    parser.add_argument('-reward', type=str, default="levenshtein", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="gru_word", help="model")
+    parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=100, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-debug', type=int, default=1,
                         help="debug mode: train on just one question from the first image")
-    parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
+    parser.add_argument('-agent', type=str, default="REINFORCE", help="RL agent")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")

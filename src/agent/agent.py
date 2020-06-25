@@ -49,11 +49,18 @@ class Agent:
         :param top_k: number of words
         :return: top k words
         """
+        seq_len = state[0].text.size(1)
         if self.pretrained_lm is None:
             return None
-        dist, value = self.pretrained_lm.act(state)
-        probs = dist.probs
-        top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
+        log_probas, _ = self.pretrained_lm(torch.cat([state_.text for state_ in state], dim=0))
+        log_probas = log_probas.view(len(state), seq_len, -1)
+        log_probas = log_probas[:, -1, :]
+        top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+        # if self.pretrained_lm is None:
+        #     return None
+        # dist, value = self.pretrained_lm.act(state)
+        # probs = dist.probs
+        # top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
         return top_k_indices
 
     def select_action(self, state, forced=None, num_truncated=10):
