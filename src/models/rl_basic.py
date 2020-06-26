@@ -161,11 +161,11 @@ class PolicyLSTMWordBatch(nn.Module):
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def _get_embed_text(self, text):
-        padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
-        lens = list(map(len, text))
+        padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device) # RL only. shape should be (B,S).
+        lens = list(map(len, text)) # RL only.
 
-        pad_embed = self.word_embedding(padded)
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+        pad_embed = self.word_embedding(padded) # RL + SL. # shape (B,S,emb_size).
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False) # RL, or RL + SL ? #TODO: can this be removed?
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         # output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
@@ -195,24 +195,26 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.rl = rl
 
     def forward(self):
-        raise NotImplementedError
+        raise NotImplementedError #TODO: use forward instead.
 
     def act(self, state, valid_actions=None):
         # text_inputs, img_feat=state.text, state.img
         # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
-        texts = [state_.text[0] for state_ in state]
-        embed_text = self._get_embed_text(texts)
+        texts = [state_.text[0] for state_ in state] # RL only.
+        embed_text = self._get_embed_text(texts) # RL + SL.
 
-        img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
+        img_feat = torch.cat([state_.img for state_ in state]).to(self.device) # RL only.
 
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1)
 
         embedding = torch.cat((img_feat__, embed_text.view(embed_text.size(0), -1)), dim=1)
         out = self.fc(embedding)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
+        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens] # use a value head instead.
 
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+
+        # only for RL.
         if valid_actions is not None:
             logits = torch.gather(logits, 1, valid_actions)
         probs = F.softmax(logits, dim=1)
@@ -222,7 +224,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         probs = policy_dist.probs.clone()
         # self.last_policy.append(probs.detach().numpy()[0])
         if self.rl:
-            return policy_dist, value
+            return policy_dist, value #TODO: remove multiple returns. 
         else:
             return logits, value
 

@@ -143,7 +143,8 @@ class Agent:
             ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
-                action, log_probs, value, _, _ = self.select_action(state=state, forced=forced,
+                action, log_probs, value, _, _ = self.select_action(state=state,
+                                                                    forced=forced,
                                                                     num_truncated=self.num_truncated)
                 state, (reward, _), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:

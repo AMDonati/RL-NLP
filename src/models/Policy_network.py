@@ -48,7 +48,7 @@ class PolicyLSTM(nn.Module):
 
     def forward(self, text_inputs, img_feat, valid_actions=None):
         '''
-        :param text_inputs: shape (S, B)
+        :param text_inputs: shape (B, S)
         :param img_feat: shape (B, C, H, W)
         :param hidden: shape (num_layers, B, hidden_size)
         :return:
