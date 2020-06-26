@@ -1,8 +1,8 @@
 import logging
 import random
-
 import torch
 import torch.optim as optim
+from nltk.translate.bleu_score import sentence_bleu
 
 
 class Memory:
@@ -81,6 +81,12 @@ class Agent:
         last_text = [item for sublist in self.generated_text[-min(10, len(self.generated_text)):] for item in sublist]
         diversity_metric = len(set(last_text)) / len(last_text)
         return diversity_metric
+
+    def get_bleu_score(self, question):
+        ref_questions = [q.split() for q in self.env.ref_questions]
+        questions_tokens = question.split()
+        score = sentence_bleu(ref_questions, questions_tokens)
+        return score
 
     def test(self, log_interval=1, num_episodes=10):
         self.generated_text = []
