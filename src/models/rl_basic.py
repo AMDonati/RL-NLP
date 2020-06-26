@@ -119,7 +119,7 @@ class PolicyLSTMWordBatch(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    def act(self, state, valid_actions=None):
+    def act(self, state_text, state_img, valid_actions=None):
         # text_inputs, img_feat=state.text, state.img
         # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
         texts = [state_.text[0] for state_ in state]
@@ -149,23 +149,12 @@ class PolicyLSTMWordBatch(nn.Module):
         else:
             return logits, value
 
-    def evaluate(self, state, action):
-        action_probs = self.action_layer(state) #TODO: where this is come from?
-        dist = Categorical(action_probs)
-
-        action_logprobs = dist.log_prob(action)
-        dist_entropy = dist.entropy()
-
-        state_value = self.value_layer(state) #TODO: where this is come from?
-
-        return action_logprobs, torch.squeeze(state_value), dist_entropy
-
     def _get_embed_text(self, text):
-        padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device) # RL only. shape should be (B,S).
-        lens = list(map(len, text)) # RL only.
+        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
+        lens = (text != 0).sum(dim=1)
 
-        pad_embed = self.word_embedding(padded) # RL + SL. # shape (B,S,emb_size).
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False) # RL, or RL + SL ? #TODO: can this be removed?
+        pad_embed = self.word_embedding(text)
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         # output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
@@ -175,7 +164,7 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True):
+                 kernel_size=1, stride=5):
         # super(PolicyLSTMBatch, self).__init__()
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
@@ -192,52 +181,30 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.img_layer = nn.Linear(1024 * 14 * 14, self.hidden_size)
         # self.pooling = pooling
         # self.max_pool = nn.MaxPool2d(kernel_size=self.pool_kernel)
-        self.rl = rl
 
     def forward(self):
-        raise NotImplementedError #TODO: use forward instead.
+        raise NotImplementedError
 
-    def act(self, state, valid_actions=None):
-        # text_inputs, img_feat=state.text, state.img
-        # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
-        texts = [state_.text[0] for state_ in state] # RL only.
-        embed_text = self._get_embed_text(texts) # RL + SL.
+    def act(self, state_text, state_img, valid_actions=None):
 
-        img_feat = torch.cat([state_.img for state_ in state]).to(self.device) # RL only.
+        embed_text = self._get_embed_text(state_text)
 
+        img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1)
 
         embedding = torch.cat((img_feat__, embed_text.view(embed_text.size(0), -1)), dim=1)
         out = self.fc(embedding)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens] # use a value head instead.
+        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
 
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-
-        # only for RL.
         if valid_actions is not None:
             logits = torch.gather(logits, 1, valid_actions)
         probs = F.softmax(logits, dim=1)
-        # sumprobs = probs.sum().detach().numpy()
-        # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        # self.last_policy.append(probs.detach().numpy()[0])
-        if self.rl:
-            return policy_dist, value #TODO: remove multiple returns. 
-        else:
-            return logits, value
+        return policy_dist, value
 
-    def evaluate(self, state, action):
-        action_probs = self.action_layer(state)
-        dist = Categorical(action_probs)
-
-        action_logprobs = dist.log_prob(action)
-        dist_entropy = dist.entropy()
-
-        state_value = self.value_layer(state)
-
-        return action_logprobs, torch.squeeze(state_value), dist_entropy
 
 
 if __name__ == '__main__':
