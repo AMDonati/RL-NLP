@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class PolicyGRU(nn.Module):
@@ -100,7 +100,8 @@ class PolicyGRUWord(nn.Module):
 
 class PolicyLSTMWordBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, kernel_size=1, stride=5, num_filters=3, rl=True):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, kernel_size=1, stride=5, num_filters=3,
+                 rl=True):
         super(PolicyLSTMWordBatch, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
@@ -116,19 +117,8 @@ class PolicyLSTMWordBatch(nn.Module):
         self.optimizer = None
         self.rl = rl
 
-    def forward(self):
-        raise NotImplementedError
-
-    def act(self, state_text, state_img, valid_actions=None):
-        # text_inputs, img_feat=state.text, state.img
-        # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
-        texts = [state_.text[0] for state_ in state]
-        # img_feat = torch.cat([state_.img for state_ in state])
-
-        embed_text = self._get_embed_text(texts)
-
-        # img_feat_ = F.relu(self.conv(img_feat))
-        # img_feat = img_feat_.view(img_feat.size(0), -1)
+    def forward(self, state_text, state_img, valid_actions=None):
+        embed_text = self._get_embed_text(state_text)
 
         # embedding = torch.cat((img_feat, embed_text.view(embed_text.size(0), -1)), dim=1)
         out = self.fc(embed_text)  # (S,B,num_tokens)
@@ -182,11 +172,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         # self.pooling = pooling
         # self.max_pool = nn.MaxPool2d(kernel_size=self.pool_kernel)
 
-    def forward(self):
-        raise NotImplementedError
-
-    def act(self, state_text, state_img, valid_actions=None):
-
+    def forward(self, state_text, state_img, valid_actions=None):
         embed_text = self._get_embed_text(state_text)
 
         img_feat = state_img.to(self.device)
@@ -204,7 +190,6 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
         return policy_dist, value
-
 
 
 if __name__ == '__main__':

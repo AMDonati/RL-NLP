@@ -47,18 +47,21 @@ class Agent:
         self.writer = writer
         self.generated_text = []
 
-    def get_top_k_words(self, state_text, state_img, top_k=10):
+    def get_top_k_words(self, state_text, top_k=10):
         """
         Truncate the action space with the top k words of a pretrained language model
         :param state: state
         :param top_k: number of words
         :return: top k words
         """
+        seq_len = state_text.size(1)
         if self.pretrained_lm is None:
             return None
-        dist, value = self.pretrained_lm.act(state_text, state_img)
-        probs = dist.probs
-        top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
+        log_probas, _ = self.pretrained_lm(state_text)
+        log_probas = log_probas.view(len(state_text), seq_len, -1)
+        log_probas = log_probas[:, -1, :]
+        top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+
         return top_k_indices
 
     def select_action(self, state, forced=None, num_truncated=10):
