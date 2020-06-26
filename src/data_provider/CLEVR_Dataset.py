@@ -74,15 +74,21 @@ class CLEVR_Dataset(Dataset):
         idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_questions, allow_unk=allow_unk)
         return idx
 
+    def get_questions_length(self):
+        non_zero_mask = self.input_questions.numpy() != 0 # (B,S).
+        len = np.sum(non_zero_mask, axis=1)
+        return list(len)
+
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]
+        len_inp_question = np.sum(input_question.numpy() != 0)
         target_question = self.target_questions[index, :]
         img_idx = self.img_idxs[index]
         answer = self.answers[index]
         # loading img feature of img_idx
         feats = self.get_feats_from_img_idx(img_idx)
 
-        return (input_question, target_question), feats, answer
+        return (input_question, len_inp_question, target_question), feats, answer
 
     def __len__(self):
         if self.max_samples is None:
@@ -104,7 +110,7 @@ if __name__ == '__main__':
     num_samples = clevr_dataset.__len__()
     print('length dataset', num_samples)
     index = np.random.randint(0, num_samples)
-    (inp_q, tar_q), feats, answer = clevr_dataset.__getitem__(0)
+    (inp_q, len_q, tar_q), feats, answer = clevr_dataset.__getitem__(0)
     print('inp_q', inp_q.shape)
     print('tar_q', tar_q.shape)
     print('feats', feats.shape)
@@ -128,7 +134,7 @@ if __name__ == '__main__':
             print('tar', tar[0, :])
             print('feats shape', feats.shape)
     print('number of samples', batch)
-    # ----------------------------------------------- test get_questions_from_img_idx------------
+    # ----------------------------------------------- test get_questions_from_img_idx ------------
     int = np.random.randint(0, 21, size=1)
     print(int)
     ep_questions = clevr_dataset.get_questions_from_img_idx(int).data.numpy()
@@ -136,3 +142,7 @@ if __name__ == '__main__':
     ep_questions = [list(ep_questions[i, :]) for i in range(ep_questions.shape[0])]
     decoded_questions = [clevr_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
     print('questions decoded :\n{}'.format("\n".join(decoded_questions)))
+
+    # ---- test get length -----------------------------------------------------------------------------
+    length = clevr_dataset.get_questions_length()
+    print(len(length))

@@ -83,9 +83,10 @@ class Agent:
         return diversity_metric
 
     def get_bleu_score(self, question):
-        ref_questions = [q.split() for q in self.env.ref_questions]
-        questions_tokens = question.split()
-        score = sentence_bleu(ref_questions, questions_tokens)
+        question_decoded = self.env.clevr_dataset.idx2word(question, stop_at_end=True)
+        ref_questions = [q.split() for q in self.env.ref_questions_decoded]
+        question_tokens = question_decoded.split()
+        score = sentence_bleu(ref_questions, question_tokens)
         return score
 
     def test(self, log_interval=1, num_episodes=10):
@@ -123,6 +124,9 @@ class Agent:
                     ep_reward += reward
                     if done:
                         self.writer.add_scalar('test_TTR', self.get_metrics(state.text), i_episode + 1)
+                        score = self.get_bleu_score(state.text)
+                        #self.writer.add_scalar('test_BLEU', self.get_bleu_score(state.text), i_episode + 1)
+
                         break
             ppl = torch.exp(-torch.stack(log_probs_ppl).sum() / idx_step)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
@@ -172,3 +176,5 @@ class Agent:
                     i_episode, ep_reward, running_reward))
                 self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+
+
