@@ -1,8 +1,8 @@
 import logging
 
-import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence
 
 from agent.agent import Agent
 
@@ -27,19 +27,20 @@ class PPO(Agent):
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words([state], num_truncated)
-        m, value = self.policy_old.act([state], valid_actions)
+        m, value = self.policy_old.act(state.text, state.img, valid_actions)
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         if valid_actions is not None:
             action = torch.gather(valid_actions, 1, action.view(1, 1))
-        self.memory.states.append(state)
+        self.memory.states_img.append(state.img[0])
+        self.memory.states_text.append(state.text[0])
         self.memory.logprobs.append(log_prob)
         return action.cpu().numpy(), log_prob, value, valid_actions, m
 
-    def evaluate(self, state, action, num_truncated=10):
-        valid_actions = self.get_top_k_words(state, num_truncated)
-        m, value = self.policy.act(state, valid_actions)
+    def evaluate(self, state_text, state_img, action, num_truncated=10):
+        valid_actions = self.get_top_k_words(state_text, state_img, num_truncated)
+        m, value = self.policy.act(state_text, state_img, valid_actions)
         dist_entropy = m.entropy()
         log_prob = m.log_prob(action.view(-1))
 
@@ -56,14 +57,16 @@ class PPO(Agent):
             rewards.insert(0, discounted_reward)
         rewards = torch.tensor(rewards).to(self.device).float()
 
-        old_states = self.memory.states
+        old_states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
+        old_states_img = torch.stack(self.memory.states_img)
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
         old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, dist_entropy = self.evaluate(old_states, old_actions, self.num_truncated)
+            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_actions,
+                                                                 self.num_truncated)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))

@@ -192,13 +192,14 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
     def forward(self):
         raise NotImplementedError
 
-    def act(self, state, valid_actions=None):
+    def act(self, state_text, state_img, valid_actions=None):
         # text_inputs, img_feat=state.text, state.img
         # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
-        texts = [state_.text[0] for state_ in state]
-        embed_text = self._get_embed_text(texts)
+        # texts = [state_.text[0] for state_ in state]
+        embed_text = self._get_embed_text(state_text)
 
-        img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
+        # img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
+        img_feat = state_img.to(self.device)
 
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1)
@@ -211,23 +212,20 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         if valid_actions is not None:
             logits = torch.gather(logits, 1, valid_actions)
         probs = F.softmax(logits, dim=1)
-        # sumprobs = probs.sum().detach().numpy()
-        # if math.isnan(sumprobs):
         policy_dist = Categorical(probs)
         probs = policy_dist.probs.clone()
-        # self.last_policy.append(probs.detach().numpy()[0])
         return policy_dist, value
 
-    def evaluate(self, state, action):
-        action_probs = self.action_layer(state)
-        dist = Categorical(action_probs)
+    def _get_embed_text(self, text):
+        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
+        lens = (text != 0).sum(dim=1)
 
-        action_logprobs = dist.log_prob(action)
-        dist_entropy = dist.entropy()
+        pad_embed = self.word_embedding(text)
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
-        state_value = self.value_layer(state)
-
-        return action_logprobs, torch.squeeze(state_value), dist_entropy
+        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
+        # output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+        return ht[-1]
 
 
 if __name__ == '__main__':
