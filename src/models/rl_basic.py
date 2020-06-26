@@ -193,14 +193,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         raise NotImplementedError
 
     def act(self, state_text, state_img, valid_actions=None):
-        # text_inputs, img_feat=state.text, state.img
-        # states_=[torch.cat((state_.img,state_.text.view(state_.text.size(0),-1)), dim=1) for state_ in state]
-        # texts = [state_.text[0] for state_ in state]
+
         embed_text = self._get_embed_text(state_text)
 
-        # img_feat = torch.cat([state_.img for state_ in state]).to(self.device)
         img_feat = state_img.to(self.device)
-
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1)
 
