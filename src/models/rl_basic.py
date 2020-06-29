@@ -160,7 +160,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
-        h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1)) / self.stride)
+        h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         self.fc = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
                             num_tokens + 1)
 
