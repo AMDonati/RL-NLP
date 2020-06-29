@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class PolicyGRU(nn.Module):
@@ -147,49 +147,74 @@ class PolicyLSTMWordBatch(nn.Module):
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        # output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
-        return ht[-1]
+        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+        return output
 
 
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5):
+                 kernel_size=1, stride=5, rl=True):
         # super(PolicyLSTMBatch, self).__init__()
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
+        self.rl = rl
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
-        self.fc = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
-                            num_tokens + 1)
-
-        # self.fc = nn.Linear(self.hidden_size + self.hidden_size, num_tokens + 1)
-
+        self.action_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
+                            num_tokens)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
-        self.img_layer = nn.Linear(1024 * 14 * 14, self.hidden_size)
-        # self.pooling = pooling
-        # self.max_pool = nn.MaxPool2d(kernel_size=self.pool_kernel)
+        self.img_layer = nn.Linear(1024 * 14 * 14, self.hidden_size) # TODO: what is this used for ?
+        if rl:
+            self.value_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size, 1)
+        else:
+            self.value_head = None
+
 
     def forward(self, state_text, state_img, valid_actions=None):
         embed_text = self._get_embed_text(state_text)
-
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
-        img_feat__ = img_feat_.view(img_feat.size(0), -1)
+        img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)  # repeat img along the sequence axis.
+        embedding = torch.cat((img_feat__, embed_text), dim=-1)
+        logits = self.action_head(embedding)  # (B,S,num_tokens)
+        if self.rl:
+            emb = embedding[:, -1, :]
+            value = self.value_head(emb)
+            if valid_actions is not None:
+                logits = torch.gather(logits, 1, valid_actions)
+            probs = F.softmax(logits[:,-1,:], dim=-1)
+            policy_dist = Categorical(probs)
+            return policy_dist, value
+        else:
+            logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+            value = None
+            return logits, value
 
-        embedding = torch.cat((img_feat__, embed_text.view(embed_text.size(0), -1)), dim=1)
-        out = self.fc(embedding)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
 
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        if valid_actions is not None:
-            logits = torch.gather(logits, 1, valid_actions)
-        probs = F.softmax(logits, dim=1)
-        policy_dist = Categorical(probs)
-        probs = policy_dist.probs.clone()
-        return policy_dist, value
+            #logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]  # logits (B,S,V)
+
+            #logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+
+            # if valid_actions is not None:
+            #     logits = torch.gather(logits, 1, valid_actions)
+            # probs = F.softmax(logits, dim=1)
+            # policy_dist = Categorical(probs)
+            # probs = policy_dist.probs.clone()
+            # return policy_dist, value
+
+        # out = self.fc(embedding)  # (S,B,num_tokens)
+        # logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
+        #
+        # logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        # if valid_actions is not None:
+        #     logits = torch.gather(logits, 1, valid_actions)
+        # probs = F.softmax(logits, dim=1)
+        # policy_dist = Categorical(probs)
+        # probs = policy_dist.probs.clone()
+        # return policy_dist, value
 
 
 if __name__ == '__main__':
@@ -205,7 +230,15 @@ if __name__ == '__main__':
     word_emb_size = 64
     hidden_size = 128
     dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
-    model = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
+    #model = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
+    #policy_dist, value = model(dummy_text_input, img_feat)
+    #print('policy dist', policy_dist.shape)
+    #print('value', value.shape)
+
+    model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
     policy_dist, value = model(dummy_text_input, img_feat)
-    print('policy dist', policy_dist.shape)
-    print('value', value.shape)
+
+    # SL mode.
+    model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size, rl=False)
+    logits, value = model(dummy_text_input, img_feat)
+
