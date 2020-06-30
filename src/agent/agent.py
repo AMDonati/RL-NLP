@@ -29,13 +29,14 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, pretrain=False,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, pretrained_policy=None, pretrain=False,
                  update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3,
                  num_truncated=10):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters, rl=True) #TODO: add loading of the pre-trained policy.
-
+                             stride=stride, num_filters=num_filters, rl=True)
+        if pretrained_policy is not None:
+            self.policy.load_state_dict(torch.load(pretrained_policy))
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
@@ -120,7 +121,7 @@ class Agent:
                             target_word_log_prob = dist.log_prob(torch.tensor([target_word]).float().to(self.device))
                         else:
                             # case where the target word is not in the top words of the language model
-                            target_word_log_prob = torch.tensor([-10]).float().to(self.device)
+                            target_word_log_prob = torch.tensor([-10]).float().to(self.device) #TODO: remove the else.
                     log_probs_ppl.append(target_word_log_prob)
                     idx_step += 1
                     state, (reward, _), done, _ = self.env.step(action)
@@ -135,10 +136,13 @@ class Agent:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
+                #TODO: add generated dialog.
+                #TODO: add ratio of unique closest question
+                #TODO: add %age of unvalid actions per episode. (counter.)
                 self.writer.add_scalar('test_running_return', running_reward, i_episode + 1)
                 self.writer.add_scalar('ppl', ppl, i_episode + 1)
                 self.writer.add_text('language_model', '  \n'.join(top_words)) #TODO: add it only with the language model.
-                # TODO: add generated dialog.
+
 
     def learn(self, log_interval=10, num_episodes=100):
 

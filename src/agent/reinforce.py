@@ -5,10 +5,12 @@ from agent.agent import Agent
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, word_emb_size=8,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, pretrained_policy=None,
+                 word_emb_size=8,
                  hidden_size=24, pretrain=False, kernel_size=1, stride=2, num_filters=3, num_truncated=10,
                  update_every=30):
-        Agent.__init__(self, policy, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm, word_emb_size=word_emb_size,
+        Agent.__init__(self, policy, env, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm,
+                       pretrained_policy=pretrained_policy, word_emb_size=word_emb_size,
                        hidden_size=hidden_size, pretrain=pretrain,
                        update_every=update_every, kernel_size=kernel_size, stride=stride, num_filters=num_filters,
                        num_truncated=num_truncated, writer=writer)

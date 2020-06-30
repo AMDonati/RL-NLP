@@ -81,14 +81,13 @@ class CLEVR_Dataset(Dataset):
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]
-        len_inp_question = np.sum(input_question.numpy() != 0)
         target_question = self.target_questions[index, :]
         img_idx = self.img_idxs[index]
         answer = self.answers[index]
         # loading img feature of img_idx
         feats = self.get_feats_from_img_idx(img_idx)
 
-        return (input_question, len_inp_question, target_question), feats, answer
+        return (input_question, target_question), feats, answer
 
     def __len__(self):
         if self.max_samples is None:

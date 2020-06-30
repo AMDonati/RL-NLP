@@ -25,7 +25,7 @@ def main(args):
     out_policy_file = os.path.join(output_path, 'model.pth')
 
     logger = create_logger(out_file_log, level=args.logger_level)
-    truncated = "basic" if args.pretrained_path is None else "truncated"
+    truncated = "basic" if args.lm_path is None else "truncated"
     writer = SummaryWriter(log_dir=os.path.join(output_path,
                                                 "runs_{}_{}_{}_{}_{}".format(truncated, args.max_len, args.debug,
                                                                              args.entropy_coeff, args.num_truncated)))
@@ -34,15 +34,15 @@ def main(args):
                    num_questions=args.num_questions)
 
     pretrained_lm = None
-    if args.pretrained_path is not None:
-        pretrained_lm = torch.load(args.pretrained_path, map_location=torch.device('cpu'))
+    if args.lm_path is not None:
+        pretrained_lm = torch.load(args.lm_path, map_location=torch.device('cpu'))
         pretrained_lm.eval()
 
     models = {
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrained_policy": args.policy_path, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=2, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=100, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,
@@ -83,19 +83,21 @@ if __name__ == '__main__':
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
-    parser.add_argument('-reward', type=str, default="levenshtein", help="type of reward function")
+    parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
-    parser.add_argument('-update_every', type=int, default=100, help="update_every episode/timestep")
+    parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.2, help="eps clip")
-    parser.add_argument('-pretrained_path', type=str, default=None,
+    parser.add_argument('-lm_path', type=str, default=None,
                         help="if specified, the language model truncate the action space")
+    parser.add_argument('-policy_path', type=str, default=None,
+                        help="if specified, pre-trained model of the policy")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-debug', type=int, default=1,
                         help="debug mode: train on just one question from the first image")
-    parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
+    parser.add_argument('-agent', type=str, default="REINFORCE", help="RL agent")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")

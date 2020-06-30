@@ -144,10 +144,10 @@ class PolicyLSTMWordBatch(nn.Module):
         lens = (text != 0).sum(dim=1)
 
         pad_embed = self.word_embedding(text)
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False) #TODO: solve bug here: seq_length of 29 instead of 46.
 
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
+        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1)) #TODO: solve bug here with SL.
         return output
 
 
@@ -170,7 +170,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         if rl:
             self.value_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size, 1)
         else:
-            self.value_head = None
+            self.value_head = None #TODO: change if pretraining of the value function.
 
 
     def forward(self, state_text, state_img, valid_actions=None):
@@ -184,9 +184,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         if self.rl:
             emb = embedding[:, -1, :]
             value = self.value_head(emb)
+            logits = logits[:,-1,:]
             if valid_actions is not None:
-                logits = torch.gather(logits, 1, valid_actions)
-            probs = F.softmax(logits[:,-1,:], dim=-1)
+                logits = torch.gather(logits, -1, valid_actions)
+            probs = F.softmax(logits, dim=-1)
             policy_dist = Categorical(probs)
             return policy_dist, value
         else:

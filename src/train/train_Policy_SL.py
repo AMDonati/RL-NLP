@@ -145,6 +145,7 @@ if __name__ == '__main__':
     ################################################################################################################################################
     # Train the model
     ################################################################################################################################################
+
     logger.info('LSTM with projection layer...')
     logger.info("start training...")
     logger.info("hparams: {}".format(hparams))
@@ -182,7 +183,7 @@ if __name__ == '__main__':
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
             with open(model_path, 'wb') as f:
-                torch.save(policy_network, f)
+                torch.save(policy_network.state_dict(), f)
             best_val_loss = val_loss
 
     logger.info("saving loss and metrics information...")
