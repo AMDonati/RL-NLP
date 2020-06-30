@@ -37,6 +37,9 @@ if __name__ == '__main__':
     parser.add_argument("-hidden_size", type=int, default=32, help="dimension of the hidden state")
     parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
+    parser.add_argument("-kernel_size", default=1, type=int)
+    parser.add_argument("-num_filters", default=3, type=int)
+    parser.add_argument("-stride", default=5, type=int)
     parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-bs", type=int, default=8, help="batch size")
     parser.add_argument("-ep", type=int, default=5, help="number of epochs")
@@ -86,18 +89,21 @@ if __name__ == '__main__':
     ###############################################################################
     # Build the model
     ###############################################################################
-    policy_network = PolicyLSTM(num_tokens=num_tokens,
-                                    word_emb_size=args.word_emb_size,
-                                    emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
-                                    hidden_size=args.hidden_size,
-                                    num_layers=args.num_layers,
-                                    p_drop=args.p_drop,
-                                    rl=False).to(device) #TODO: change policy network here.
+    # policy_network = PolicyLSTM(num_tokens=num_tokens,
+    #                                 word_emb_size=args.word_emb_size,
+    #                                 emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
+    #                                 hidden_size=args.hidden_size,
+    #                                 num_layers=args.num_layers,
+    #                                 p_drop=args.p_drop,
+    #                                 rl=False).to(device)
 
     policy_network = PolicyLSTMBatch(num_tokens=num_tokens,
                                      word_emb_size=args.word_emb_size,
                                      hidden_size=args.hidden_size,
-                                     rl=False) #TODO: add hparams for conv features.
+                                     kernel_size=args.kernel_size,
+                                     num_filters=args.num_filters,
+                                     stride=args.stride,
+                                     rl=False).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
