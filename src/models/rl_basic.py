@@ -175,6 +175,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def forward(self, state_text, state_img, valid_actions=None):
         embed_text = self._get_embed_text(state_text)
+        seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)  # repeat img along the sequence axis.
@@ -192,30 +193,6 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
             logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
             value = None
             return logits, value
-
-
-            #logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]  # logits (B,S,V)
-
-            #logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-
-            # if valid_actions is not None:
-            #     logits = torch.gather(logits, 1, valid_actions)
-            # probs = F.softmax(logits, dim=1)
-            # policy_dist = Categorical(probs)
-            # probs = policy_dist.probs.clone()
-            # return policy_dist, value
-
-        # out = self.fc(embedding)  # (S,B,num_tokens)
-        # logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
-        #
-        # logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        # if valid_actions is not None:
-        #     logits = torch.gather(logits, 1, valid_actions)
-        # probs = F.softmax(logits, dim=1)
-        # policy_dist = Categorical(probs)
-        # probs = policy_dist.probs.clone()
-        # return policy_dist, value
-
 
 if __name__ == '__main__':
     train_features_path = '../../data/train_features.h5'

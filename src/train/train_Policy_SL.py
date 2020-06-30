@@ -92,7 +92,12 @@ if __name__ == '__main__':
                                     hidden_size=args.hidden_size,
                                     num_layers=args.num_layers,
                                     p_drop=args.p_drop,
-                                    rl=False).to(device)
+                                    rl=False).to(device) #TODO: change policy network here.
+
+    policy_network = PolicyLSTMBatch(num_tokens=num_tokens,
+                                     word_emb_size=args.word_emb_size,
+                                     hidden_size=args.hidden_size,
+                                     rl=False) #TODO: add hparams for conv features.
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)

@@ -34,7 +34,9 @@ class Agent:
                  num_truncated=10):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters)
+                             stride=stride, num_filters=num_filters, rl=True) #TODO: add loading of the pre-trained policy.
+
+
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
@@ -84,7 +86,7 @@ class Agent:
         return diversity_metric
 
     def get_bleu_score(self, question):
-        question_decoded = self.env.clevr_dataset.idx2word(question, stop_at_end=True)
+        question_decoded = self.env.clevr_dataset.idx2word(question.squeeze().cpu().numpy().tolist(), ignored=["<SOS>"], stop_at_end=True)
         ref_questions = [q.split() for q in self.env.ref_questions_decoded]
         question_tokens = question_decoded.split()
         score = sentence_bleu(ref_questions, question_tokens)
@@ -125,9 +127,7 @@ class Agent:
                     ep_reward += reward
                     if done:
                         self.writer.add_scalar('test_TTR', self.get_metrics(state.text), i_episode + 1)
-                        score = self.get_bleu_score(state.text)
-                        #self.writer.add_scalar('test_BLEU', self.get_bleu_score(state.text), i_episode + 1)
-
+                        self.writer.add_scalar('test_BLEU', self.get_bleu_score(state.text), i_episode + 1)
                         break
             ppl = torch.exp(-torch.stack(log_probs_ppl).sum() / idx_step)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
@@ -137,7 +137,8 @@ class Agent:
                 self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('test_running_return', running_reward, i_episode + 1)
                 self.writer.add_scalar('ppl', ppl, i_episode + 1)
-                self.writer.add_text('language_model', '  \n'.join(top_words))
+                self.writer.add_text('language_model', '  \n'.join(top_words)) #TODO: add it only with the language model.
+                # TODO: add generated dialog.
 
     def learn(self, log_interval=10, num_episodes=100):
 

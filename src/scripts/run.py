@@ -11,6 +11,9 @@ from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
 
+#TODO: add pretrained_path for pre-training of policy.
+#TODO: add loading of policy in the case of pre-training.
+
 
 def main(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=2, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,
@@ -92,7 +95,7 @@ if __name__ == '__main__':
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-debug', type=int, default=1,
                         help="debug mode: train on just one question from the first image")
-    parser.add_argument('-agent', type=str, default="REINFORCE", help="RL agent")
+    parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
