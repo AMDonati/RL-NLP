@@ -14,23 +14,24 @@ class REINFORCE(Agent):
                        hidden_size=hidden_size, pretrain=pretrain,
                        update_every=update_every, kernel_size=kernel_size, stride=stride, num_filters=num_filters,
                        num_truncated=num_truncated, writer=writer)
-        self.update_every = 1
+        self.update_every = update_every
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.update_mode = "episode"
         self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions = self.get_top_k_words([state], num_truncated)
-        m, value = self.policy.act([state], valid_actions)
+        valid_actions = self.get_top_k_words(state.text, num_truncated)
+        m, value = self.policy(state.text, state.img, valid_actions)
         action = m.sample() if forced is None else forced
-        log_prob = m.log_prob(action).view(-1)
+        log_prob = m.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         if valid_actions is not None:
             action = torch.gather(valid_actions, 1, action.view(1, 1))
-        self.memory.states.append(state)
+        self.memory.states_img.append(state.img[0])
+        self.memory.states_text.append(state.text[0])
         self.memory.logprobs.append(log_prob)
         self.memory.values.append(value)
-        return action.numpy(), log_prob, value, None, m
+        return action.cpu().numpy(), log_prob, value, valid_actions, m
 
     def update(self):
         rewards = []

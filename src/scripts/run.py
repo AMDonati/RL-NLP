@@ -43,12 +43,13 @@ def main(args):
         "lstm_word": PolicyLSTMWordBatch}
 
     generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrained_policy": args.policy_path, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
+                      "update_every": args.update_every,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
-                  "update_every": args.update_every, "entropy_coeff": args.entropy_coeff,
+                   "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
     reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
