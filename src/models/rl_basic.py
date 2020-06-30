@@ -109,45 +109,38 @@ class PolicyLSTMWordBatch(nn.Module):
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_tokens + 1)
-        self.saved_log_probs = []
-        self.rewards = []
-        self.values = []
-        self.last_policy = []
-        self.optimizer = None
         self.rl = rl
+        self.action_head = nn.Linear(self.hidden_size,
+                                     num_tokens)
+        if rl:
+            self.value_head = nn.Linear(self.hidden_size, 1)
+        else:
+            self.value_head = None  # TODO: change if pretraining of the value function.
 
     def forward(self, state_text, state_img, valid_actions=None):
-        embed_text = self._get_embed_text(state_text)
-
-        # embedding = torch.cat((img_feat, embed_text.view(embed_text.size(0), -1)), dim=1)
-        out = self.fc(embed_text)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
-
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        if valid_actions is not None:
-            logits = torch.gather(logits, 1, valid_actions)
-            # logits = logits[:, valid_actions]
-        probs = F.softmax(logits, dim=1)
-        # sumprobs = probs.sum().detach().numpy()
-        # if math.isnan(sumprobs):
-        policy_dist = Categorical(probs)
-        probs = policy_dist.probs.clone()
-        # self.last_policy.append(probs.detach().cpu().numpy()[0])
+        embedding = self._get_embed_text(state_text)
+        logits = self.action_head(embedding)  # (B,S,num_tokens)
         if self.rl:
+            emb = embedding[:, -1, :]
+            value = self.value_head(emb)
+            logits = logits[:, -1, :]
+            if valid_actions is not None:
+                logits = torch.gather(logits, -1, valid_actions)
+            probs = F.softmax(logits, dim=-1)
+            policy_dist = Categorical(probs)
             return policy_dist, value
         else:
+            logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+            value = None
             return logits, value
 
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = (text != 0).sum(dim=1)
-
         pad_embed = self.word_embedding(text)
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False) #TODO: solve bug here: seq_length of 29 instead of 46.
-
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1)) #TODO: solve bug here with SL.
+        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
         return output
 
 
@@ -166,7 +159,6 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
                             num_tokens)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
-        self.img_layer = nn.Linear(1024 * 14 * 14, self.hidden_size) # TODO: what is this used for ?
         if rl:
             self.value_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size, 1)
         else:

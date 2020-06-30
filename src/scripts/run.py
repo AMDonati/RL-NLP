@@ -86,7 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="lstm", help="model")
+    parser.add_argument('-model', type=str, default="lstm_word", help="model")
     parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
