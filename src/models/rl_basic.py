@@ -121,9 +121,7 @@ class PolicyLSTMWordBatch(nn.Module):
         embedding = self._get_embed_text(state_text)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         if self.rl:
-            emb = embedding[:, -1, :]
-            value = self.value_head(emb)
-            logits = logits[:, -1, :]
+            value = self.value_head(embedding)
             if valid_actions is not None:
                 logits = torch.gather(logits, -1, valid_actions)
             probs = F.softmax(logits, dim=-1)
@@ -135,13 +133,12 @@ class PolicyLSTMWordBatch(nn.Module):
             return logits, value
 
     def _get_embed_text(self, text):
-        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
+        #padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
-        return output
+        return ht[-1]
 
 
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
@@ -167,16 +164,13 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def forward(self, state_text, state_img, valid_actions=None):
         embed_text = self._get_embed_text(state_text)
-        seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
-        img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)  # repeat img along the sequence axis.
-        embedding = torch.cat((img_feat__, embed_text), dim=-1)
+        img_feat__ = img_feat_.view(img_feat.size(0), -1)
+        embedding = torch.cat((img_feat__, embed_text), dim=-1) # (B,S,hidden_size).
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         if self.rl:
-            emb = embedding[:, -1, :]
-            value = self.value_head(emb)
-            logits = logits[:,-1,:]
+            value = self.value_head(embedding)
             if valid_actions is not None:
                 logits = torch.gather(logits, -1, valid_actions)
             probs = F.softmax(logits, dim=-1)
