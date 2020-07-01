@@ -27,6 +27,7 @@ class Metric:
             self.agent.writer.add_text(self.key, '  \n'.join(self.metric), self.idx_write)
         self.idx_write += 1
 
+
 class LMMetric(Metric):
     def __init__(self, agent):
         Metric.__init__(self, agent)
@@ -74,13 +75,10 @@ class PPLMetric(Metric):
         self.idx_step += 1
 
     def compute(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / self.idx_step)
+        ppl = torch.exp(-torch.stack(self.measure).sum() / self.idx_step).detach().numpy()
         self.metric.append(ppl)
 
-    def write(self, **kwargs):
-        metric = torch.mean(torch.stack(self.metric))
-        self.agent.writer.add_scalar(self.key, metric, self.idx_write)
-        self.idx_write += 1
+
 
 
 class RewardMetric(Metric):
