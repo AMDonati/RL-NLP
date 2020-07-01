@@ -7,7 +7,7 @@ import math
 import json
 import numpy as np
 from models.Policy_network import PolicyLSTM
-from models.rl_basic import PolicyLSTMBatch
+from models.rl_basic import PolicyLSTMBatch_SL
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from train.train_functions import train_one_epoch_policy, evaluate_policy
 from torch.utils.data import DataLoader
@@ -33,13 +33,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-word_emb_size", type=int, default=16, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, default=32, help="dimension of the hidden state")
+    parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-p_drop", type=float, default=0, help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
     parser.add_argument("-kernel_size", default=1, type=int)
     parser.add_argument("-num_filters", default=3, type=int)
-    parser.add_argument("-stride", default=5, type=int)
+    parser.add_argument("-stride", default=2, type=int)
     parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-bs", type=int, default=8, help="batch size")
     parser.add_argument("-ep", type=int, default=5, help="number of epochs")
@@ -97,13 +97,12 @@ if __name__ == '__main__':
     #                                 p_drop=args.p_drop,
     #                                 rl=False).to(device)
 
-    policy_network = PolicyLSTMBatch(num_tokens=num_tokens,
+    policy_network = PolicyLSTMBatch_SL(num_tokens=num_tokens,
                                      word_emb_size=args.word_emb_size,
                                      hidden_size=args.hidden_size,
                                      kernel_size=args.kernel_size,
                                      num_filters=args.num_filters,
-                                     stride=args.stride,
-                                     rl=False).to(device)
+                                     stride=args.stride).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
