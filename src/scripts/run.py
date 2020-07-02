@@ -12,10 +12,6 @@ from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
 
 
-# TODO: add pretrained_path for pre-training of policy.
-# TODO: add loading of policy in the case of pre-training.
-
-
 def main(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
     output_path = os.path.join(args.out_path, "experiments", type_folder,
@@ -81,7 +77,7 @@ if __name__ == '__main__':
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=5000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,

@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
 
-from eval.metric import PPLMetric, RewardMetric, LMMetric
+from eval.metric import PPLMetric, RewardMetric, LMMetric, DialogMetric
 
 
 class Memory:
@@ -52,7 +52,8 @@ class Agent:
         self.num_truncated = num_truncated
         self.writer = writer
         self.generated_text = []
-        self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self)]
+        #self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
+        self.metrics = [RewardMetric(self), LMMetric(self), DialogMetric(self)]
 
     def get_top_k_words(self, state_text, top_k=10):
         """
@@ -109,10 +110,10 @@ class Agent:
                     action, log_probs, value, valid_actions, dist = self.select_action(state=state,
                                                                                        num_truncated=self.num_truncated)
                     idx_step += 1
-                    state, (reward, _), done, _ = self.env.step(action)
+                    state, (reward, closest_question), done, _ = self.env.step(action)
                     for metric in self.metrics:
                         metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
-                                    ref_question=ref_question, reward=reward)
+                                    ref_question=ref_question, reward=reward, closest_question=closest_question)
                     if done:
                         break
             for metric in self.metrics:

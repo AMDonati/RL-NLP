@@ -47,6 +47,22 @@ class LMMetric(Metric):
     def compute(self, **kwargs):
         pass
 
+class DialogMetric(Metric):
+    def __init__(self, agent):
+        Metric.__init__(self, agent)
+        self.type = "text"
+        self.key = "dialog"
+
+    def fill(self, **kwargs):
+        if kwargs["done"]:
+            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
+            closest_question_decoded = kwargs["closest_question"]
+            self.metric.append(state_decoded + '---closest question---' + closest_question_decoded)
+
+    def compute(self, **kwargs):
+        pass
+
+
 
 class PPLMetric(Metric):
     def __init__(self, agent):
