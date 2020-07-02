@@ -56,3 +56,7 @@ To extract the image features, run the following command lines (batch size arg m
 `-model "lstm" -update_every 20 \`
 `-debug 1 \`
 `-agent "PPO" -K_epochs 10 -eps_clip 0.02 -word_emb_size 8 -hidden_size 24`
+
+#### logging on tensorboard to display results: 
+* `cd output/ppo_debug_len_10"`
+* `tensorboard --logdir=experiments/train`
