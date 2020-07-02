@@ -75,9 +75,9 @@ if __name__ == '__main__':
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
-    parser.add_argument("-max_len", type=int, default=10, help="max episode length")
+    parser.add_argument("-max_len", type=int, default=5, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,

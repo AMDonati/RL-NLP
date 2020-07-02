@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
 
-from eval.metric import PPLMetric, RewardMetric, LMMetric, DialogMetric
+from eval.metric import PPLMetric, RewardMetric, LMMetric, DialogMetric, RefQuestionsMetric
 
 
 class Memory:
@@ -53,7 +53,7 @@ class Agent:
         self.writer = writer
         self.generated_text = []
         #self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
-        self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
+        self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test"), RefQuestionsMetric(self, train_test="test")]
         self.train_metrics = [RewardMetric(self, train_test="train"), LMMetric(self, train_test="train"),
                              DialogMetric(self, train_test="train")]
 
