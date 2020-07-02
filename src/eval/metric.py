@@ -3,13 +3,14 @@ import torch
 
 
 class Metric:
-    def __init__(self, agent):
+    def __init__(self, agent, train_test):
         self.measure = []
         self.metric = []
         self.idx_step = 0
         self.idx_word = 0
         self.idx_write = 1
         self.agent = agent
+        self.train_test = train_test
 
     def fill(self, **kwargs):
         raise NotImplementedError
@@ -29,10 +30,10 @@ class Metric:
 
 
 class LMMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
         self.type = "text"
-        self.key = "lm"
+        self.key = train_test + "_" + "lm"
 
     def fill(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
@@ -47,11 +48,12 @@ class LMMetric(Metric):
     def compute(self, **kwargs):
         pass
 
+
 class DialogMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
         self.type = "text"
-        self.key = "dialog"
+        self.key = train_test + "_" + "dialog"
 
     def fill(self, **kwargs):
         if kwargs["done"]:
@@ -63,12 +65,11 @@ class DialogMetric(Metric):
         pass
 
 
-
 class PPLMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
         self.type = "scalar"
-        self.key = "ppl"
+        self.key = train_test + "_" + "ppl"
 
     def fill(self, **kwargs):
         if kwargs["done"]:
@@ -95,13 +96,11 @@ class PPLMetric(Metric):
         self.metric.append(ppl)
 
 
-
-
 class RewardMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
         self.type = "scalar"
-        self.key = "test_reward"
+        self.key = train_test + "_" + "reward"
 
     def fill(self, **kwargs):
         self.idx_word += 1

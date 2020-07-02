@@ -53,7 +53,9 @@ class Agent:
         self.writer = writer
         self.generated_text = []
         #self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
-        self.metrics = [RewardMetric(self), LMMetric(self), DialogMetric(self)]
+        self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
+        self.train_metrics = [RewardMetric(self, train_test="train"), LMMetric(self, train_test="train"),
+                             DialogMetric(self, train_test="train")]
 
     def get_top_k_words(self, state_text, top_k=10):
         """
@@ -111,15 +113,15 @@ class Agent:
                                                                                        num_truncated=self.num_truncated)
                     idx_step += 1
                     state, (reward, closest_question), done, _ = self.env.step(action)
-                    for metric in self.metrics:
+                    for metric in self.test_metrics:
                         metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                     ref_question=ref_question, reward=reward, closest_question=closest_question)
                     if done:
                         break
-            for metric in self.metrics:
+            for metric in self.test_metrics:
                 metric.compute()
             if i_episode % log_interval == 0:
-                for metric in self.metrics:
+                for metric in self.test_metrics:
                     metric.write()
                 # TODO: add generated dialog.
                 # TODO: add ratio of unique closest question
