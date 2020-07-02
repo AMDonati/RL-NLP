@@ -47,7 +47,8 @@ To extract the image features, run the following command lines:
 
 ### Pre-training of the Policy with Supervised Learning 
 `python src/train/train_Policy_SL.py -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 \
- -bs 512 -ep 50 -num_workers 10`
+ -bs 512 -ep 50 -num_workers 10 -max_samples 21`  
+ N.B: When training only on a CPU, the max_samples args is required to train only on a subset of the dataset. 
  
 ### Training the RL Agent 
 `python src/scripts/run.py -max_len 10 -data_path "data" \`
