@@ -72,7 +72,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, default=87, help="dimension of the hidden state")
+    parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
     parser.add_argument("-num_episodes_train", type=int, default=5000, help="number of episodes training")
@@ -87,10 +87,10 @@ if __name__ == '__main__':
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
-    parser.add_argument('-K_epochs', type=int, default=5, help="# epochs of training each update_timestep")
+    parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
-    parser.add_argument('-eps_clip', type=float, default=0.2, help="eps clip")
+    parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
     parser.add_argument('-lm_path', type=str, default=None,
                         help="if specified, the language model truncate the action space")
     parser.add_argument('-policy_path', type=str, default=None,
