@@ -46,6 +46,7 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, required=True)
     parser.add_argument("-out_path", type=str, required=True)
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
+    parser.add_argument('-max_samples', type=int, help="number of samples in the dataset - to train on a subset of the full dataset")
 
     args = parser.parse_args()
 
@@ -65,11 +66,11 @@ if __name__ == '__main__':
         train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
                                       h5_feats_path=train_feats_path,
                                       vocab_path=vocab_path,
-                                      max_samples=21)
+                                      max_samples=args.max_samples)
         val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
                                     h5_feats_path=val_feats_path,
                                     vocab_path=vocab_path,
-                                    max_samples=21)
+                                    max_samples=args.max_samples)
     else:
         train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
                                       h5_feats_path=train_feats_path,
