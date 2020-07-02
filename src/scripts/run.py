@@ -11,8 +11,9 @@ from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
 
-#TODO: add pretrained_path for pre-training of policy.
-#TODO: add loading of policy in the case of pre-training.
+
+# TODO: add pretrained_path for pre-training of policy.
+# TODO: add loading of policy in the case of pre-training.
 
 
 def main(args):
@@ -26,9 +27,13 @@ def main(args):
 
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
+    pre_trained = "scratch" if args.policy_path is None else "pretrain"
+    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
+                                                                       args.max_len, args.debug,
+                                                                       args.entropy_coeff, args.num_truncated,
+                                                                       args.update_every)
     writer = SummaryWriter(log_dir=os.path.join(output_path,
-                                                "runs_{}_{}_{}_{}_{}".format(truncated, args.max_len, args.debug,
-                                                                             args.entropy_coeff, args.num_truncated)))
+                                                out_folder))
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                    num_questions=args.num_questions)
@@ -42,14 +47,15 @@ def main(args):
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrained_policy": args.policy_path, "pretrain": args.pretrain, "word_emb_size": args.word_emb_size,
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrained_policy": args.policy_path, "pretrain": args.pretrain,
+                      "word_emb_size": args.word_emb_size,
                       "update_every": args.update_every,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
-                   "entropy_coeff": args.entropy_coeff,
+                  "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
     reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
