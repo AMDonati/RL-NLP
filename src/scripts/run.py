@@ -28,6 +28,10 @@ def main(args):
                                                                        args.max_len, args.debug,
                                                                        args.entropy_coeff, args.num_truncated,
                                                                        args.update_every)
+    if args.agent == 'REINFORCE':
+        out_folder = out_folder +'_lr{}'.format(args.lr)
+    elif args.agent == 'PPO':
+        out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
     writer = SummaryWriter(log_dir=os.path.join(output_path,
                                                 out_folder))
 
