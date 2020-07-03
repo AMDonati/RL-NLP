@@ -35,6 +35,8 @@ class Agent:
                  pretrain=False,
                  update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3,
                  num_truncated=10):
+
+        torch.autograd.set_detect_anomaly(True)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                              stride=stride, num_filters=num_filters, rl=True)

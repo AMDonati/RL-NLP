@@ -1,3 +1,5 @@
+import logging
+
 import h5py
 import numpy as np
 import torch
@@ -168,6 +170,11 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
             mask[0, valid_actions] = 1
             probs_truncated = masked_softmax(logits, mask)
             policy_dist_truncated = Categorical(probs_truncated)
+            is_nan = torch.sum(torch.isnan(policy_dist_truncated.probs))
+            is_inf = torch.sum(torch.isinf(policy_dist_truncated.probs))
+
+            if is_inf.item() > 0 or is_nan.item() > 0:
+                logging.error("ERRORR: probs {}".format(policy_dist_truncated.probs))
         else:
             policy_dist_truncated = policy_dist
         return policy_dist, policy_dist_truncated, value

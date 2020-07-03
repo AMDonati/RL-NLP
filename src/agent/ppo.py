@@ -31,7 +31,12 @@ class PPO(Agent):
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words(state.text, num_truncated)
         policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
-        action = policy_dist_truncated.sample() if forced is None else forced
+        try:
+            action = policy_dist_truncated.sample() if forced is None else forced
+        except RuntimeError:
+            num_negative_values = torch.sum(policy_dist_truncated.probs < 0).item()
+            logging.error('Negative values:{}'.format(num_negative_values))
+            raise
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         self.memory.states_img.append(state.img[0])
