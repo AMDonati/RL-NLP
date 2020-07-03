@@ -8,10 +8,12 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, pretrained_lm=None, pretrained_policy=None, update_every=100,
+    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, pretrained_lm=None, pretrained_policy=None,
+                 update_every=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
                  stride=2, num_filters=3, num_truncated=10):
-        Agent.__init__(self, policy, env, writer, gamma=gamma, pretrained_lm=pretrained_lm, pretrained_policy=pretrained_policy,
+        Agent.__init__(self, policy, env, writer, gamma=gamma, pretrained_lm=pretrained_lm,
+                       pretrained_policy=pretrained_policy,
                        pretrain=pretrain,
                        update_every=update_every, word_emb_size=word_emb_size, hidden_size=hidden_size,
                        kernel_size=kernel_size, stride=stride, num_filters=num_filters, num_truncated=num_truncated)
@@ -28,22 +30,20 @@ class PPO(Agent):
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions = self.get_top_k_words(state.text, num_truncated)
-        m, value = self.policy_old(state.text, state.img, valid_actions)
-        action = m.sample() if forced is None else forced
-        log_prob = m.log_prob(action.to(self.device)).view(-1)
+        policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
+        action = policy_dist_truncated.sample() if forced is None else forced
+        log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
-        if valid_actions is not None:
-            action = torch.gather(valid_actions, 1, action.view(1, 1))
         self.memory.states_img.append(state.img[0])
         self.memory.states_text.append(state.text[0])
         self.memory.logprobs.append(log_prob)
-        return action.cpu().numpy(), log_prob, value, valid_actions, m
+        return action.cpu().numpy(), log_prob, value, valid_actions, policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
         valid_actions = self.get_top_k_words(state_text, num_truncated)
-        m, value = self.policy(state_text, state_img, valid_actions)
-        dist_entropy = m.entropy()
-        log_prob = m.log_prob(action.view(-1))
+        policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions)
+        dist_entropy = policy_dist.entropy()
+        log_prob = policy_dist.log_prob(action.view(-1))
 
         return log_prob, value, dist_entropy
 
@@ -91,6 +91,8 @@ class PPO(Agent):
             self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('vf_loss', vf_loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
+            self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
+
             self.writer_iteration += 1
             # take gradient step
             self.optimizer.zero_grad()

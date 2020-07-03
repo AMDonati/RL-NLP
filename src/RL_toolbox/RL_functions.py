@@ -5,13 +5,17 @@ from collections import namedtuple
 import os
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 import Levenshtein as lv
-from RL_toolbox.action_selection import select_action
 from models.Policy_network import PolicyLSTM
 from RL_toolbox.reward import Levenshtein, get_dummy_reward
 
 State = namedtuple('State', ('text', 'img'))
 Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'closest_question', 'dialog', 'rewards'))
 
+def masked_softmax(vec, mask, dim=1, epsilon=1e-5):
+    exps = torch.exp(vec)
+    masked_exps = exps * mask.float()
+    masked_sums = masked_exps.sum(dim, keepdim=True) + epsilon
+    return (masked_exps / masked_sums)
 
 def preprocess_final_state(state_text, dataset, EOS_idx):
     state_text = state_text[:, 1:]  # removing sos token.

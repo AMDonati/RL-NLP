@@ -6,6 +6,8 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
+from RL_toolbox.RL_functions import masked_softmax
+
 
 class PolicyGRU(nn.Module):
     def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0,
@@ -114,7 +116,6 @@ class PolicyLSTMWordBatch(nn.Module):
                                      num_tokens)
         self.value_head = nn.Linear(self.hidden_size, 1)
 
-
     def forward(self, state_text, state_img, valid_actions=None):
         embedding = self._get_embed_text(state_text)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
@@ -126,7 +127,7 @@ class PolicyLSTMWordBatch(nn.Module):
         return policy_dist, value
 
     def _get_embed_text(self, text):
-        #padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
+        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
@@ -146,11 +147,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.rl = rl
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         self.action_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
-                            num_tokens)
+                                     num_tokens)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
         self.value_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size, 1)
-
 
     def forward(self, state_text, state_img, valid_actions=None):
         embed_text = self._get_embed_text(state_text)
@@ -160,11 +160,18 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
-        if valid_actions is not None:
-            logits = torch.gather(logits, -1, valid_actions)
+
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
-        return policy_dist, value
+        if valid_actions is not None:
+            mask = torch.zeros(1, self.num_tokens)
+            mask[0, valid_actions] = 1
+            probs_truncated = masked_softmax(logits, mask)
+            policy_dist_truncated = Categorical(probs_truncated)
+        else:
+            policy_dist_truncated = policy_dist
+        return policy_dist, policy_dist_truncated, value
+
 
 class PolicyLSTMWordBatch_SL(nn.Module):
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, kernel_size=1, stride=5, num_filters=3):
@@ -193,6 +200,7 @@ class PolicyLSTMWordBatch_SL(nn.Module):
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
         return output
+
 
 class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
 
@@ -236,10 +244,10 @@ if __name__ == '__main__':
     word_emb_size = 64
     hidden_size = 128
     dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
-    #model = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
-    #policy_dist, value = model(dummy_text_input, img_feat)
-    #print('policy dist', policy_dist.shape)
-    #print('value', value.shape)
+    # model = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
+    # policy_dist, value = model(dummy_text_input, img_feat)
+    # print('policy dist', policy_dist.shape)
+    # print('value', value.shape)
 
     model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
     policy_dist, value = model(dummy_text_input, img_feat)
