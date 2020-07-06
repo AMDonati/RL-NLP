@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
 
-from eval.metric import PPLMetric, RewardMetric, LMMetric, DialogMetric
+from eval.metric import PPLMetric, RewardMetric, LMMetric, DialogMetric, VAMetric
 
 
 class Memory:
@@ -58,8 +58,7 @@ class Agent:
         #self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
         self.test_metrics = [RewardMetric(self, train_test="test"),
                              DialogMetric(self, train_test="test")]
-        self.train_metrics = [RewardMetric(self, train_test="train"), LMMetric(self, train_test="train"),
-                             DialogMetric(self, train_test="train")]
+        self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train")]
 
     def get_top_k_words(self, state_text, top_k=10):
         """
@@ -70,13 +69,13 @@ class Agent:
         """
         seq_len = state_text.size(1)
         if self.pretrained_lm is None:
-            return None
+            return None, None
         log_probas, _ = self.pretrained_lm(state_text)
         log_probas = log_probas.view(len(state_text), seq_len, -1)
         log_probas = log_probas[:, -1, :]
         top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
 
-        return top_k_indices
+        return top_k_indices, top_k_weights
 
     def select_action(self, state, forced=None, num_truncated=10):
         pass
@@ -113,7 +112,7 @@ class Agent:
             for ref_question in self.env.ref_questions:
                 state, ep_reward = self.env.reset(), 0
                 for t in range(0, self.env.max_len):
-                    action, log_probs, value, valid_actions, dist = self.select_action(state=state,
+                    action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                        num_truncated=self.num_truncated)
                     idx_step += 1
                     state, (reward, closest_question), done, _ = self.env.step(action)
@@ -140,15 +139,18 @@ class Agent:
             ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
-                action, log_probs, value, _, _ = self.select_action(state=state,
+                action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                     forced=forced,
                                                                     num_truncated=self.num_truncated)
-                state, (reward, _), done, _ = self.env.step(action)
+                state, (reward, closest_question), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:
                 self.memory.rewards.append(reward)
                 self.memory.is_terminals.append(done)
 
                 timestep += 1
+                for metric in self.train_metrics:
+                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions, actions_probs=actions_probs,
+                                ref_question=self.env.ref_questions_decoded, reward=reward, closest_question=closest_question)
 
                 # update if its time
                 if self.update_mode == "step" and timestep % self.update_every == 0:
@@ -158,14 +160,19 @@ class Agent:
 
                 ep_reward += reward
                 if done:
+                    for metric in self.train_metrics:
+                        metric.reset()
                     self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         self.update()
                         self.memory.clear_memory()
                     break
+
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+                for metric in self.train_metrics:
+                    metric.write()

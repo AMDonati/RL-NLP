@@ -29,7 +29,7 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions = self.get_top_k_words(state.text, num_truncated)
+        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated)
         policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
         try:
             action = policy_dist_truncated.sample() if forced is None else forced
@@ -42,10 +42,10 @@ class PPO(Agent):
         self.memory.states_img.append(state.img[0])
         self.memory.states_text.append(state.text[0])
         self.memory.logprobs.append(log_prob)
-        return action.cpu().numpy(), log_prob, value, valid_actions, policy_dist
+        return action.cpu().numpy(), log_prob, value, (valid_actions, actions_probs), policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
-        valid_actions = self.get_top_k_words(state_text, num_truncated)
+        valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
         policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))

@@ -20,7 +20,7 @@ class REINFORCE(Agent):
         self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions = self.get_top_k_words(state.text, num_truncated)
+        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated)
         m, value = self.policy(state.text, state.img, valid_actions)
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action.to(self.device)).view(-1)
@@ -31,7 +31,7 @@ class REINFORCE(Agent):
         self.memory.states_text.append(state.text[0])
         self.memory.logprobs.append(log_prob)
         self.memory.values.append(value)
-        return action.cpu().numpy(), log_prob, value, valid_actions, m
+        return action.cpu().numpy(), log_prob, value, (valid_actions, actions_probs), m
 
     def update(self):
         rewards = []
