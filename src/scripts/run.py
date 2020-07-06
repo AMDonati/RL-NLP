@@ -24,10 +24,16 @@ def main(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
+    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
                                                                        args.max_len, args.debug,
+                                                                       args.num_questions,
                                                                        args.entropy_coeff, args.num_truncated,
                                                                        args.update_every)
+    if args.agent == 'REINFORCE':
+        out_folder = out_folder + '_lr{}'.format(args.lr)
+    elif args.agent == 'PPO':
+        out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
+
     writer = SummaryWriter(log_dir=os.path.join(output_path,
                                                 out_folder))
 
@@ -77,7 +83,7 @@ if __name__ == '__main__':
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,
