@@ -59,7 +59,7 @@ class Agent:
         self.test_metrics = [RewardMetric(self, train_test="test"),
                              DialogMetric(self, train_test="test")]
         self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train"),
-                              LMVAMetric(self, "train")]
+                              LMVAMetric(self, "train"), VAMetric(self, "train")]
 
     def get_top_k_words(self, state_text, top_k=10):
         """

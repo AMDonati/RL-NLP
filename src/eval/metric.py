@@ -52,6 +52,7 @@ class LMMetric(Metric):
         self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
 
     def compute_(self, **kwargs):
+        self.metric = [self.measure[-1]]
         pass
 
 
@@ -74,11 +75,12 @@ class VAMetric(Metric):
         target_words = [w.split()[self.idx_word] for w in ref_questions]
         string = string + '--- target words: {}'.format(', '.join(target_words)) + '--- true action: {}'.format(
             self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, -1].numpy()))
-        self.metric.append(string)
+        self.measure.append(string)
 
     # self.idx_word += 1
 
     def compute_(self, **kwargs):
+        self.metric = [self.measure[-1]]
         pass
 
 
@@ -92,9 +94,10 @@ class DialogMetric(Metric):
         if kwargs["done"]:
             state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
             closest_question_decoded = kwargs["closest_question"]
-            self.metric.append(state_decoded + '---closest question---' + closest_question_decoded)
+            self.measure.append(state_decoded + '---closest question---' + closest_question_decoded)
 
     def compute_(self, **kwargs):
+        self.metric = [self.measure[-1]]
         pass
 
 
