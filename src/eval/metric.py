@@ -90,6 +90,20 @@ class DialogMetric(Metric):
     def compute(self, **kwargs):
         pass
 
+class RefQuestionsMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = train_test + "_" + "ratio_closest_questions"
+
+    def fill(self, **kwargs):
+        if kwargs["done"]:
+            self.measure.append(kwargs["closest_question"])
+
+    def compute(self, **kwargs):
+        unique_ratio = len(list(set(self.measure))) / len(self.measure)
+        self.metric.append(unique_ratio)
+
 
 class PPLMetric(Metric):
     def __init__(self, agent, train_test):
