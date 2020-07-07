@@ -49,7 +49,7 @@ def main(args):
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "pretrained_policy": args.policy_path, "pretrain": args.pretrain,
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl, "pretrained_policy": args.policy_path, "pretrain": args.pretrain,
                       "word_emb_size": args.word_emb_size,
                       "update_every": args.update_every,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
@@ -101,6 +101,7 @@ if __name__ == '__main__':
     parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
     parser.add_argument('-lm_path', type=str, default=None,
                         help="if specified, the language model truncate the action space")
+    parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")

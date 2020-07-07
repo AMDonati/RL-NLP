@@ -31,10 +31,9 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, pretrained_policy=None,
-                 pretrain=False,
-                 update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2, num_filters=3,
-                 num_truncated=10):
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
+                 pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
+                 num_filters=3, num_truncated=10):
 
         torch.autograd.set_detect_anomaly(True)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,6 +46,7 @@ class Agent:
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
+        self.lm_sl = lm_sl
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -67,13 +67,18 @@ class Agent:
         :param top_k: number of words
         :return: top k words
         """
-        seq_len = state_text.size(1)
-        if self.pretrained_lm is None:
-            return None, None
-        log_probas, _ = self.pretrained_lm(state_text)
-        log_probas = log_probas.view(len(state_text), seq_len, -1)
-        log_probas = log_probas[:, -1, :]
-        top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+        if self.lm_sl:
+            seq_len = state_text.size(1)
+            if self.pretrained_lm is None:
+                return None, None
+            log_probas, _ = self.pretrained_lm(state_text)
+            log_probas = log_probas.view(len(state_text), seq_len, -1)
+            log_probas = log_probas[:, -1, :]
+            top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+        else:
+            dist, value = self.pretrained_lm(state_text)
+            probs = dist.probs
+            top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
 
         return top_k_indices, top_k_weights
 
