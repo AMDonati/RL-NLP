@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
 
-from eval.metric import PPLMetric, RewardMetric, LMMetric, DialogMetric, VAMetric
+from eval.metric import RewardMetric, DialogMetric, VAMetric, LMVAMetric
 
 
 class Memory:
@@ -35,7 +35,7 @@ class Agent:
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
                  num_filters=3, num_truncated=10):
 
-        #torch.autograd.set_detect_anomaly(True)
+        # torch.autograd.set_detect_anomaly(True)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                              stride=stride, num_filters=num_filters, rl=True)
@@ -54,11 +54,12 @@ class Agent:
         self.num_truncated = num_truncated
         self.writer = writer
         self.generated_text = []
-        #self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
-        #self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
+        # self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
+        # self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
         self.test_metrics = [RewardMetric(self, train_test="test"),
                              DialogMetric(self, train_test="test")]
-        self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train")]
+        self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train"),
+                              LMVAMetric(self, "train")]
 
     def get_top_k_words(self, state_text, top_k=10):
         """
@@ -118,7 +119,7 @@ class Agent:
                 state, ep_reward = self.env.reset(), 0
                 for t in range(0, self.env.max_len):
                     action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
-                                                                                       num_truncated=self.num_truncated)
+                                                                                                        num_truncated=self.num_truncated)
                     idx_step += 1
                     state, (reward, closest_question), done, _ = self.env.step(action)
                     for metric in self.test_metrics:
@@ -145,8 +146,8 @@ class Agent:
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
-                                                                    forced=forced,
-                                                                    num_truncated=self.num_truncated)
+                                                                                                    forced=forced,
+                                                                                                    num_truncated=self.num_truncated)
                 state, (reward, closest_question), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:
                 self.memory.rewards.append(reward)
@@ -154,8 +155,10 @@ class Agent:
 
                 timestep += 1
                 for metric in self.train_metrics:
-                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions, actions_probs=actions_probs,
-                                ref_question=self.env.ref_questions_decoded, reward=reward, closest_question=closest_question)
+                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
+                                actions_probs=actions_probs,
+                                ref_question=self.env.ref_questions_decoded, reward=reward,
+                                closest_question=closest_question)
 
                 # update if its time
                 if self.update_mode == "step" and timestep % self.update_every == 0:

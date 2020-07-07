@@ -3,7 +3,6 @@ import os
 from collections import namedtuple
 
 import gym
-import numpy as np
 import torch
 
 from RL_toolbox.reward import rewards
@@ -59,21 +58,22 @@ class ClevrEnv(gym.Env):
         # question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
         #                               EOS_idx=self.special_tokens.EOS_idx)
         reward, closest_question = self.reward_func.get(question=question,
-                                                        ep_questions_decoded=self.ref_questions_decoded) if done else (
-            0, None)
+                                                        ep_questions_decoded=self.ref_questions_decoded)
         self.step_idx += 1
         if done:
+            #episodic reward
+            reward = 0
             self.dialog = question
             logging.info(question)
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        #self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
-            #0]) if not self.debug else np.random.randint(0, self.debug)
+        # self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
+        # 0]) if not self.debug else np.random.randint(0, self.debug)
         self.img_idx = 2
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
-        #if self.debug > 0:
+        # if self.debug > 0:
         self.ref_questions = self.ref_questions[0:self.num_questions]
         # if self.debug:
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
