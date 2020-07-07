@@ -24,7 +24,7 @@ def main(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
+    out_folder = "runs_imgidx2_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
                                                                        args.max_len, args.debug,
                                                                        args.num_questions,
                                                                        args.entropy_coeff, args.num_truncated,

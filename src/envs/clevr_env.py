@@ -68,9 +68,9 @@ class ClevrEnv(gym.Env):
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
-            0]) if not self.debug else np.random.randint(0, self.debug)
-        # self.img_idx = 0
+        #self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
+            #0]) if not self.debug else np.random.randint(0, self.debug)
+        self.img_idx = 2
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
         #if self.debug > 0:

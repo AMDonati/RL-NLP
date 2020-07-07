@@ -57,10 +57,13 @@ class VAMetric(Metric):
 
     def fill(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, :-1].numpy()[0])
-        top_words_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["valid_actions"].cpu().numpy()[0])
-        weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                         zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().exp().numpy()[0])]
-        string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
+        if kwargs["valid_actions"] is not None:
+            top_words_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["valid_actions"].cpu().numpy()[0])
+            weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
+                             zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().exp().numpy()[0])]
+            string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
+        else:
+            string = ""
         ref_questions = [w + ' <EOS>' for w in kwargs["ref_question"]]
         target_words = [w.split()[self.idx_word] for w in ref_questions]
         string = string + '--- target words: {}'.format(', '.join(target_words)) + '--- true action: {}'.format(
