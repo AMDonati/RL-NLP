@@ -169,6 +169,7 @@ class Agent:
                 ep_reward += reward
                 if done:
                     for metric in self.train_metrics:
+                        metric.compute()
                         metric.reset()
                     self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
