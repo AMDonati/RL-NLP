@@ -61,10 +61,11 @@ class ClevrEnv(gym.Env):
                                                         ep_questions_decoded=self.ref_questions_decoded)
         self.step_idx += 1
         if done:
-            #episodic reward
-            reward = 0
             self.dialog = question
             logging.info(question)
+        else:
+            #episodic reward
+            reward = 0
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
