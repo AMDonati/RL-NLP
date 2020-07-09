@@ -18,6 +18,10 @@ class Memory:
         self.rewards = []
         self.is_terminals = []
         self.values = []
+        self.arrs = [self.actions, self.states_text, self.states_img, self.logprobs, self.rewards,
+                     self.is_terminals, self.values]
+
+        self.idx_episode = 0
 
     def clear_memory(self):
         del self.actions[:]
@@ -29,16 +33,19 @@ class Memory:
         del self.is_terminals[:]
         del self.values[:]
 
+    def add_step(self, actions, states_text, states_img, logprobs, rewards, is_terminals, values):
+        for arr, val in zip(self.arrs, [actions, states_text, states_img, logprobs, rewards, is_terminals, values]):
+            arr.append(val)
+
 
 class Agent:
     def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
-                 num_filters=3, num_truncated=10):
+                 num_filters=3, num_truncated=10, truncate_mode="masked"):
 
-        # torch.autograd.set_detect_anomaly(True)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters, rl=True)
+                             stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         if pretrained_policy is not None:
             self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
 
@@ -62,14 +69,14 @@ class Agent:
         self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train"),
                               LMVAMetric(self, "train"), VAMetric(self, "train")]
 
-    def get_top_k_words(self, state_text, top_k=10):
+    def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
         Truncate the action space with the top k words of a pretrained language model
         :param state: state
         :param top_k: number of words
         :return: top k words
         """
-        if self.lm_sl:
+        if not self.lm_sl:
             seq_len = state_text.size(1)
             if self.pretrained_lm is None:
                 return None, None
@@ -78,7 +85,7 @@ class Agent:
             log_probas = log_probas[:, -1, :]
             top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
         else:
-            dist, value = self.pretrained_lm(state_text)
+            dist, dist_, value = self.pretrained_lm(state_text, state_img)
             probs = dist.probs
             top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
 
@@ -122,7 +129,7 @@ class Agent:
                     action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                         num_truncated=self.num_truncated)
                     idx_step += 1
-                    state, (reward, closest_question), done, _ = self.env.step(action)
+                    state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                     for metric in self.test_metrics:
                         metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                     ref_question=ref_question, reward=reward, closest_question=closest_question)
@@ -140,7 +147,7 @@ class Agent:
     def learn(self, log_interval=10, num_episodes=100):
 
         running_reward = 0
-        timestep = 0
+        timestep = 1
         for i_episode in range(num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
@@ -149,10 +156,9 @@ class Agent:
                 action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                     forced=forced,
                                                                                                     num_truncated=self.num_truncated)
-                state, (reward, closest_question), done, _ = self.env.step(action)
+                new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                 # Saving reward and is_terminal:
-                self.memory.rewards.append(reward)
-                self.memory.is_terminals.append(done)
+                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
 
                 timestep += 1
                 for metric in self.train_metrics:
@@ -160,6 +166,7 @@ class Agent:
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
                                 closest_question=closest_question)
+                state = new_state
 
                 # update if its time
                 if self.update_mode == "step" and timestep % self.update_every == 0:

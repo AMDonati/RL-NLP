@@ -9,14 +9,15 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
-                 update_every=100,
-                 K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
-                 stride=2, num_filters=3, num_truncated=10):
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None, pretrained_lm=None, lm_sl=True,
+                 pretrained_policy=None,
+                 update_every=100, K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24,
+                 kernel_size=1,
+                 stride=2, num_filters=3, num_truncated=10, truncate_mode="masked"):
         Agent.__init__(self, policy, env, writer, gamma=gamma, lr=lr, grad_clip=grad_clip, pretrained_lm=pretrained_lm, lm_sl=lm_sl,
                        pretrained_policy=pretrained_policy, pretrain=pretrain, update_every=update_every,
                        word_emb_size=word_emb_size, hidden_size=hidden_size, kernel_size=kernel_size, stride=stride,
-                       num_filters=num_filters, num_truncated=num_truncated)
+                       num_filters=num_filters, num_truncated=num_truncated, truncate_mode=truncate_mode)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                                  stride=stride, num_filters=num_filters)
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -30,20 +31,13 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated)
+        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
         policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
-        try:
-            action = policy_dist_truncated.sample() if forced is None else forced
-        except RuntimeError:
-            num_negative_values = torch.sum(policy_dist_truncated.probs < 0).item()
-            logging.error('Negative values:{}'.format(num_negative_values))
-            raise
+        action = policy_dist_truncated.sample() if forced is None else forced
+        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
-        self.memory.actions.append(action)
-        self.memory.states_img.append(state.img[0])
-        self.memory.states_text.append(state.text[0])
-        self.memory.logprobs.append(log_prob)
-        return action.cpu().numpy(), log_prob, value, (valid_actions, actions_probs), policy_dist
+        return action, log_prob, value, (valid_actions, actions_probs), policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
         valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
@@ -78,23 +72,21 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1 # shape (max_len, max_len) instead of max_len
-            surr1 = ratios * advantages # shape (max_len, max_len)
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages # shape (max_len, max_len)
-            surr = -torch.min(surr1, surr2) # shape (max_len, max_len)
+            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
+            surr1 = ratios * advantages
+            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
+            surr = -torch.min(surr1, surr2)
             # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
-            entropy_loss = self.entropy_coeff * dist_entropy # shape (max_len)
+            entropy_loss = self.entropy_coeff * dist_entropy
 
-            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor([0]).float().to(
-                self.device) # shape (max_len, max_len)
-            loss = surr + vf_loss - entropy_loss # shape (max_len, max_len)
-
-
-            # logging.info(
-            #     "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
-            #                                                 surr.mean(),
-            #                                                 vf_loss.mean()))
-            logging.info("UPDATING POLICY PARAMETERS...")
+            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor(
+                [0]).float().to(
+                self.device)
+            loss = surr + vf_loss - entropy_loss
+            logging.info(
+                "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
+                                                            surr.mean(),
+                                                            vf_loss.mean()))
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
