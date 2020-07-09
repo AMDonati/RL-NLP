@@ -24,7 +24,7 @@ def main(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_gradclip{}_trunc_{}".format(args.agent, args.model,
+    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}".format(args.agent, args.model,
                                                                                       pre_trained, truncated,
                                                                                       args.max_len, args.debug,
                                                                                       args.num_questions,
@@ -32,11 +32,10 @@ def main(args):
                                                                                       args.num_truncated,
                                                                                       args.update_every,
                                                                                       args.grad_clip,
+                                                                                        args.lr,
                                                                                         args.truncate_mode)
 
-    if args.agent == 'REINFORCE':
-        out_folder = out_folder + '_lr{}'.format(args.lr)
-    elif args.agent == 'PPO':
+    if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
 
     writer = SummaryWriter(log_dir=os.path.join(output_path,
