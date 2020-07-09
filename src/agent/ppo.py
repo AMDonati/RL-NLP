@@ -31,8 +31,8 @@ class PPO(Agent):
         valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
         policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
         action = policy_dist_truncated.sample() if forced is None else forced
-        if valid_actions is not None:
-            action = torch.gather(valid_actions, 1, action.view(1, 1))
+        #if valid_actions is not None:
+            #action = torch.gather(valid_actions, 1, action.view(1, 1))
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         self.memory.states_img.append(state.img[0])
