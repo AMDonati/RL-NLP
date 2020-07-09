@@ -56,6 +56,7 @@ def main(args):
                       "pretrain": args.pretrain,
                       "word_emb_size": args.word_emb_size,
                       "update_every": args.update_every,
+                      "lr": args.lr,
                       "grad_clip": args.grad_clip,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
@@ -64,7 +65,7 @@ def main(args):
                   "K_epochs": args.K_epochs,
                   "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
-    reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma, "lr": args.lr,
+    reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
     algo_kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
     kwargs = {**algo_kwargs[args.agent], **generic_kwargs}
