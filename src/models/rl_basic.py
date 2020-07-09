@@ -127,7 +127,7 @@ class PolicyLSTMWordBatch(nn.Module):
             logits = torch.gather(logits, -1, valid_actions)
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
-        return policy_dist, policy_dist, value
+        return policy_dist,policy_dist, value
 
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
