@@ -31,7 +31,7 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
                  num_filters=3, num_truncated=10):
 
@@ -44,6 +44,7 @@ class Agent:
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) #TODO: learning rate plays as well.
+        self.gr
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
         self.lm_sl = lm_sl
@@ -128,7 +129,7 @@ class Agent:
                     if done:
                         break
             for metric in self.test_metrics:
-                metric.compute()
+                metric.compute() #TODO: change reward here?
             if i_episode % log_interval == 0:
                 for metric in self.test_metrics:
                     metric.write()

@@ -101,14 +101,17 @@ class PPO(Agent):
             self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
-            self.writer_iteration += 1
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
+            # clip grad norm:
+            if self.grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(parameters=self.policy.parameters(), max_norm=self.grad_clip)
             self.optimizer.step()
             # compute grad norm:
             grad_norm = compute_grad_norm(self.policy)
             self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
+            self.writer_iteration += 1
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
