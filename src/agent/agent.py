@@ -76,7 +76,7 @@ class Agent:
         :param top_k: number of words
         :return: top k words
         """
-        if not self.lm_sl:
+        if self.lm_sl:
             seq_len = state_text.size(1)
             if self.pretrained_lm is None:
                 return None, None
