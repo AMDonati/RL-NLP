@@ -10,15 +10,15 @@ from eval.metric import RewardMetric, DialogMetric, VAMetric, LMVAMetric
 
 class Memory:
     def __init__(self):
-        self.actions = [[]]
-        self.states = [[]]
-        self.states_img = [[]]
-        self.states_text = [[]]
-        self.logprobs = [[]]
-        self.rewards = [[]]
-        self.is_terminals = [[]]
-        self.values = [[]]
-        self.arrs = [self.actions, self.states, self.states_text, self.states_img, self.logprobs, self.rewards,
+        self.actions = []
+        self.states = []
+        self.states_img = []
+        self.states_text = []
+        self.logprobs = []
+        self.rewards = []
+        self.is_terminals = []
+        self.values = []
+        self.arrs = [self.actions, self.states_text, self.states_img, self.logprobs, self.rewards,
                      self.is_terminals, self.values]
 
         self.idx_episode = 0
@@ -35,10 +35,10 @@ class Memory:
 
     def add_step(self, actions, states_text, states_img, logprobs, rewards, is_terminals, values):
         for arr, val in zip(self.arrs, [actions, states_text, states_img, logprobs, rewards, is_terminals, values]):
-            arr[-1].append(val)
-        if is_terminals:
-            for arr in self.arrs:
-                arr.append([])
+            arr.append(val)
+        # if is_terminals:
+        # for arr in self.arrs:
+        # arr.append([])
 
 
 class Agent:
@@ -150,7 +150,7 @@ class Agent:
     def learn(self, log_interval=10, num_episodes=100):
 
         running_reward = 0
-        timestep = 0
+        timestep = 1
         for i_episode in range(num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
@@ -162,7 +162,7 @@ class Agent:
                                                                                                     num_truncated=self.num_truncated)
                 state, (reward, closest_question), done, _ = self.env.step(action)
                 # Saving reward and is_terminal:
-                self.memory.add_step(action, state.text[0], state.img[0], logprobs, reward, done, value)
+                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
 
                 timestep += 1
                 for metric in self.train_metrics:
