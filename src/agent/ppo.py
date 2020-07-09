@@ -76,16 +76,16 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach() if not self.pretrain else 1
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
-            surr = -torch.min(surr1, surr2)
+            advantages = rewards - state_values.detach() if not self.pretrain else 1 # shape (max_len, max_len) instead of max_len #TODO: why detaching values ?
+            surr1 = ratios * advantages # shape (max_len, max_len)
+            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages # shape (max_len, max_len)
+            surr = -torch.min(surr1, surr2) # shape (max_len, max_len)
             # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
-            entropy_loss = self.entropy_coeff * dist_entropy
+            entropy_loss = self.entropy_coeff * dist_entropy # shape (max_len)
 
             vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else torch.tensor([0]).float().to(
-                self.device)
-            loss = surr + vf_loss - entropy_loss
+                self.device) # shape (max_len, max_len)
+            loss = surr + vf_loss - entropy_loss # shape (max_len, max_len)
             logging.info(
                 "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
                                                             surr.mean(),
