@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -55,6 +57,7 @@ class REINFORCE(Agent):
         self.writer.add_scalar('reinforce_loss', reinforce_loss.mean(), self.writer_iteration + 1)
         self.writer.add_scalar('vf_loss', vf_loss.mean(), self.writer_iteration + 1)
         self.writer.add_scalar('loss', loss_per_episode.mean(), self.writer_iteration + 1)
+        logging.info("values {}".format(values.mean()))
         # loss=torch.cat(losses)
         self.writer_iteration += 1
 
