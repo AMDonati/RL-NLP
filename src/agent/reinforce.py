@@ -28,7 +28,7 @@ class REINFORCE(Agent):
         action = m.sample() if forced is None else forced
         log_prob = m.log_prob(action.to(self.device)).view(-1)
 
-        return action.cpu().numpy(), log_prob, value, (valid_actions, actions_probs), m
+        return action, log_prob, value, (valid_actions, actions_probs), m
 
     def update(self):
         # getting the lengths for the loss split

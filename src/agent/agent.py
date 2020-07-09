@@ -36,9 +36,7 @@ class Memory:
     def add_step(self, actions, states_text, states_img, logprobs, rewards, is_terminals, values):
         for arr, val in zip(self.arrs, [actions, states_text, states_img, logprobs, rewards, is_terminals, values]):
             arr.append(val)
-        # if is_terminals:
-        # for arr in self.arrs:
-        # arr.append([])
+
 
 
 class Agent:
@@ -159,7 +157,7 @@ class Agent:
                 action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                     forced=forced,
                                                                                                     num_truncated=self.num_truncated)
-                state, (reward, closest_question), done, _ = self.env.step(action)
+                state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
 
