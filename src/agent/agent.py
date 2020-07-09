@@ -38,7 +38,6 @@ class Memory:
             arr.append(val)
 
 
-
 class Agent:
     def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
@@ -69,7 +68,7 @@ class Agent:
         self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train"),
                               LMVAMetric(self, "train"), VAMetric(self, "train")]
 
-    def get_top_k_words(self, state_text, top_k=10,state_img=None):
+    def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
         Truncate the action space with the top k words of a pretrained language model
         :param state: state
@@ -85,7 +84,7 @@ class Agent:
             log_probas = log_probas[:, -1, :]
             top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
         else:
-            dist, dist_,value = self.pretrained_lm(state_text, state_img)
+            dist, dist_, value = self.pretrained_lm(state_text, state_img)
             probs = dist.probs
             top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
 
@@ -129,7 +128,7 @@ class Agent:
                     action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                         num_truncated=self.num_truncated)
                     idx_step += 1
-                    state, (reward, closest_question), done, _ = self.env.step(action)
+                    state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                     for metric in self.test_metrics:
                         metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                     ref_question=ref_question, reward=reward, closest_question=closest_question)
@@ -151,13 +150,12 @@ class Agent:
         for i_episode in range(num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
-            rewards, is_terminals, states_img, states_text, logprobs, values, actions = [], [], [], [], [], [], []
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                     forced=forced,
                                                                                                     num_truncated=self.num_truncated)
-                state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
+                new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
 
@@ -167,6 +165,7 @@ class Agent:
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
                                 closest_question=closest_question)
+                state = new_state
 
                 # update if its time
                 if self.update_mode == "step" and timestep % self.update_every == 0:
