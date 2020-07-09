@@ -31,8 +31,8 @@ def main(args):
                                                                                       args.entropy_coeff,
                                                                                       args.num_truncated,
                                                                                       args.update_every,
-                                                                                      args.grad_clip,
                                                                                         args.lr,
+                                                                                      args.grad_clip,
                                                                                         args.truncate_mode)
 
     if args.agent == 'PPO':
