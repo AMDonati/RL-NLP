@@ -1,5 +1,3 @@
-import logging
-
 import h5py
 import numpy as np
 import torch
@@ -126,7 +124,7 @@ class PolicyLSTMWordBatch(nn.Module):
             logits = torch.gather(logits, -1, valid_actions)
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
-        return policy_dist, value
+        return policy_dist, policy_dist, value
 
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
@@ -166,18 +164,22 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            mask = torch.zeros(1, self.num_tokens)
-            mask[0, valid_actions] = 1
-            probs_truncated = masked_softmax(logits, mask)
-            policy_dist_truncated = Categorical(probs_truncated)
-            is_nan = torch.sum(torch.isnan(policy_dist_truncated.probs))
-            is_inf = torch.sum(torch.isinf(policy_dist_truncated.probs))
-
-            if is_inf.item() > 0 or is_nan.item() > 0:
-                logging.error("ERRORR: probs {}".format(policy_dist_truncated.probs))
+            policy_dist_truncated = self.gather_truncature(valid_actions, logits)
         else:
             policy_dist_truncated = policy_dist
         return policy_dist, policy_dist_truncated, value
+
+    def gather_truncature(self, valid_actions, logits):
+        logits = torch.gather(logits.clone().detach(), -1, valid_actions)
+        probs = F.softmax(logits, dim=-1)
+        return Categorical(probs)
+
+    def mask_truncature(self, valid_actions, logits):
+        mask = torch.zeros(1, self.num_tokens)
+        mask[0, valid_actions] = 1
+        probs_truncated = masked_softmax(logits.clone().detach(), mask)
+        policy_dist_truncated = Categorical(probs_truncated)
+        return policy_dist_truncated
 
 
 class PolicyLSTMWordBatch_SL(nn.Module):

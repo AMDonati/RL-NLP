@@ -61,14 +61,14 @@ class Agent:
         self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train"),
                               LMVAMetric(self, "train"), VAMetric(self, "train")]
 
-    def get_top_k_words(self, state_text, top_k=10):
+    def get_top_k_words(self, state_text, top_k=10,state_img=None):
         """
         Truncate the action space with the top k words of a pretrained language model
         :param state: state
         :param top_k: number of words
         :return: top k words
         """
-        if self.lm_sl:
+        if not self.lm_sl:
             seq_len = state_text.size(1)
             if self.pretrained_lm is None:
                 return None, None
@@ -77,7 +77,7 @@ class Agent:
             log_probas = log_probas[:, -1, :]
             top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
         else:
-            dist, value = self.pretrained_lm(state_text)
+            dist, dist_,value = self.pretrained_lm(state_text, state_img)
             probs = dist.probs
             top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
 

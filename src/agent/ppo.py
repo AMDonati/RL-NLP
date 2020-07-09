@@ -28,14 +28,11 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated)
+        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
         policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
-        try:
-            action = policy_dist_truncated.sample() if forced is None else forced
-        except RuntimeError:
-            num_negative_values = torch.sum(policy_dist_truncated.probs < 0).item()
-            logging.error('Negative values:{}'.format(num_negative_values))
-            raise
+        action = policy_dist_truncated.sample() if forced is None else forced
+        if valid_actions is not None:
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         self.memory.states_img.append(state.img[0])
@@ -83,7 +80,7 @@ class PPO(Agent):
             # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy
 
-            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else torch.tensor([0]).float().to(
+            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor([0]).float().to(
                 self.device)
             loss = surr + vf_loss - entropy_loss
             logging.info(
