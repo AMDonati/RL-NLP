@@ -43,7 +43,7 @@ class Agent:
             self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
 
         self.policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) #TODO: learning rate plays as well.
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
         self.lm_sl = lm_sl
@@ -181,7 +181,8 @@ class Agent:
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
-                self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
+                logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
+                #self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for metric in self.train_metrics:
                     metric.write()

@@ -3,6 +3,7 @@ import logging
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
+from RL_toolbox.RL_functions import compute_grad_norm
 
 from agent.agent import Agent
 
@@ -76,20 +77,23 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach() if not self.pretrain else 1 # shape (max_len, max_len) instead of max_len #TODO: why detaching values ?
+            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1 # shape (max_len, max_len) instead of max_len #TODO: why detaching values ?
             surr1 = ratios * advantages # shape (max_len, max_len)
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages # shape (max_len, max_len)
             surr = -torch.min(surr1, surr2) # shape (max_len, max_len)
             # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy # shape (max_len)
 
-            vf_loss = 0.5 * self.MSE_loss(state_values, rewards) if not self.pretrain else torch.tensor([0]).float().to(
+            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor([0]).float().to(
                 self.device) # shape (max_len, max_len)
             loss = surr + vf_loss - entropy_loss # shape (max_len, max_len)
-            logging.info(
-                "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
-                                                            surr.mean(),
-                                                            vf_loss.mean()))
+
+
+            # logging.info(
+            #     "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
+            #                                                 surr.mean(),
+            #                                                 vf_loss.mean()))
+            logging.info("UPDATING POLICY PARAMETERS...")
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
@@ -102,6 +106,9 @@ class PPO(Agent):
             self.optimizer.zero_grad()
             loss.mean().backward()
             self.optimizer.step()
+            # compute grad norm:
+            grad_norm = compute_grad_norm(self.policy)
+            self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())

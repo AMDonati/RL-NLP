@@ -80,7 +80,7 @@ class ClevrEnv(gym.Env):
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, clean=True)
                                       for question in self.ref_questions.numpy()]
-        logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
+        #logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
         # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
