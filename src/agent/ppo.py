@@ -8,16 +8,17 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
-                 update_every=100,
-                 K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
-                 stride=2, num_filters=3, num_truncated=10):
+    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, pretrained_lm=None, lm_sl=True,
+                 pretrained_policy=None,
+                 update_every=100, K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24,
+                 kernel_size=1,
+                 stride=2, num_filters=3, num_truncated=10, truncate_mode="masked"):
         Agent.__init__(self, policy, env, writer, gamma=gamma, pretrained_lm=pretrained_lm, lm_sl=lm_sl,
                        pretrained_policy=pretrained_policy, pretrain=pretrain, update_every=update_every,
                        word_emb_size=word_emb_size, hidden_size=hidden_size, kernel_size=kernel_size, stride=stride,
-                       num_filters=num_filters, num_truncated=num_truncated)
+                       num_filters=num_filters, num_truncated=num_truncated, truncate_mode=truncate_mode)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                                 stride=stride, num_filters=num_filters)
+                                 stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -80,7 +81,8 @@ class PPO(Agent):
             # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy
 
-            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor([0]).float().to(
+            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor(
+                [0]).float().to(
                 self.device)
             loss = surr + vf_loss - entropy_loss
             logging.info(

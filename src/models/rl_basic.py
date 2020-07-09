@@ -102,8 +102,8 @@ class PolicyGRUWord(nn.Module):
 
 class PolicyLSTMWordBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, kernel_size=1, stride=5, num_filters=3,
-                 rl=True):
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1,
+                 rl=True, truncate_mode="masked"):
         super(PolicyLSTMWordBatch, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
@@ -115,6 +115,9 @@ class PolicyLSTMWordBatch(nn.Module):
         self.action_head = nn.Linear(self.hidden_size,
                                      num_tokens)
         self.value_head = nn.Linear(self.hidden_size, 1)
+
+        truncature = {"masked": self.mask_truncature, "gather": self.gather_truncature}
+        self.truncate = truncature[truncate_mode]
 
     def forward(self, state_text, state_img, valid_actions=None):
         embedding = self._get_embed_text(state_text)
@@ -134,13 +137,25 @@ class PolicyLSTMWordBatch(nn.Module):
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         return ht[-1]
 
+    def gather_truncature(self, valid_actions, logits):
+        logits = torch.gather(logits.clone().detach(), -1, valid_actions)
+        probs = F.softmax(logits, dim=-1)
+        return Categorical(probs)
+
+    def mask_truncature(self, valid_actions, logits):
+        mask = torch.zeros(1, self.num_tokens)
+        mask[0, valid_actions] = 1
+        probs_truncated = masked_softmax(logits.clone().detach(), mask)
+        policy_dist_truncated = Categorical(probs_truncated)
+        return policy_dist_truncated
+
 
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True):
-        # super(PolicyLSTMBatch, self).__init__()
-        PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
+                 kernel_size=1, stride=5, rl=True, truncate_mode="masked"):
+        PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
+                                     truncate_mode=truncate_mode)
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
@@ -164,22 +179,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.gather_truncature(valid_actions, logits)
+            policy_dist_truncated = self.truncate(valid_actions, logits)
         else:
             policy_dist_truncated = policy_dist
         return policy_dist, policy_dist_truncated, value
-
-    def gather_truncature(self, valid_actions, logits):
-        logits = torch.gather(logits.clone().detach(), -1, valid_actions)
-        probs = F.softmax(logits, dim=-1)
-        return Categorical(probs)
-
-    def mask_truncature(self, valid_actions, logits):
-        mask = torch.zeros(1, self.num_tokens)
-        mask[0, valid_actions] = 1
-        probs_truncated = masked_softmax(logits.clone().detach(), mask)
-        policy_dist_truncated = Categorical(probs_truncated)
-        return policy_dist_truncated
 
 
 class PolicyLSTMWordBatch_SL(nn.Module):

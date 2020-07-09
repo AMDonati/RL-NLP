@@ -24,11 +24,14 @@ def main(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_imgidx2_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
-                                                                       args.max_len, args.debug,
-                                                                       args.num_questions,
-                                                                       args.entropy_coeff, args.num_truncated,
-                                                                       args.update_every)
+    out_folder = "runs_imgidx2_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_trunc_{}".format(args.agent, args.model,
+                                                                                            pre_trained, truncated,
+                                                                                            args.max_len, args.debug,
+                                                                                            args.num_questions,
+                                                                                            args.entropy_coeff,
+                                                                                            args.num_truncated,
+                                                                                            args.update_every,
+                                                                                            args.truncate_mode)
     if args.agent == 'REINFORCE':
         out_folder = out_folder + '_lr{}'.format(args.lr)
     elif args.agent == 'PPO':
@@ -49,11 +52,13 @@ def main(args):
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl, "pretrained_policy": args.policy_path, "pretrain": args.pretrain,
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl, "pretrained_policy": args.policy_path,
+                      "pretrain": args.pretrain,
                       "word_emb_size": args.word_emb_size,
                       "update_every": args.update_every,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
-                      "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
+                      "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer,
+                      "truncate_mode": args.truncate_mode}
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -95,6 +100,7 @@ if __name__ == '__main__':
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
+    parser.add_argument('-truncate_mode', type=str, default="masked", help="truncation mode")
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")

@@ -33,12 +33,11 @@ class Memory:
 class Agent:
     def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
-                 num_filters=3, num_truncated=10):
+                 num_filters=3, num_truncated=10, truncate_mode="masked"):
 
-        # torch.autograd.set_detect_anomaly(True)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters, rl=True)
+                             stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         if pretrained_policy is not None:
             self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
 
