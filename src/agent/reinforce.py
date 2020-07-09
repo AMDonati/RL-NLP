@@ -5,16 +5,17 @@ from agent.agent import Agent
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
                  num_filters=3, num_truncated=10):
 
-        Agent.__init__(self, policy, env, writer=writer, gamma=gamma, lr=lr, pretrained_lm=pretrained_lm,
+        Agent.__init__(self, policy, env, writer=writer, gamma=gamma, lr=lr, grad_clip=grad_clip, pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrained_policy=pretrained_policy, pretrain=pretrain, update_every=update_every,
                        word_emb_size=word_emb_size, hidden_size=hidden_size, kernel_size=kernel_size, stride=stride,
                        num_filters=num_filters, num_truncated=num_truncated)
         self.update_every = update_every
+        self.grad_clip = grad_clip
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.update_mode = "episode"
         self.writer_iteration = 0
@@ -56,4 +57,7 @@ class REINFORCE(Agent):
         # take gradient step
         self.optimizer.zero_grad()
         loss.sum().backward()
+        # clip grad norm:
+        if self.grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(parameters=self.policy.parameters(), max_norm=self.grad_clip)
         self.optimizer.step()

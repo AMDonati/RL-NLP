@@ -9,11 +9,11 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
+    def __init__(self, policy, env, writer, gamma=1., eps_clip=0.2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
                  update_every=100,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24, kernel_size=1,
                  stride=2, num_filters=3, num_truncated=10):
-        Agent.__init__(self, policy, env, writer, gamma=gamma, pretrained_lm=pretrained_lm, lm_sl=lm_sl,
+        Agent.__init__(self, policy, env, writer, gamma=gamma, grad_clip=grad_clip, pretrained_lm=pretrained_lm, lm_sl=lm_sl,
                        pretrained_policy=pretrained_policy, pretrain=pretrain, update_every=update_every,
                        word_emb_size=word_emb_size, hidden_size=hidden_size, kernel_size=kernel_size, stride=stride,
                        num_filters=num_filters, num_truncated=num_truncated)
@@ -24,6 +24,7 @@ class PPO(Agent):
         self.K_epochs = K_epochs
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.eps_clip = eps_clip
+        self.grad_clip = grad_clip
         self.entropy_coeff = entropy_coeff
         self.update_mode = "episode"
         self.writer_iteration = 0
@@ -77,7 +78,7 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1 # shape (max_len, max_len) instead of max_len #TODO: why detaching values ?
+            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1 # shape (max_len, max_len) instead of max_len
             surr1 = ratios * advantages # shape (max_len, max_len)
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages # shape (max_len, max_len)
             surr = -torch.min(surr1, surr2) # shape (max_len, max_len)

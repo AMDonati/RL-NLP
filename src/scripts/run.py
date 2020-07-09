@@ -24,11 +24,14 @@ def main(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_imgidx2_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}".format(args.agent, args.model, pre_trained, truncated,
-                                                                       args.max_len, args.debug,
-                                                                       args.num_questions,
-                                                                       args.entropy_coeff, args.num_truncated,
-                                                                       args.update_every)
+    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_gradclip{}".format(args.agent, args.model,
+                                                                                      pre_trained, truncated,
+                                                                                      args.max_len, args.debug,
+                                                                                      args.num_questions,
+                                                                                      args.entropy_coeff,
+                                                                                      args.num_truncated,
+                                                                                      args.update_every,
+                                                                                      args.grad_clip)
     if args.agent == 'REINFORCE':
         out_folder = out_folder + '_lr{}'.format(args.lr)
     elif args.agent == 'PPO':
@@ -49,9 +52,11 @@ def main(args):
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl, "pretrained_policy": args.policy_path, "pretrain": args.pretrain,
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl, "pretrained_policy": args.policy_path,
+                      "pretrain": args.pretrain,
                       "word_emb_size": args.word_emb_size,
                       "update_every": args.update_every,
+                      "grad_clip": args.grad_clip,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer}
 
@@ -99,6 +104,7 @@ if __name__ == '__main__':
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
+    parser.add_argument('-grad_clip', type=float, help="value of gradient norm clipping")
     parser.add_argument('-lm_path', type=str, default=None,
                         help="if specified, the language model truncate the action space")
     parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
