@@ -31,8 +31,8 @@ class PPO(Agent):
         valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
         policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
         action = policy_dist_truncated.sample() if forced is None else forced
-        #if valid_actions is not None:
-            #action = torch.gather(valid_actions, 1, action.view(1, 1))
+        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         self.memory.actions.append(action)
         self.memory.states_img.append(state.img[0])
@@ -73,7 +73,7 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach() if not self.pretrain else 1
+            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)

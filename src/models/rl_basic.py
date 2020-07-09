@@ -164,7 +164,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.mask_truncature(valid_actions, logits)
+            policy_dist_truncated = self.gather_truncature(valid_actions, logits)
         else:
             policy_dist_truncated = policy_dist
         return policy_dist, policy_dist_truncated, value
