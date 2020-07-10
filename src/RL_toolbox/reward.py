@@ -40,7 +40,7 @@ class Levenshtein(Reward):
         Reward.__init__(self, path)
         self.correct_vocab = correct_vocab
 
-    def get(self, question, ep_questions_decoded):
+    def get(self, question, ep_questions_decoded, step_idx, done=False):
         if question is None:
             return 0., "N/A"
         else:
@@ -120,12 +120,12 @@ class Levenshtein_(Reward):
     def __init__(self, path=None):
         Reward.__init__(self, path)
 
-    def get(self, question, ep_questions_decoded):
+    def get(self, question, ep_questions_decoded, step_idx, done=False):
         if question is None:
             return 0., "N/A"
         distances = np.array([nltk.edit_distance(question.split()[1:], true_question.split()) for true_question in
                               ep_questions_decoded])
-        self.last_reward = -min(distances)
+        self.last_reward = -min(distances) if done else 0
         return self.last_reward, ep_questions_decoded[distances.argmin()]
 
     def get_diff(self, question, ep_questions_decoded):
@@ -140,10 +140,11 @@ class Differential(Reward):
         self.reward_function = reward_function
         self.last_reward = None
 
-    def get(self, question, ep_questions_decoded):
-        if self.last_reward == None:
-            self.last_reward, _ = self.reward_function.get("", ep_questions_decoded)
-        reward, closest_question = self.reward_function.get(question, ep_questions_decoded)
+    def get(self, question, ep_questions_decoded, step_idx, done=False):
+        if step_idx == 0:
+            self.last_reward, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True)
+        reward, closest_question = self.reward_function.get(question, ep_questions_decoded, step_idx=step_idx,
+                                                            done=True)
         diff_reward = reward - self.last_reward
         self.last_reward = reward
         return diff_reward, closest_question

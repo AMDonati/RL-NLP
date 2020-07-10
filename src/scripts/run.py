@@ -123,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
-    parser.add_argument('-diff_reward', type=int, default=1, help="is reward differential")
+    parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
 
     args = parser.parse_args()
     main(args)

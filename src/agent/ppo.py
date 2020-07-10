@@ -56,6 +56,7 @@ class PPO(Agent):
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
         rewards = torch.tensor(rewards).to(self.device).float()
+        #rewards=torch.tensor(self.memory.rewards).to(self.device).float()
 
         old_states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
         old_states_img = torch.stack(self.memory.states_img)
