@@ -46,6 +46,7 @@ class GRUModel(nn.Module):
 class LSTMModel(nn.Module):
     def __init__(self, num_tokens, emb_size, hidden_size, num_layers=1, p_drop=0, bidirectional=False):
         super(LSTMModel, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
         self.emb_size = emb_size
         self.hidden_size = hidden_size
@@ -67,7 +68,7 @@ class LSTMModel(nn.Module):
         self.fc = nn.Linear(in_features=in_features, out_features=num_tokens)
 
     def forward(self, input):
-        emb = self.embedding(input)  # (B, seq_len, emb_size)
+        emb = self.embedding(input.to(self.device))  # (B, seq_len, emb_size)
         emb = self.dropout(emb)
         output, hidden = self.lstm(
             emb)  # output (B, seq_len, hidden_size*num_dimension) # hidden: (num_layers * num_directions, B, hidden_size)
