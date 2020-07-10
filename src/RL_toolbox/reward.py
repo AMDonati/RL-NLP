@@ -137,13 +137,16 @@ class Levenshtein_(Reward):
 class Differential(Reward):
     def __init__(self, reward_function, path=None):
         Reward.__init__(self, path)
-        self.last_reward = None
         self.reward_function = reward_function
+        self.last_reward = None
 
     def get(self, question, ep_questions_decoded):
-        prev_reward = self.last_reward
+        if self.last_reward == None:
+            self.last_reward, _ = self.reward_function.get("", ep_questions_decoded)
         reward, closest_question = self.reward_function.get(question, ep_questions_decoded)
-        return reward - prev_reward, closest_question
+        diff_reward = reward - self.last_reward
+        self.last_reward = reward
+        return diff_reward, closest_question
 
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "per_word": PerWord,
