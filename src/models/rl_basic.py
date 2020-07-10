@@ -103,7 +103,7 @@ class PolicyGRUWord(nn.Module):
 class PolicyLSTMWordBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1,
-                 rl=True, truncate_mode="masked"):
+                 rl=True, truncate_mode="masked", **kwargs):
         super(PolicyLSTMWordBatch, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens

@@ -3,16 +3,18 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
+
 from agent.agent import Agent
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True,
+                 pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
                  num_filters=3, num_truncated=10, truncate_mode="masked"):
 
-        Agent.__init__(self, policy, env, writer=writer, gamma=gamma, lr=lr, grad_clip=grad_clip, pretrained_lm=pretrained_lm,
+        Agent.__init__(self, policy, env, writer=writer, gamma=gamma, lr=lr, grad_clip=grad_clip,
+                       pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrained_policy=pretrained_policy, pretrain=pretrain, update_every=update_every,
                        word_emb_size=word_emb_size, hidden_size=hidden_size, kernel_size=kernel_size, stride=stride,
@@ -25,11 +27,12 @@ class REINFORCE(Agent):
 
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated)
-        m, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        action = m.sample() if forced is None else forced
-        log_prob = m.log_prob(action.to(self.device)).view(-1)
-
-        return action, log_prob, value, (valid_actions, actions_probs), m
+        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
+        action = policy_dist_truncated.sample() if forced is None else forced
+        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
+        log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
+        return action, log_prob, value, (valid_actions, actions_probs), policy_dist
 
     def update(self):
         # getting the lengths for the loss split
@@ -53,7 +56,6 @@ class REINFORCE(Agent):
         vf_loss = self.MSE_loss(values.squeeze(), rewards.squeeze())
         loss = reinforce_loss + vf_loss
         loss_per_step = torch.split(loss, tuple(lengths.flatten()))
-
 
         loss_per_episode = torch.stack([torch.sum(l) for l in loss_per_step])
         self.writer.add_scalar('reinforce_loss', reinforce_loss.mean(), self.writer_iteration + 1)
