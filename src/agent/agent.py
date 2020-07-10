@@ -80,7 +80,7 @@ class Agent:
             seq_len = state_text.size(1)
             if self.pretrained_lm is None:
                 return None, None
-            log_probas, _ = self.pretrained_lm(state_text)
+            log_probas, _ = self.pretrained_lm(state_text.to(self.device))
             log_probas = log_probas.view(len(state_text), seq_len, -1)
             log_probas = log_probas[:, -1, :]
             top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
