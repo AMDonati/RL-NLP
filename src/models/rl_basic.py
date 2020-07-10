@@ -144,7 +144,7 @@ class PolicyLSTMWordBatch(nn.Module):
         return Categorical(probs)
 
     def mask_truncature(self, valid_actions, logits):
-        mask = torch.ones(logits.size(0), self.num_tokens)
+        mask = torch.ones(logits.size(0), self.num_tokens).to(self.device)
         mask[0, valid_actions] = 1
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
         policy_dist_truncated = Categorical(probs_truncated)
