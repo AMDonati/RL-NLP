@@ -6,7 +6,8 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-#TODO: add the intermediate reward (diff of R(t+1)-R(t))
+
+# TODO: add the intermediate reward (diff of R(t+1)-R(t))
 
 
 class Reward:
@@ -38,6 +39,7 @@ class Levenshtein(Reward):
     def __init__(self, correct_vocab=False, path=None):
         Reward.__init__(self, path)
         self.correct_vocab = correct_vocab
+
     def get(self, question, ep_questions_decoded):
         if question is None:
             return 0., "N/A"
@@ -63,12 +65,13 @@ class Levenshtein(Reward):
         intersect = list(set(vocab_ref_question).intersection(vocab_question))
         return len(intersect) / len(vocab_ref_question)
 
+
 class CorrectVocab(Reward):
     def __init__(self, path):
         Reward.__init__(self, path=None)
 
     def get(self, question, ep_questions_decoded):
-        if question is None or len(question.split())==0:
+        if question is None or len(question.split()) == 0:
             return 0.
         else:
             vocab_ref_questions, len_questions = self.get_vocab(ep_questions_decoded)
@@ -84,6 +87,7 @@ class CorrectVocab(Reward):
         vocab = list(set(vocab))
         return vocab, len_questions
 
+
 class CombinedReward(Reward):
     def __init__(self, reward_func_1, reward_func_2, alpha, path):
         self.reward_func_1 = rewards[reward_func_1]()
@@ -92,7 +96,7 @@ class CombinedReward(Reward):
         Reward.__init__(self, path)
 
     def get(self, question, ep_questions_decoded):
-        rew = (1-self.alpha) * self.reward_func_1.get(question=question, ep_questions_decoded=ep_questions_decoded)[0]\
+        rew = (1 - self.alpha) * self.reward_func_1.get(question=question, ep_questions_decoded=ep_questions_decoded)[0] \
               + self.alpha * self.reward_func_2.get(question=question, ep_questions_decoded=ep_questions_decoded)
         return rew
 
@@ -130,7 +134,20 @@ class Levenshtein_(Reward):
         return reward - prev_reward
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "per_word": PerWord, "correct_vocab": CorrectVocab, "combined": CombinedReward}
+class Differential(Reward):
+    def __init__(self, reward_function, path=None):
+        Reward.__init__(self, path)
+        self.last_reward = None
+        self.reward_function = reward_function
+
+    def get(self, question, ep_questions_decoded):
+        prev_reward = self.last_reward
+        reward, closest_question = self.reward_function.get(question, ep_questions_decoded)
+        return reward - prev_reward, closest_question
+
+
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "per_word": PerWord,
+           "correct_vocab": CorrectVocab, "combined": CombinedReward}
 
 
 def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
@@ -178,7 +195,6 @@ if __name__ == '__main__':
     print('question', str_1)
     print('true question', str_2)
 
-
     rew_norm_pos, sim_q = reward_func.get(str_1, [str_2])
     rew, _ = reward_func_.get(str_1, [str_2])
     print('rew norm positive', rew_norm_pos)
@@ -215,7 +231,7 @@ if __name__ == '__main__':
     str_2 = "is it blue ?"
     print(str_1)
     print(str_2)
-    #rew = reward_func.get(str_1, [str_2])
+    # rew = reward_func.get(str_1, [str_2])
     print('reward', rew)
 
     str_1 = "blue it is ?"
@@ -260,12 +276,10 @@ if __name__ == '__main__':
     print('reward w/o vocab', reward_func.get(str, ref_questions))
     print('rew with vocab', reward_func_vocab.get(str, ref_questions))
     # --------------- Combined Reward ----------------------------------------------------------------------------------------------
-    #print("combined reward...")
+    # print("combined reward...")
 
-    #reward_func = rewards["combined"](reward_func_1="levenshtein",
-                                      #reward_func_2="correct_vocab", alpha=0.1, path=None)
+    # reward_func = rewards["combined"](reward_func_1="levenshtein",
+    # reward_func_2="correct_vocab", alpha=0.1, path=None)
 
-
-
-#TODO: code a reward for taking in account the good words.
-#TODO: editing distance that rewards correctly the length of question.
+# TODO: code a reward for taking in account the good words.
+# TODO: editing distance that rewards correctly the length of question.

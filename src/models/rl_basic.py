@@ -116,7 +116,8 @@ class PolicyLSTMWordBatch(nn.Module):
                                      num_tokens)
         self.value_head = nn.Linear(self.hidden_size, 1)
 
-        truncature = {"masked": self.mask_truncature, "gather": self.gather_truncature}
+        truncature = {"masked": self.mask_truncature, "gather": self.gather_truncature,
+                      "masked_inf": self.mask_inf_truncature}
         self.truncate = truncature[truncate_mode]
 
     def forward(self, state_text, state_img, valid_actions=None):
@@ -127,7 +128,7 @@ class PolicyLSTMWordBatch(nn.Module):
             logits = torch.gather(logits, -1, valid_actions)
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
-        return policy_dist,policy_dist, value
+        return policy_dist, policy_dist, value
 
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
@@ -143,9 +144,16 @@ class PolicyLSTMWordBatch(nn.Module):
         return Categorical(probs)
 
     def mask_truncature(self, valid_actions, logits):
-        mask = torch.zeros(1, self.num_tokens)
+        mask = torch.ones(logits.size(0), self.num_tokens)
         mask[0, valid_actions] = 1
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
+        policy_dist_truncated = Categorical(probs_truncated)
+        return policy_dist_truncated
+
+    def mask_inf_truncature(self, valid_actions, logits):
+        mask = torch.ones(logits.size(0), self.num_tokens) * -float("Inf")
+        mask[:, valid_actions] = logits[:, valid_actions]
+        probs_truncated = F.softmax(mask, dim=-1)
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 

@@ -42,7 +42,7 @@ def main(args):
                                                 out_folder))
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
-                   num_questions=args.num_questions)
+                   num_questions=args.num_questions, diff_reward=args.diff_reward)
 
     pretrained_lm = None
     if args.lm_path is not None:
