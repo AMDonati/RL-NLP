@@ -133,7 +133,7 @@ class PolicyLSTMWordBatch(nn.Module):
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = (text != 0).sum(dim=1)
-        pad_embed = self.word_embedding(text)
+        pad_embed = self.word_embedding(text.to(self.device))
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         return ht[-1]
