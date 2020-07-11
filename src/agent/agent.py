@@ -54,7 +54,7 @@ class Agent:
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.pretrained_lm = pretrained_lm
-        if self.pretrained_lm != None:
+        if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.lm_sl = lm_sl
         self.env = env
