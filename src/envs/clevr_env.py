@@ -23,7 +23,7 @@ class ClevrEnv(gym.Env):
         h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(self.mode))
         vocab_path = os.path.join(data_path, 'vocab.json')
         # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
-        self.debug = debug
+        self.debug = debug.split(",")
         self.num_questions = num_questions
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
@@ -72,8 +72,7 @@ class ClevrEnv(gym.Env):
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        self.img_idx = np.random.randint(0, self.clevr_dataset.all_feats.shape[
-            0]) if not self.debug else np.random.randint(0, self.debug)
+        self.img_idx = np.random.randint(int(self.debug[0]), int(self.debug[1]))
         # self.img_idx = 2
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)

@@ -115,8 +115,8 @@ if __name__ == '__main__':
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
-    parser.add_argument('-debug', type=int, default=1,
-                        help="debug mode: train on just one question from the first image")
+    parser.add_argument('-debug', type=str, default="0,69000",
+                        help="debug mode: train on the first debug images")
     parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
