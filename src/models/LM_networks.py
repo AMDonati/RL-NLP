@@ -67,7 +67,7 @@ class LSTMModel(nn.Module):
         self.fc = nn.Linear(in_features=in_features, out_features=num_tokens)
 
     def forward(self, input):
-        emb = self.embedding(input)  # (B, seq_len, emb_size)
+        emb = self.embedding(input.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")))  # (B, seq_len, emb_size)
         emb = self.dropout(emb)
         output, hidden = self.lstm(
             emb)  # output (B, seq_len, hidden_size*num_dimension) # hidden: (num_layers * num_directions, B, hidden_size)
