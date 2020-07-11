@@ -53,7 +53,7 @@ class Agent:
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) #TODO: learning rate plays as well.
         self.grad_clip = grad_clip
         self.gamma = gamma
-        self.pretrained_lm = pretrained_lm
+        self.pretrained_lm = pretrained_lm.to(self.device)
         self.lm_sl = lm_sl
         self.env = env
         self.pretrain = pretrain
