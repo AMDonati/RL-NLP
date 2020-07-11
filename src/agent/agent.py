@@ -47,7 +47,8 @@ class Agent:
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                              stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         if pretrained_policy is not None:
-            self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
+            #self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
+            self.policy=torch.load(pretrained_policy,map_location=self.device)
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) #TODO: learning rate plays as well.
