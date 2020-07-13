@@ -28,11 +28,11 @@ class Metric:
 
     def write(self, **kwargs):
         if self.type == "scalar":
-            self.agent.writer.add_scalar(self.key, np.mean(self.metric), self.idx_write)
+            self.agent.writer.add_scalar(self.key, np.mean(self.metric[-self.agent.log_interval:]), self.idx_write)
         else:
-            self.agent.writer.add_text(self.key, '  \n'.join(self.metric), self.idx_write)
+            self.agent.writer.add_text(self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
-        self.metric = []
+        #self.metric = []
 
 
 class LMMetric(Metric):
@@ -174,3 +174,6 @@ class LMVAMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
+
+
+metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric}

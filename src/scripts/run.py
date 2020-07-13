@@ -12,7 +12,7 @@ from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
 
 
-def main(args):
+def run(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
     output_path = os.path.join(args.out_path, "experiments", type_folder,
                                "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
@@ -24,16 +24,19 @@ def main(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}".format(args.agent, args.model,
-                                                                                      pre_trained, truncated,
-                                                                                      args.max_len, args.debug,
-                                                                                      args.num_questions,
-                                                                                      args.entropy_coeff,
-                                                                                      args.num_truncated,
-                                                                                      args.update_every,
-                                                                                        args.lr,
-                                                                                      args.grad_clip,
-                                                                                        args.truncate_mode)
+    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}".format(args.agent,
+                                                                                                    args.model,
+                                                                                                    pre_trained,
+                                                                                                    truncated,
+                                                                                                    args.max_len,
+                                                                                                    args.debug,
+                                                                                                    args.num_questions,
+                                                                                                    args.entropy_coeff,
+                                                                                                    args.num_truncated,
+                                                                                                    args.update_every,
+                                                                                                    args.lr,
+                                                                                                    args.grad_clip,
+                                                                                                    args.truncate_mode)
 
     if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
@@ -61,7 +64,7 @@ def main(args):
                       "grad_clip": args.grad_clip,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer,
-                      "truncate_mode": args.truncate_mode}
+                      "truncate_mode": args.truncate_mode, "log_interval": args.log_interval}
 
     ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -76,15 +79,13 @@ def main(args):
 
     agent = agents[args.agent](**kwargs)
 
-    agent.learn(log_interval=args.log_interval, num_episodes=args.num_episodes_train)
+    agent.learn(num_episodes=args.num_episodes_train)
     agent.save(out_policy_file)
-    agent.test(log_interval=args.log_interval, num_episodes=args.num_episodes_test)
+    agent.test(num_episodes=args.num_episodes_test)
+    return agent
 
 
-if __name__ == '__main__':
-    # -data_path /Users/guillaumequispe/PycharmProjects/RL-NLP/data -out_path /Users/guillaumequispe/PycharmProjects/RL-NLP/output
-    # -max_len 7 -logger_level DEBUG -num_episodes_train 4000 -log_interval 1 -reward "levenshtein_"
-    # -model lstm_word -update_timestep 50 -K_epochs 10 -entropy_coeff 0.01 -eps_clip 0.02
+def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
@@ -124,6 +125,13 @@ if __name__ == '__main__':
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
     parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
+    return parser
 
+
+if __name__ == '__main__':
+    # -data_path /Users/guillaumequispe/PycharmProjects/RL-NLP/data -out_path /Users/guillaumequispe/PycharmProjects/RL-NLP/output
+    # -max_len 7 -logger_level DEBUG -num_episodes_train 4000 -log_interval 1 -reward "levenshtein_"
+    # -model lstm_word -update_timestep 50 -K_epochs 10 -entropy_coeff 0.01 -eps_clip 0.02
+    parser = get_parser()
     args = parser.parse_args()
-    main(args)
+    run(args)

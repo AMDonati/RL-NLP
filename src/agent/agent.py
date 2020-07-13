@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
 
-from eval.metric import RewardMetric, DialogMetric, VAMetric, LMVAMetric
+from eval.metric import metrics
 
 
 class Memory:
@@ -39,21 +39,23 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True, pretrained_policy=None,
+    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True,
+                 pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
-                 num_filters=3, num_truncated=10, truncate_mode="masked"):
+                 num_filters=3, num_truncated=10, truncate_mode="masked", log_interval=10):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                              stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         if pretrained_policy is not None:
-            #self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
-            self.policy=torch.load(pretrained_policy,map_location=self.device)
+            # self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
+            self.policy = torch.load(pretrained_policy, map_location=self.device)
 
         self.policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) #TODO: learning rate plays as well.
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)  # TODO: learning rate plays as well.
         self.grad_clip = grad_clip
         self.gamma = gamma
+        self.log_interval = log_interval
         self.pretrained_lm = pretrained_lm
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
@@ -65,12 +67,13 @@ class Agent:
         self.num_truncated = num_truncated
         self.writer = writer
         self.generated_text = []
+        self.init_metrics()
         # self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
         # self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
-        self.test_metrics = [RewardMetric(self, train_test="test"),
-                             DialogMetric(self, train_test="test")]
-        self.train_metrics = [DialogMetric(self, train_test="train"), VAMetric(self, train_test="train"),
-                              LMVAMetric(self, "train"), VAMetric(self, "train")]
+
+    def init_metrics(self):
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -133,15 +136,16 @@ class Agent:
                                                                                                         num_truncated=self.num_truncated)
                     idx_step += 1
                     state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
-                    for metric in self.test_metrics:
+                    for key, metric in self.test_metrics.items():
                         metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
-                                    ref_question=ref_question, reward=reward, closest_question=closest_question)
+                                    ref_question=self.env.ref_questions_decoded, reward=reward,
+                                    closest_question=closest_question)
                     if done:
                         break
-            for metric in self.test_metrics:
-                metric.compute() #TODO: change reward here?
+            for key, metric in self.test_metrics.items():
+                metric.compute()  # TODO: change reward here?
             if i_episode % log_interval == 0:
-                for metric in self.test_metrics:
+                for key, metric in self.test_metrics.items():
                     metric.write()
                 # TODO: add generated dialog.
                 # TODO: add ratio of unique closest question
@@ -164,7 +168,7 @@ class Agent:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
 
                 timestep += 1
-                for metric in self.train_metrics:
+                for key, metric in self.train_metrics.items():
                     metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
@@ -179,9 +183,8 @@ class Agent:
 
                 ep_reward += reward
                 if done:
-                    for metric in self.train_metrics:
+                    for key, metric in self.train_metrics.items():
                         metric.compute()
-                        metric.reset()
                     self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         self.update()
@@ -193,7 +196,7 @@ class Agent:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
-                #self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
-                self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
-                for metric in self.train_metrics:
+                # self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
+                # self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+                for key, metric in self.train_metrics.items():
                     metric.write()
