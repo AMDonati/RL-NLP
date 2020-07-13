@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
 
-    search_space = { # "num_truncated": hp.choice("num_truncated", [10, 20, 40, 60, 87]),
+    search_space = {  # "num_truncated": hp.choice("num_truncated", [10, 20, 40, 60, 87]),
         "update_every": hp.choice("update_every", [20, 50, 100]),
         "K_epochs": hp.choice("K_epochs", [5, 10]),
     }
