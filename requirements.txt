@@ -1,8 +1,6 @@
 h5py==2.10.0
 wordcloud==1.7.0
 hyperopt==0.2.4
-torch==0.4.1
-nltk==3.3
 gym==0.15.3
 pandas==1.0.3
 torchvision==0.6.0
