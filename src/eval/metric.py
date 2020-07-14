@@ -6,6 +6,7 @@ class Metric:
     def __init__(self, agent, train_test):
         self.measure = []
         self.metric = []
+        self.metric_history = []
         self.idx_step = 0
         self.idx_word = 0
         self.idx_write = 1
@@ -28,11 +29,12 @@ class Metric:
 
     def write(self, **kwargs):
         if self.type == "scalar":
-            self.agent.writer.add_scalar(self.key, np.mean(self.metric[-self.agent.log_interval:]), self.idx_write)
+            self.agent.writer.add_scalar(self.key, np.mean(self.metric), self.idx_write)
         else:
             self.agent.writer.add_text(self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
-        #self.metric = []
+        self.metric_history.extend(self.metric)
+        self.metric = []
 
 
 class LMMetric(Metric):
@@ -152,8 +154,9 @@ class RewardMetric(Metric):
         self.key = train_test + "_" + "reward"
 
     def fill_(self, **kwargs):
-        self.idx_word += 1
-        self.measure.append(kwargs["reward"])
+        condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
+        if condition:
+            self.measure.append(kwargs["reward"])
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))

@@ -60,15 +60,12 @@ class ClevrEnv(gym.Env):
         question_token[:len(self.state.text.numpy()[0])] = self.state.text.numpy()[0]
         question = self.clevr_dataset.idx2word(question_token)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
-        # question = preprocess_final_state(state_text=self.state.text, dataset=self.clevr_dataset,
-        #                               EOS_idx=self.special_tokens.EOS_idx)
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded,
                                                         step_idx=self.step_idx, done=done)
         self.step_idx += 1
         if done:
             self.dialog = question
-            logging.info(question)
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):

@@ -15,7 +15,7 @@ def objective(params):
         setattr(args, key, value)
     print(args)
     agent = run(args)
-    rewards = agent.train_metrics["reward"].metric
+    rewards = agent.train_metrics["reward"].metric_history
     loss = -np.mean(rewards[-agent.log_interval:])
     # run()
     return {

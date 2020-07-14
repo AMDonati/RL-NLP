@@ -119,24 +119,21 @@ class PerWord(Reward):
 class Levenshtein_(Reward):
     def __init__(self, path=None):
         Reward.__init__(self, path)
+        self.type = "episode"
 
     def get(self, question, ep_questions_decoded, step_idx, done=False):
         if question is None:
             return 0., "N/A"
         distances = np.array([nltk.edit_distance(question.split()[1:], true_question.split()) for true_question in
                               ep_questions_decoded])
-        self.last_reward = -min(distances) if done else 0
-        return self.last_reward, ep_questions_decoded[distances.argmin()]
-
-    def get_diff(self, question, ep_questions_decoded):
-        prev_reward = self.last_reward
-        reward = self.get(question, ep_questions_decoded)
-        return reward - prev_reward
+        reward = -min(distances) if done else 0
+        return reward, ep_questions_decoded[distances.argmin()]
 
 
 class Differential(Reward):
     def __init__(self, reward_function, path=None):
         Reward.__init__(self, path)
+        self.type = "step"
         self.reward_function = reward_function
         self.last_reward = None
 
