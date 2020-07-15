@@ -92,7 +92,7 @@ class DialogMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
+            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:,1:].numpy()[0]) #TODO: remove the SOS token and add the last token.
             closest_question_decoded = kwargs["closest_question"]
             self.measure.append(state_decoded + '---closest question---' + closest_question_decoded)
 

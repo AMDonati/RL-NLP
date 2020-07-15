@@ -162,7 +162,7 @@ class Agent:
 
                 timestep += 1
                 for metric in self.train_metrics:
-                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
+                    metric.fill(state=new_state, done=done, dist=dist, valid_actions=valid_actions, #TODO: change state in new_state here.
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
                                 closest_question=closest_question)
