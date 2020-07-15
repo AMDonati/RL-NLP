@@ -135,11 +135,13 @@ class Agent:
                     action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                         num_truncated=self.num_truncated)
                     idx_step += 1
-                    state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
+                    new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                     for key, metric in self.test_metrics.items():
                         metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                     ref_question=self.env.ref_questions_decoded, reward=reward,
-                                    closest_question=closest_question)
+                                    closest_question=closest_question, new_state=new_state)
+                    state = new_state
+
                     if done:
                         break
             for key, metric in self.test_metrics.items():
@@ -172,7 +174,7 @@ class Agent:
                     metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
-                                closest_question=closest_question)
+                                closest_question=closest_question, new_state=new_state)
                 state = new_state
 
                 # update if its time
