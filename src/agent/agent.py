@@ -48,8 +48,8 @@ class Agent:
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                              stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         if pretrained_policy is not None:
-            # self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
-            self.policy = torch.load(pretrained_policy, map_location=self.device)
+            self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
+            #self.policy = torch.load(pretrained_policy, map_location=self.device)
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)  # TODO: learning rate plays as well.
@@ -199,6 +199,6 @@ class Agent:
                     i_episode, ep_reward, running_reward))
                 logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 # self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
-                # self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+                self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():
                     metric.write()

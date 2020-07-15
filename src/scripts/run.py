@@ -24,7 +24,7 @@ def run(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_{}_{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}".format(args.agent,
+    out_folder = "runs_{}_{}32-64_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}".format(args.agent,
                                                                                                     args.model,
                                                                                                     pre_trained,
                                                                                                     truncated,
