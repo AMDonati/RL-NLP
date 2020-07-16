@@ -25,18 +25,18 @@ def run(args):
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
     out_folder = "runs_{}_{}32-64_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}".format(args.agent,
-                                                                                                    args.model,
-                                                                                                    pre_trained,
-                                                                                                    truncated,
-                                                                                                    args.max_len,
-                                                                                                    args.debug,
-                                                                                                    args.num_questions,
-                                                                                                    args.entropy_coeff,
-                                                                                                    args.num_truncated,
-                                                                                                    args.update_every,
-                                                                                                    args.lr,
-                                                                                                    args.grad_clip,
-                                                                                                    args.truncate_mode)
+                                                                                                         args.model,
+                                                                                                         pre_trained,
+                                                                                                         truncated,
+                                                                                                         args.max_len,
+                                                                                                         args.debug,
+                                                                                                         args.num_questions,
+                                                                                                         args.entropy_coeff,
+                                                                                                         args.num_truncated,
+                                                                                                         args.update_every,
+                                                                                                         args.lr,
+                                                                                                         args.grad_clip,
+                                                                                                         args.truncate_mode)
 
     if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
@@ -46,6 +46,9 @@ def run(args):
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                    num_questions=args.num_questions, diff_reward=args.diff_reward)
+    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                          num_questions=args.num_questions, diff_reward=args.diff_reward) for mode in
+                 ["test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:
@@ -64,13 +67,14 @@ def run(args):
                       "grad_clip": args.grad_clip,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer,
-                      "truncate_mode": args.truncate_mode, "log_interval": args.log_interval}
+                      "truncate_mode": args.truncate_mode, "log_interval": args.log_interval, "env": env,
+                      "test_envs": test_envs}
 
-    ppo_kwargs = {"policy": models[args.model], "env": env, "gamma": args.gamma,
+    ppo_kwargs = {"policy": models[args.model], "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
                   "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
-    reinforce_kwargs = {"env": env, "policy": models[args.model], "gamma": args.gamma,
+    reinforce_kwargs = {"policy": models[args.model], "gamma": args.gamma,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
     algo_kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
     kwargs = {**algo_kwargs[args.agent], **generic_kwargs}

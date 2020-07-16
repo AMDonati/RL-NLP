@@ -1,5 +1,3 @@
-import logging
-
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
@@ -9,7 +7,8 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, writer, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None, pretrained_lm=None,
+    def __init__(self, policy, env, test_envs, writer, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None,
+                 pretrained_lm=None,
                  lm_sl=True,
                  pretrained_policy=None,
                  update_every=100, K_epochs=10, entropy_coeff=0.01, pretrain=False, word_emb_size=8, hidden_size=24,
@@ -20,7 +19,7 @@ class PPO(Agent):
                        pretrained_policy=pretrained_policy, pretrain=pretrain, update_every=update_every,
                        word_emb_size=word_emb_size, hidden_size=hidden_size, kernel_size=kernel_size, stride=stride,
                        num_filters=num_filters, num_truncated=num_truncated, truncate_mode=truncate_mode,
-                       log_interval=log_interval)
+                       log_interval=log_interval, test_envs=test_envs)
         self.policy_old = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                                  stride=stride, num_filters=num_filters)
         self.policy_old.load_state_dict(self.policy.state_dict())

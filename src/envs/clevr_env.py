@@ -18,8 +18,9 @@ class ClevrEnv(gym.Env):
         super(ClevrEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
-        h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(self.mode))
-        h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(self.mode))
+        modes = {"train": "train", "test_images": "val", "test_text": "train"}
+        h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
+        h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(modes[self.mode]))
         vocab_path = os.path.join(data_path, 'vocab.json')
         # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
         self.debug = debug.split(",")
@@ -73,8 +74,10 @@ class ClevrEnv(gym.Env):
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
         # if self.debug > 0:
-        self.ref_questions = self.ref_questions[0:self.num_questions] if self.mode == "train" else self.ref_questions[
-                                                                                                   self.num_questions:]
+        if self.mode == "train":
+            self.ref_questions = self.ref_questions[0:self.num_questions]
+        elif self.mode == "test_images":
+            self.ref_questions[self.num_questions:]
         # if self.debug:
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, clean=True)

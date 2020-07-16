@@ -42,7 +42,7 @@ class Agent:
     def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True,
                  pretrained_policy=None,
                  pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
-                 num_filters=3, num_truncated=10, truncate_mode="masked", log_interval=10):
+                 num_filters=3, num_truncated=10, truncate_mode="masked", log_interval=10, test_envs=[]):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
@@ -56,6 +56,7 @@ class Agent:
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval
+        self.test_envs = test_envs
         self.pretrained_lm = pretrained_lm
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
@@ -125,20 +126,23 @@ class Agent:
         return score
 
     def test(self, log_interval=1, num_episodes=10):
-        self.env.mode = "test"
+        for env in self.test_envs:
+            self.test_env(env, log_interval=log_interval, num_episodes=num_episodes)
+
+    def test_env(self, env, log_interval=1, num_episodes=10):
         self.generated_text = []
         self.policy.eval()
         running_reward, idx_step = 0, 0
         for i_episode in range(num_episodes):
-            state, ep_reward = self.env.reset(), 0
-            for t in range(0, self.env.max_len):
+            state, ep_reward = env.reset(), 0
+            for t in range(0, env.max_len):
                 action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
                                                                                                     num_truncated=self.num_truncated)
                 idx_step += 1
-                new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
+                new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
                 for key, metric in self.test_metrics.items():
                     metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
-                                ref_question=self.env.ref_questions_decoded, reward=reward,
+                                ref_question=env.ref_questions_decoded, reward=reward,
                                 closest_question=closest_question, new_state=new_state)
                 state = new_state
 
