@@ -44,11 +44,9 @@ def run(args):
     writer = SummaryWriter(log_dir=os.path.join(output_path,
                                                 out_folder))
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
-                   num_questions=args.num_questions, diff_reward=args.diff_reward)
-    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                          num_questions=args.num_questions, diff_reward=args.diff_reward) for mode in
-                 ["test_images", "test_text"]]
+    envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                     num_questions=args.num_questions, diff_reward=args.diff_reward) for mode in
+            ["train", "test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:
@@ -67,8 +65,8 @@ def run(args):
                       "grad_clip": args.grad_clip,
                       "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
                       "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer,
-                      "truncate_mode": args.truncate_mode, "log_interval": args.log_interval, "env": env,
-                      "test_envs": test_envs}
+                      "truncate_mode": args.truncate_mode, "log_interval": args.log_interval, "env": envs[0],
+                      "test_envs": envs}
 
     ppo_kwargs = {"policy": models[args.model], "gamma": args.gamma,
                   "K_epochs": args.K_epochs,

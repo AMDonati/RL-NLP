@@ -79,7 +79,7 @@ class ClevrEnv(gym.Env):
         # if self.debug > 0:
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions]
-        elif self.mode == "test_images":
+        elif self.mode == "test_text":
             self.ref_questions[self.num_questions:]
         # if self.debug:
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
