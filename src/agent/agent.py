@@ -198,6 +198,7 @@ class Agent:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
+                logging.info('Last Dialog: {}'.format(self.agent.env.clevr_dataset.idx2word(state.text[:,1:].numpy()[0])))
                 # self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():

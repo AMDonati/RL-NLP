@@ -87,10 +87,10 @@ class PPO(Agent):
                 [0]).float().to(
                 self.device)
             loss = surr + vf_loss - entropy_loss
-            logging.info(
-                "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
-                                                            surr.mean(),
-                                                            vf_loss.mean()))
+            # logging.info(
+            #     "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
+            #                                                 surr.mean(),
+            #                                                 vf_loss.mean()))
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
