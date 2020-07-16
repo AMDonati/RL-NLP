@@ -47,9 +47,9 @@ class Agent:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
                              stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
-        if pretrained_policy is not None:
-            self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
-            # self.policy = torch.load(pretrained_policy, map_location=self.device)
+        if pretrained_policy is not None: #TODO: fix that for loading the trained policy by RL.
+            #self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
+            self.policy = torch.load(pretrained_policy, map_location=self.device)
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)  # TODO: learning rate plays as well.
@@ -72,8 +72,9 @@ class Agent:
         # self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
         # self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
 
-    def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
+    def init_metrics(self, name_display="train"):
+        #TODO: solve the issue of init_metric on the long-run.
+        self.test_metrics = {key: metrics[key](self, train_test=name_display) for key in ["reward", "dialog"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
@@ -130,6 +131,7 @@ class Agent:
             self.test_env(env, log_interval=log_interval, num_episodes=num_episodes)
 
     def test_env(self, env, log_interval=1, num_episodes=10):
+        self.init_metrics(env.mode)
         self.generated_text = []
         self.policy.eval()
         running_reward, idx_step = 0, 0
