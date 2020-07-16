@@ -49,7 +49,7 @@ class Agent:
                              stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
         if pretrained_policy is not None:
             self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
-            #self.policy = torch.load(pretrained_policy, map_location=self.device)
+            # self.policy = torch.load(pretrained_policy, map_location=self.device)
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)  # TODO: learning rate plays as well.
@@ -72,7 +72,7 @@ class Agent:
         # self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
@@ -125,33 +125,31 @@ class Agent:
         return score
 
     def test(self, log_interval=1, num_episodes=10):
+        self.env.mode = "test"
         self.generated_text = []
         self.policy.eval()
         running_reward, idx_step = 0, 0
         for i_episode in range(num_episodes):
-            for ref_question in self.env.ref_questions:
-                state, ep_reward = self.env.reset(), 0
-                for t in range(0, self.env.max_len):
-                    action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
-                                                                                                        num_truncated=self.num_truncated)
-                    idx_step += 1
-                    new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
-                    for key, metric in self.test_metrics.items():
-                        metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
-                                    ref_question=self.env.ref_questions_decoded, reward=reward,
-                                    closest_question=closest_question, new_state=new_state)
-                    state = new_state
+            state, ep_reward = self.env.reset(), 0
+            for t in range(0, self.env.max_len):
+                action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
+                                                                                                    num_truncated=self.num_truncated)
+                idx_step += 1
+                new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
+                for key, metric in self.test_metrics.items():
+                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
+                                ref_question=self.env.ref_questions_decoded, reward=reward,
+                                closest_question=closest_question, new_state=new_state)
+                state = new_state
 
-                    if done:
-                        break
+                if done:
+                    break
             for key, metric in self.test_metrics.items():
-                metric.compute()  # TODO: change reward here?
+                metric.compute(state=state, closest_question=closest_question,
+                               reward=reward)  # TODO: change reward here?
             if i_episode % log_interval == 0:
                 for key, metric in self.test_metrics.items():
                     metric.write()
-                # TODO: add generated dialog.
-                # TODO: add ratio of unique closest question
-                # TODO: add %age of unvalid actions per episode. (counter.)
 
     def learn(self, log_interval=10, num_episodes=100):
 
@@ -198,7 +196,8 @@ class Agent:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
-                logging.info('Last Dialog: {}'.format(self.agent.env.clevr_dataset.idx2word(state.text[:,1:].numpy()[0])))
+                logging.info(
+                    'Last Dialog: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 # self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():

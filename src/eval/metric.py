@@ -19,7 +19,7 @@ class Metric:
         self.idx_step += 1
 
     def compute(self, **kwargs):
-        self.compute_()
+        self.compute_(**kwargs)
         self.measure = []
         self.idx_word = 0
         self.idx_step = 0
@@ -93,13 +93,12 @@ class DialogMetric(Metric):
         self.key = train_test + "_" + "dialog"
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[:,1:].numpy()[0])
-            closest_question_decoded = kwargs["closest_question"]
-            self.measure.append(state_decoded + '---closest question---' + closest_question_decoded)
+        pass
 
     def compute_(self, **kwargs):
-        self.metric = [self.measure[-1]]
+        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
+        closest_question_decoded = kwargs["closest_question"]
+        self.metric.append(state_decoded + '---closest question---' + closest_question_decoded)
         pass
 
 
