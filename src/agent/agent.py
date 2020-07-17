@@ -158,6 +158,8 @@ class Agent:
                 for key, metric in self.test_metrics.items():
                     metric.write()
 
+            #TODO: add the mean's reward and variance.
+
     def learn(self, log_interval=10, num_episodes=100):
         start_time = time.time()
         current_time = time.time()
