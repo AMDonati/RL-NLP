@@ -41,19 +41,14 @@ class Memory:
 
 class Agent:
     def __init__(self, policy, env, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True,
-                 pretrained_policy=None,
-                 pretrain=False, update_every=50, word_emb_size=8, hidden_size=24, kernel_size=1, stride=2,
-                 num_filters=3, num_truncated=10, truncate_mode="masked", log_interval=10, test_envs=[]):
+                 pretrain=False, update_every=50,
+                 num_truncated=10, log_interval=10, test_envs=[]):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode) #TODO: put this out of the agent and into run ?
-        if pretrained_policy is not None: #TODO: fix that for loading the trained policy by RL.
-            self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
-            #self.policy = torch.load(pretrained_policy, map_location=self.device)
+        self.policy = policy
 
         self.policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)  # TODO: learning rate plays as well.
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval
@@ -111,7 +106,8 @@ class Agent:
     #    pass
 
     def save(self, out_file):
-        torch.save(self.policy, out_file)
+        with open(out_file, 'wb') as f:
+            torch.save(self.policy.state_dict(), f)
 
     def get_metrics(self, question):
         self.generated_text.append(question.view(-1)[1:].cpu().numpy())

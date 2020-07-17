@@ -173,9 +173,13 @@ class LMVAMetric(Metric):
             closest_question = self.agent.env.clevr_dataset.word2idx(kwargs["closest_question"].split())
             if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                 self.counter += 1
+            #TODO: timer cette métrique.
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric}
+
+
+#TODO: add TTR metric, BLEU score.

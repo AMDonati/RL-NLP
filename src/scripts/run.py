@@ -57,22 +57,28 @@ def run(args):
         "lstm": PolicyLSTMBatch,
         "lstm_word": PolicyLSTMWordBatch}
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl, "pretrained_policy": args.policy_path,
+    # creating the policy model.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size, kernel_size=args.kernel_size,
+                             stride=args.stride, num_filters=args.num_filters, rl=True, truncate_mode=args.truncate_mode)
+    if args.policy_path is not None:
+        policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
+        # self.policy = torch.load(pretrained_policy, map_location=self.device)
+
+    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl,
                       "pretrain": args.pretrain,
-                      "word_emb_size": args.word_emb_size,
                       "update_every": args.update_every,
                       "lr": args.lr,
                       "grad_clip": args.grad_clip,
-                      "hidden_size": args.hidden_size, "kernel_size": args.conv_kernel, "stride": args.stride,
-                      "num_filters": args.num_filters, "num_truncated": args.num_truncated, "writer": writer,
-                      "truncate_mode": args.truncate_mode, "log_interval": args.log_interval, "env": envs[0],
+                      "num_truncated": args.num_truncated, "writer": writer,
+                      "log_interval": args.log_interval, "env": envs[0],
                       "test_envs": envs}
 
-    ppo_kwargs = {"policy": models[args.model], "gamma": args.gamma,
+    ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
                   "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
-    reinforce_kwargs = {"policy": models[args.model], "gamma": args.gamma,
+    reinforce_kwargs = {"policy": policy, "gamma": args.gamma,
                         "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
     algo_kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
     kwargs = {**algo_kwargs[args.agent], **generic_kwargs}
