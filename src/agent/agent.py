@@ -46,10 +46,10 @@ class Agent:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy(env.clevr_dataset.len_vocab, word_emb_size, hidden_size, kernel_size=kernel_size,
-                             stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode)
+                             stride=stride, num_filters=num_filters, rl=True, truncate_mode=truncate_mode) #TODO: put this out of the agent and into run ?
         if pretrained_policy is not None: #TODO: fix that for loading the trained policy by RL.
-            #self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
-            self.policy = torch.load(pretrained_policy, map_location=self.device)
+            self.policy.load_state_dict(torch.load(pretrained_policy, map_location=self.device), strict=False)
+            #self.policy = torch.load(pretrained_policy, map_location=self.device)
 
         self.policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)  # TODO: learning rate plays as well.
@@ -152,7 +152,7 @@ class Agent:
                     break
             for key, metric in self.test_metrics.items():
                 metric.compute(state=state, closest_question=closest_question,
-                               reward=reward)  # TODO: change reward here?
+                               reward=reward)
             if i_episode % log_interval == 0:
                 for key, metric in self.test_metrics.items():
                     metric.write()
@@ -184,6 +184,7 @@ class Agent:
                 # update if its time
                 if self.update_mode == "step" and timestep % self.update_every == 0:
                     self.update()
+                    logging.info("UPDATING POLICY WEIGHTS...")
                     self.memory.clear_memory()
                     timestep = 0
 
@@ -194,6 +195,7 @@ class Agent:
                     self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         self.update()
+                        logging.info("UPDATING POLICY WEIGHTS...")
                         self.memory.clear_memory()
                     break
 
@@ -204,6 +206,7 @@ class Agent:
                 logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info(
                     'Last Dialog: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
+                logging.info('Closest Question: {}'.format(closest_question))
                 # self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():
