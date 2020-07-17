@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-
+import time
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -173,7 +173,7 @@ class LMVAMetric(Metric):
             closest_question = self.agent.env.clevr_dataset.word2idx(kwargs["closest_question"].split())
             if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                 self.counter += 1
-            #TODO: timer cette métrique.
+
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
