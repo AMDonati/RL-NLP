@@ -48,7 +48,7 @@ class REINFORCE(Agent):
         rewards = torch.tensor(rewards).to(self.device).float().view(-1, 1)
         logprobs = torch.stack(self.memory.logprobs).to(self.device)
         values = torch.stack(self.memory.values)
-        advantages = rewards.squeeze() - values.squeeze()
+        advantages = rewards.squeeze() - values.squeeze().detach()
         # advantages_split=torch.split(advantages, tuple(lengths.flatten()))
 
         states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
