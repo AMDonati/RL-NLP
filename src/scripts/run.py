@@ -6,7 +6,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from agent.ppo import PPO
-from agent.reinforce import REINFORCE
+from agent.reinforce_ import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger

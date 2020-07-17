@@ -1,8 +1,7 @@
-import logging
-
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence
 
 from agent.agent import Agent
 
@@ -52,6 +51,12 @@ class REINFORCE(Agent):
         advantages = rewards.squeeze() - values.squeeze()
         # advantages_split=torch.split(advantages, tuple(lengths.flatten()))
 
+        states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
+
+        policy_dist, policy_dist_truncated, values = self.policy(states_text, torch.stack(self.memory.states_img))
+        probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
+        logprobs = torch.log(probs)
+
         reinforce_loss = -logprobs.squeeze(dim=1) * advantages
         vf_loss = self.MSE_loss(values.squeeze(), rewards.squeeze())
         loss = reinforce_loss + vf_loss
@@ -72,4 +77,16 @@ class REINFORCE(Agent):
             torch.nn.utils.clip_grad_norm_(parameters=self.policy.parameters(), max_norm=self.grad_clip)
         self.optimizer.step()
 
+        # debug
+        # states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
+
+        policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img))
+        new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
+        diff = torch.log(new_probs) - logprobs
+        # this must be positive
+        diff_adv = diff.squeeze() * advantages
+
+        #if torch.sum(diff_adv < 0).numpy() > 0:
+            #print(diff)
+            #print(diff_adv)
         return loss_per_episode.mean()
