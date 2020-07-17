@@ -8,10 +8,12 @@ from agent.agent import Agent
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, test_envs, writer, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True,
+    def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None,
+                 lm_sl=True,
                  pretrain=False, update_every=50, num_truncated=10, log_interval=10):
 
-        Agent.__init__(self, policy, env, writer=writer, gamma=gamma, lr=lr, grad_clip=grad_clip,
+        Agent.__init__(self, policy, env, writer=writer, out_path=out_path,
+                       gamma=gamma, lr=lr, grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
@@ -69,3 +71,5 @@ class REINFORCE(Agent):
         if self.grad_clip is not None:
             torch.nn.utils.clip_grad_norm_(parameters=self.policy.parameters(), max_norm=self.grad_clip)
         self.optimizer.step()
+
+        return loss_per_episode.mean()

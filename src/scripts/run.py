@@ -14,7 +14,10 @@ from utils.utils_train import create_logger
 
 def run(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
-    output_path = os.path.join(args.out_path, "experiments", type_folder,
+    if args.resume_training is not None:
+        output_path = args.resume_training
+    else:
+        output_path = os.path.join(args.out_path, "experiments", type_folder,
                                "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
@@ -71,6 +74,7 @@ def run(args):
                       "lr": args.lr,
                       "grad_clip": args.grad_clip,
                       "num_truncated": args.num_truncated, "writer": writer,
+                      "out_path": output_path,
                       "log_interval": args.log_interval, "env": envs[0],
                       "test_envs": envs}
 
@@ -86,20 +90,23 @@ def run(args):
 
     agent = agents[args.agent](**kwargs)
 
+    if args.resume_training is not None:
+        epoch, loss = agent.load_ckpt()
+        logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
     agent.learn(num_episodes=args.num_episodes_train)
     agent.save(out_policy_file)
     agent.test(num_episodes=args.num_episodes_test)
     return agent
 
 
-def get_parser():
+def get_gparser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=2, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=10000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,
@@ -125,6 +132,7 @@ def get_parser():
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
+    parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
