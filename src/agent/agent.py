@@ -6,6 +6,7 @@ import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
 
 from eval.metric import metrics
+import time
 
 
 class Memory:
@@ -158,7 +159,8 @@ class Agent:
                     metric.write()
 
     def learn(self, log_interval=10, num_episodes=100):
-
+        start_time = time.time()
+        current_time = time.time()
         running_reward = 0
         timestep = 1
         for i_episode in range(num_episodes):
@@ -211,3 +213,12 @@ class Agent:
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():
                     metric.write()
+
+            if i_episode % 1000 == 0:
+                elapsed = time.time() - current_time
+                logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
+                current_time = time.time()
+
+        logging.info("TRAINING DONE")
+        logging.info("total training time: {:7.2f}".format(time.time() - start_time))
+        logging.info("running_reward: {}".format(running_reward))

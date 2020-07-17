@@ -35,7 +35,7 @@ class GRUModel(nn.Module):
         output, hidden = self.gru(
             emb)  # output (B,seq_len,hidden_size*num_directions) , hidden: (num_layers * num_directions, B, hidden_size)
         output = self.dropout(output)
-        dec_output = self.fc(output)  # (B, S, num_tokens)
+        dec_output = self.fc(output)  # (B, S, num_tokens) #TODO: no activation function.
         dec_output = dec_output.view(-1, self.num_tokens)  # (S * B, num_tokens) # resizing for the NLL Loss.
         log_probas = F.log_softmax(dec_output,
                                    dim=1)  # when outputting the log_probas, use torch.nn.NLLLoss and not torch.nn.CrossEntropy.
