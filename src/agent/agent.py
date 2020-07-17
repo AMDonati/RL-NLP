@@ -70,7 +70,7 @@ class Agent:
 
     def init_metrics(self, name_display="train"):
         #TODO: solve the issue of init_metric on the long-run.
-        self.test_metrics = {key: metrics[key](self, train_test=name_display) for key in ["reward", "dialog"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
@@ -128,7 +128,8 @@ class Agent:
             self.test_env(env, log_interval=log_interval, num_episodes=num_episodes)
 
     def test_env(self, env, log_interval=1, num_episodes=10):
-        self.init_metrics(env.mode)
+        for m in self.test_metrics.values():
+            m.train_test = env.mode
         self.generated_text = []
         self.policy.eval()
         running_reward, idx_step = 0, 0

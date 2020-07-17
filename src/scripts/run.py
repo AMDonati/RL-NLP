@@ -59,7 +59,7 @@ def run(args):
 
     # creating the policy model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size, kernel_size=args.kernel_size,
+    policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size, kernel_size=args.conv_kernel,
                              stride=args.stride, num_filters=args.num_filters, rl=True, truncate_mode=args.truncate_mode)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
@@ -78,8 +78,7 @@ def run(args):
                   "K_epochs": args.K_epochs,
                   "entropy_coeff": args.entropy_coeff,
                   "eps_clip": args.eps_clip}
-    reinforce_kwargs = {"policy": policy, "gamma": args.gamma,
-                        "word_emb_size": args.word_emb_size, "hidden_size": args.hidden_size}
+    reinforce_kwargs = {"policy": policy, "gamma": args.gamma}
     algo_kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
     kwargs = {**algo_kwargs[args.agent], **generic_kwargs}
 
@@ -100,7 +99,7 @@ def get_parser():
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=2, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,
