@@ -99,7 +99,7 @@ def run(args):
     return agent
 
 
-def get_gparser():
+def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
