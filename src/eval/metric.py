@@ -171,8 +171,9 @@ class LMVAMetric(Metric):
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             closest_question = self.agent.env.clevr_dataset.word2idx(kwargs["closest_question"].split())
-            if closest_question[self.idx_word] not in kwargs["valid_actions"]:
-                self.counter += 1
+            if len(closest_question) > self.idx_word:
+                if closest_question[self.idx_word] not in kwargs["valid_actions"]:
+                    self.counter += 1
 
 
     def compute_(self, **kwargs):
