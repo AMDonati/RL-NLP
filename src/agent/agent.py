@@ -73,7 +73,7 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward", "lm_valid_actions"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """

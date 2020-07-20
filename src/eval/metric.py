@@ -29,9 +29,9 @@ class Metric:
 
     def write(self, **kwargs):
         if self.type == "scalar":
-            self.agent.writer.add_scalar(self.key, np.mean(self.metric), self.idx_write)
+            self.agent.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
         else:
-            self.agent.writer.add_text(self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
+            self.agent.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
         self.metric_history.extend(self.metric)
         self.metric = []
@@ -41,7 +41,7 @@ class LMMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
-        self.key = self.train_test + "_" + "lm"
+        self.key = "lm"
 
     def fill_(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
@@ -62,7 +62,7 @@ class VAMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
-        self.key = self.train_test + "_" + "valid_actions"
+        self.key = "valid_actions"
 
     def fill_(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, :-1].numpy()[0])
@@ -90,7 +90,7 @@ class DialogMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
-        self.key = self.train_test + "_" + "dialog"
+        self.key = "dialog"
 
     def fill_(self, **kwargs):
         pass
@@ -106,7 +106,7 @@ class RefQuestionsMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
-        self.key = self.train_test + "_" + "ratio_closest_questions"
+        self.key = "ratio_closest_questions"
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -121,7 +121,7 @@ class PPLMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
-        self.key = self.train_test + "_" + "ppl"
+        self.key = "ppl"
 
     def fill_(self, **kwargs):
         if self.agent.pretrained_lm is None:
@@ -150,7 +150,7 @@ class RewardMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
-        self.key = self.train_test + "_" + "reward"
+        self.key = "reward"
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
@@ -166,13 +166,14 @@ class LMVAMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.counter = 0
-        self.key = self.train_test + "_" + "invalid_actions"
+        self.key = "invalid_actions"
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             closest_question = self.agent.env.clevr_dataset.word2idx(kwargs["closest_question"].split())
-            if closest_question[self.idx_word] not in kwargs["valid_actions"]:
-                self.counter += 1
+            if len(closest_question) > self.idx_word:
+                if closest_question[self.idx_word] not in kwargs["valid_actions"]:
+                    self.counter += 1
 
 
     def compute_(self, **kwargs):

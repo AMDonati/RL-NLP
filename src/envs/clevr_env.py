@@ -56,10 +56,9 @@ class ClevrEnv(gym.Env):
     def step(self, action):
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
-        question_token = np.zeros((self.max_len + 1))
-        question_token[:len(self.state.text.numpy()[0])] = self.state.text.numpy()[0]
-        question = self.clevr_dataset.idx2word(question_token)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
+        question = self.clevr_dataset.idx2word(self.state.text[:,:-1].numpy()[0]) if action.item() == self.special_tokens.EOS_idx else self.clevr_dataset.idx2word(self.state.text.numpy()[0])
+
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded,
                                                         step_idx=self.step_idx, done=done)
@@ -83,7 +82,7 @@ class ClevrEnv(gym.Env):
             self.ref_questions[self.num_questions:]
         # if self.debug:
         # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
-        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, clean=True)
+        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
         # logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
         # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
@@ -95,27 +94,10 @@ class ClevrEnv(gym.Env):
 
         return self.state
 
-    def decode_current_episode(self):
-        valid_actions = self.current_episode.valid_actions
-        assert valid_actions is not None
-        valid_actions_decoded = [self.clevr_dataset.idx2word(actions, delim=',') for actions in valid_actions]
-        # dialog_split = [self.current_episode.dialog.split()[:i] for i in range(valid_actions)]
-        # return dict(zip(dialog_split, valid_actions_decoded))
-        return valid_actions_decoded
-
     def clean_ref_questions(self):
         questions_decoded = [tokens.replace('<PAD>', '') for tokens in self.ref_questions_decoded]
         questions_decoded = [q.strip() for q in questions_decoded]
         self.ref_questions_decoded = questions_decoded
-
-    def get_reduced_action_space(self):
-        assert self.ref_questions_decoded is not None
-        reduced_vocab = [q.split() for q in self.ref_questions_decoded]
-        reduced_vocab = [i for l in reduced_vocab for i in l]
-        reduced_vocab = list(set(reduced_vocab))
-        unique_tokens = self.clevr_dataset.word2idx(seq_tokens=reduced_vocab)
-        dict_tokens = dict(zip([i for i in range(len(unique_tokens))], unique_tokens))
-        return dict_tokens, reduced_vocab
 
     def render(self, mode='human', close=False):
         pass
@@ -158,7 +140,7 @@ class VectorEnv:
 
 
 if __name__ == '__main__':
-    env = ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
+    env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,1')
     state = env.reset()
     dict_tokens, reduced_vocab = env.get_reduced_action_space()
     print(dict_tokens)
