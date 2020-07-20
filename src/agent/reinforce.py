@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 
 from agent.agent import Agent
+from RL_toolbox.RL_functions import compute_grad_norm
 
 
 class REINFORCE(Agent):
@@ -64,7 +65,16 @@ class REINFORCE(Agent):
         # clip grad norm:
         self.optimizer.step()
         # compute grad norm:
+        grad_norm = compute_grad_norm(self.policy)
+        self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
         self.writer_iteration += 1
+
+        # compute new log_probs for comparison with old ones:
+        states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
+        policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img))
+        new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
+        ratios = torch.exp(torch.log(new_probs) - old_logprobs)
+        self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
         return loss.mean()
 
