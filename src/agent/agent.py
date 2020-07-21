@@ -41,7 +41,8 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None, lm_sl=True,
+    def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
+                 lm_sl=True,
                  pretrain=False, update_every=50,
                  num_truncated=10, log_interval=10, test_envs=[]):
 
@@ -73,7 +74,7 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward", "lm_valid_actions"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward", "lm_valid_actions", "policies_discrepancy"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -155,14 +156,16 @@ class Agent:
         for i_episode in range(num_episodes):
             state, ep_reward = env.reset(), 0
             for t in range(0, env.max_len):
-                action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
-                                                                                                    num_truncated=self.num_truncated)
+                action, log_probs, value, (
+                    valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
+                                                                                                  num_truncated=self.num_truncated)
                 idx_step += 1
                 new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
                 for key, metric in self.test_metrics.items():
                     metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                 ref_question=env.ref_questions_decoded, reward=reward,
-                                closest_question=closest_question, new_state=new_state)
+                                closest_question=closest_question, new_state=new_state, log_probs=log_probs,
+                                log_probs_truncated=log_probs_truncated)
                 state = new_state
 
                 if done:
@@ -174,7 +177,7 @@ class Agent:
                 for key, metric in self.test_metrics.items():
                     metric.write()
 
-            #TODO: add the mean's reward and variance.
+            # TODO: add the mean's reward and variance.
 
     def learn(self, log_interval=10, num_episodes=100):
         start_time = time.time()
@@ -186,9 +189,10 @@ class Agent:
             ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
-                action, log_probs, value, (valid_actions, actions_probs), dist = self.select_action(state=state,
-                                                                                                    forced=forced,
-                                                                                                    num_truncated=self.num_truncated)
+                action, log_probs, value, (
+                valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
+                                                                                              forced=forced,
+                                                                                              num_truncated=self.num_truncated)
                 new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
@@ -198,7 +202,8 @@ class Agent:
                     metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
-                                closest_question=closest_question, new_state=new_state)
+                                closest_question=closest_question, new_state=new_state, log_probs=log_probs,
+                                log_probs_truncated=log_probs_truncated)
                 state = new_state
 
                 # update if its time
@@ -236,7 +241,7 @@ class Agent:
                 elapsed = time.time() - current_time
                 logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
                 current_time = time.time()
-                #saving checkpoint:
+                # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
 
         logging.info("TRAINING DONE")

@@ -175,12 +175,24 @@ class LMVAMetric(Metric):
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
 
-
     def compute_(self, **kwargs):
         self.metric = [self.counter]
 
+class PoliciesRatioMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "policies_discrepancy"
 
-metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric}
+    def fill_(self, **kwargs):
+        ratios = torch.exp(kwargs["log_probs"].clone().detach() - kwargs["log_probs_truncated"])
+        self.measure.append(ratios)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
+metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric, "policies_discrepancy": PoliciesRatioMetric}
 
 
 #TODO: add TTR metric, BLEU score.

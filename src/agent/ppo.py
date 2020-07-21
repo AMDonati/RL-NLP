@@ -35,7 +35,8 @@ class PPO(Agent):
         if policy_dist_truncated.probs.size() != policy_dist.probs.size():
             action = torch.gather(valid_actions, 1, action.view(1, 1))
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
-        return action, log_prob, value, (valid_actions, actions_probs), policy_dist
+        log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
+        return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
         valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
