@@ -49,20 +49,24 @@ class REINFORCE(Agent):
             rewards.insert(0, discounted_reward)
         rewards = torch.tensor(rewards).to(self.device).float()
 
-        old_logprobs = torch.stack(self.memory.logprobs).to(self.device)
-        old_values = torch.stack(self.memory.values).to(self.device)
+        logprobs = torch.stack(self.memory.logprobs).to(self.device)
+        values = torch.stack(self.memory.values).to(self.device)
 
-        advantages = rewards - old_values.detach().squeeze() if not self.pretrain else 1
-        reinforce_loss = -old_logprobs.view(-1)*advantages
-        vf_loss = 0.5 * self.MSE_loss(old_values.view(-1), rewards) if not self.pretrain else torch.tensor(
+        advantages = rewards - values.detach().squeeze() if not self.pretrain else 1
+        reinforce_loss = -logprobs.view(-1)*advantages
+        vf_loss = 0.5 * self.MSE_loss(values.view(-1), rewards) if not self.pretrain else torch.tensor(
             [0]).float().to(
             self.device)
         loss = reinforce_loss + vf_loss
-
+        loss = loss.sum() / self.update_every
+        #loss = loss.mean()
         # take gradient step
         self.optimizer.zero_grad()
-        loss.sum().backward()
+        #loss.sum().backward()
+        loss.backward()
         # clip grad norm:
+        if self.grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(parameters=self.policy.parameters(), max_norm=self.grad_clip)
         self.optimizer.step()
         # compute grad norm:
         grad_norm = compute_grad_norm(self.policy)
@@ -73,7 +77,7 @@ class REINFORCE(Agent):
         states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
         policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img))
         new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
-        ratios = torch.exp(torch.log(new_probs) - old_logprobs)
+        ratios = torch.exp(torch.log(new_probs) - logprobs)
         self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
         return loss.mean()

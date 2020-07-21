@@ -91,11 +91,11 @@ def encode(seq_tokens, token_to_idx, allow_unk):
     return seq_idx
 
 
-def decode(seq_idx, idx_to_token, stop_at_end, delim=' ', clean=False, ignored=["<SOS>", "<PAD>"]):
+def decode(seq_idx, idx_to_token, stop_at_end, delim=' ', ignored=["<SOS>", "<PAD>"]):
     tokens = []
     for idx in seq_idx:
         token = idx_to_token[idx]
-        if not (clean and token in ignored):
+        if not token in ignored:
             if stop_at_end and token == '<EOS>':
                 break
             tokens.append(token)

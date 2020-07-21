@@ -18,7 +18,7 @@ def run(args):
         output_path = args.resume_training
     else:
         output_path = os.path.join(args.out_path, "experiments", type_folder,
-                               "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+                                   "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
@@ -27,20 +27,24 @@ def run(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.lm_path is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    out_folder = "runs_{}_{}32-64_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_eps-adam{}_gradclip{}_trunc_{}".format(args.agent,
-                                                                                                         args.model,
-                                                                                                         pre_trained,
-                                                                                                         truncated,
-                                                                                                         args.max_len,
-                                                                                                         args.debug,
-                                                                                                         args.num_questions,
-                                                                                                         args.entropy_coeff,
-                                                                                                         args.num_truncated,
-                                                                                                         args.update_every,
-                                                                                                         args.lr,
+    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_eps-adam{}_gradclip{}_trunc_{}_diffrew{}".format(
+        args.agent,
+        args.model,
+        args.word_emb_size,
+        args.hidden_size,
+        pre_trained,
+        truncated,
+        args.max_len,
+        args.debug,
+        args.num_questions,
+        args.entropy_coeff,
+        args.num_truncated,
+        args.update_every,
+        args.lr,
                                                                                                             args.eps,
-                                                                                                         args.grad_clip,
-                                                                                                         args.truncate_mode)
+        args.grad_clip,
+        args.truncate_mode,
+        args.diff_reward)
 
     if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
@@ -63,8 +67,10 @@ def run(args):
 
     # creating the policy model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size, kernel_size=args.conv_kernel,
-                             stride=args.stride, num_filters=args.num_filters, rl=True, truncate_mode=args.truncate_mode)
+    policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
+                                kernel_size=args.conv_kernel,
+                                stride=args.stride, num_filters=args.num_filters, rl=True,
+                                truncate_mode=args.truncate_mode)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
@@ -108,7 +114,7 @@ def get_parser():
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=10000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
 
     parser.add_argument("-data_path", type=str, required=True,
