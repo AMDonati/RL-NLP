@@ -41,14 +41,14 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None, lm_sl=True,
+    def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None, lm_sl=True,
                  pretrain=False, update_every=50,
                  num_truncated=10, log_interval=10, test_envs=[]):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr, eps=eps)
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval

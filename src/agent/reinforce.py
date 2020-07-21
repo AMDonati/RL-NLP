@@ -7,10 +7,10 @@ from RL_toolbox.RL_functions import compute_grad_norm
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, grad_clip=None, pretrained_lm=None,
+    def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
                  lm_sl=True,
                  pretrain=False, update_every=50, num_truncated=10, log_interval=10):
-        Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, grad_clip=grad_clip,
+        Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, eps=eps, grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,

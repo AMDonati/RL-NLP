@@ -7,13 +7,13 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None,
+    def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, eps_clip=0.2, grad_clip=None,
                  pretrained_lm=None,
                  lm_sl=True,
                  update_every=100, num_truncated=10,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
                  log_interval=10):
-        Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, grad_clip=grad_clip, pretrained_lm=pretrained_lm,
+        Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, eps=eps, grad_clip=grad_clip, pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,

@@ -72,6 +72,7 @@ def run(args):
                       "pretrain": args.pretrain,
                       "update_every": args.update_every,
                       "lr": args.lr,
+                      "eps": args.eps,
                       "grad_clip": args.grad_clip,
                       "num_truncated": args.num_truncated, "writer": writer,
                       "out_path": output_path,
@@ -117,6 +118,7 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
+    parser.add_argument('-eps', type=float, default=1e-08, help='epsilon value for adam optimizer')
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
     parser.add_argument('-truncate_mode', type=str, default="masked", help="truncation mode")
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
