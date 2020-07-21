@@ -185,7 +185,7 @@ class PoliciesRatioMetric(Metric):
         self.key = "policies_discrepancy"
 
     def fill_(self, **kwargs):
-        ratios = torch.exp(kwargs["log_probs"].clone().detach().cpu() - kwargs["log_probs_truncated"].cpu())
+        ratios = np.exp(kwargs["log_probs"].clone().detach().cpu().numpy() - kwargs["log_probs_truncated"].cpu().numpy())
         self.measure.append(ratios)
 
     def compute_(self, **kwargs):
