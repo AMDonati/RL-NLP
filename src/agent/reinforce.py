@@ -24,7 +24,7 @@ class REINFORCE(Agent):
     def select_action(self, state, num_truncated=10, forced=None):
         valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        action = policy_dist.sample() if forced is None else forced
+        action = policy_dist_truncated.sample() if forced is None else forced
         if policy_dist_truncated.probs.size() != policy_dist.probs.size():
             action = torch.gather(valid_actions, 1, action.view(1, 1))
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
