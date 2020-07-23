@@ -9,6 +9,8 @@ from eval.metric import metrics
 import time
 import os
 
+import numpy as np
+
 
 class Memory:
     def __init__(self):
@@ -187,12 +189,15 @@ class Agent:
         for i_episode in range(num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
+            ep_log_probs, ep_log_probs_truncated = [], []
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
                 valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
                                                                                               forced=forced,
                                                                                               num_truncated=self.num_truncated)
+                ep_log_probs.append(log_probs)
+                ep_log_probs_truncated.append(log_probs_truncated)
                 new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
@@ -217,13 +222,16 @@ class Agent:
                 if done:
                     for key, metric in self.train_metrics.items():
                         metric.compute()
-                    self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
+                    #self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         loss = self.update()
                         logging.info("UPDATING POLICY WEIGHTS...")
                         self.memory.clear_memory()
                     break
-
+            ep_log_probs = torch.stack(ep_log_probs).clone().detach()
+            ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=3)
+            ep_log_probs_truncated = torch.stack(ep_log_probs_truncated)
+            ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=3)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
@@ -232,8 +240,10 @@ class Agent:
                 logging.info(
                     'Last Dialog: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
-                # self.writer.add_text('episode_questions', '  \n'.join(self.env.ref_questions_decoded))
+                logging.info('episode action probs: {}'.format(ep_probs))
+                logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+                self.writer.add_scalar('train_episode_reward', ep_reward, i_episode+1)
                 for key, metric in self.train_metrics.items():
                     metric.write()
 
