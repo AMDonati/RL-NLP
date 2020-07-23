@@ -229,9 +229,9 @@ class Agent:
                         self.memory.clear_memory()
                     break
             ep_log_probs = torch.stack(ep_log_probs).clone().detach()
-            ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=3)
+            ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
             ep_log_probs_truncated = torch.stack(ep_log_probs_truncated)
-            ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=3)
+            ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % log_interval == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
