@@ -46,7 +46,7 @@ class Agent:
     def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, log_interval=10, test_envs=[]):
+                 num_truncated=10, log_interval=1, test_envs=[]):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
@@ -230,13 +230,14 @@ class Agent:
                     break
             ep_log_probs = torch.stack(ep_log_probs).clone().detach()
             ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
-            ep_log_probs_truncated = torch.stack(ep_log_probs_truncated)
+            ep_log_probs_truncated = torch.stack(ep_log_probs_truncated).clone().detach()
             ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-            if i_episode % log_interval == 0:
+            #if i_episode % log_interval == 0:
+            if i_episode % 1 == 0:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
-                logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
+                #logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info(
                     'Last Dialog: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))

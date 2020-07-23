@@ -12,7 +12,7 @@ class PPO(Agent):
                  lm_sl=True,
                  update_every=100, num_truncated=10,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
-                 log_interval=10):
+                 log_interval=1):
         Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, eps=eps, grad_clip=grad_clip, pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,

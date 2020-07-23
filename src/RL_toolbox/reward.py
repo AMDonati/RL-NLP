@@ -124,7 +124,7 @@ class Levenshtein_(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False):
         if question is None:
             return 0., "N/A"
-        distances = np.array([nltk.edit_distance(question.split()[1:], true_question.split()) for true_question in
+        distances = np.array([nltk.edit_distance(question.split(), true_question.split()) for true_question in
                               ep_questions_decoded])
         reward = -min(distances) if done else 0
         return reward, ep_questions_decoded[distances.argmin()]
