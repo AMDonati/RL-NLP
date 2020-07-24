@@ -151,6 +151,9 @@ class PolicyLSTMWordBatch(nn.Module):
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
         # check that the truncation is right.
         assert probs_truncated[:,valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
+        for word in range(self.num_tokens):
+            if word not in valid_actions:
+                assert probs_truncated[:,word] == 0, "ERROR IN TRUNCATION FUNCTION"
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 
@@ -232,7 +235,6 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
                  kernel_size=1, stride=5):
-        # super(PolicyLSTMBatch, self).__init__()
         PolicyLSTMWordBatch_SL.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
