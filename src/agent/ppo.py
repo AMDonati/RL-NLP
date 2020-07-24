@@ -64,7 +64,7 @@ class PPO(Agent):
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
-            # Evaluating old actions and values :
+            # Evaluating old actions and values:
             logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_actions,
                                                                  self.num_truncated)
 

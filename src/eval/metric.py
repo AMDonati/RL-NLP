@@ -240,7 +240,6 @@ class BleuMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
-        self.step_compute()
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,

@@ -98,13 +98,19 @@ def run(args):
 
     agent = agents[args.agent](**kwargs)
 
+    eval_mode = ['sampling', 'greedy'] #TODO: put it as a parser arg.
+    #eval_mode = ['greedy']
+
     if args.resume_training is not None:
         epoch, loss = agent.load_ckpt()
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
         agent.start_episode = epoch
     agent.learn(num_episodes=args.num_episodes_train)
+    logger.info('---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
     agent.save(out_policy_file)
-    agent.test(num_episodes=args.num_episodes_test)
+    for mode in eval_mode:
+        logger.info("Starting evaluation for {} action selection-------------------------------------------------".format(mode))
+        agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
     return agent
 
 

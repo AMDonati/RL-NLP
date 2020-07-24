@@ -6,7 +6,6 @@ import logging
 import random
 import torch
 import torch.optim as optim
-from nltk.translate.bleu_score import sentence_bleu
 from eval.metric import metrics
 import time
 import os
@@ -104,8 +103,54 @@ class Agent:
     def select_action(self, state, forced=None, num_truncated=10):
         pass
 
-    def finish_episode(self):
+    def generate_action_test(self, state, truncation=False, test_mode='sampling', num_truncated=10):
+        if truncation:
+            valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
+        else:
+            valid_actions, actions_probs = None, None
+        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
+        if test_mode == 'sampling':
+            action = policy_dist_truncated.sample()
+        elif test_mode == 'greedy':
+            action = torch.argmax(policy_dist_truncated.probs).view(1).detach()
+        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
+        log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
+        log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
+        return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
+
+    def generate_one_episode_test(self, env, truncation, test_mode):
+            state, ep_reward = env.reset(), 0
+            for t in range(0, env.max_len):
+                action, log_probs, value, _, dist = self.generate_action_test(state=state,
+                                                                              truncation=truncation,
+                                                                              num_truncated=self.num_truncated,
+                                                                              test_mode=test_mode)
+                new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+                for key, metric in self.test_metrics.items():
+                    metric.fill(state=state, done=done,
+                                ref_question=env.ref_questions_decoded, reward=reward,
+                                closest_question=closest_question)
+                state = new_state
+                if done:
+                    break
+            for key, metric in self.test_metrics.items():
+                metric.compute(state=state, closest_question=closest_question,
+                               reward=reward)
+                metric.write()
+            logging.info('Episode Img Idx: {}'.format(env.img_idx))
+            # reset metrics key value for writing:
+            for m in self.test_metrics.values():
+                m.train_test = env.mode + '_' + test_mode
+            return state, closest_question, self.test_metrics
+
+
+    def generate_one_episode_with_lm(self, env, test_mode='sampling'):
+        #TODO: to complete.
+        #TODO: do it even for algo not using the truncation.
         pass
+
+    #TODO: add a save dialog function (writing to .txt file)
 
     def save(self, out_file):
         with open(out_file, 'wb') as f:
@@ -125,58 +170,34 @@ class Agent:
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
         loss = checkpoint['loss']
-
         return epoch, loss
 
-    def get_metrics(self, question):
-        self.generated_text.append(question.view(-1)[1:].cpu().numpy())
-        last_text = [item for sublist in self.generated_text[-min(10, len(self.generated_text)):] for item in sublist]
-        diversity_metric = len(set(last_text)) / len(last_text)
-        return diversity_metric
-
-    def get_bleu_score(self, question):
-        question_decoded = self.env.clevr_dataset.idx2word(question.squeeze().cpu().numpy().tolist(), ignored=["<SOS>"],
-                                                           stop_at_end=True)
-        ref_questions = [q.split() for q in self.env.ref_questions_decoded]
-        question_tokens = question_decoded.split()
-        score = sentence_bleu(ref_questions, question_tokens)
-        return score
-
-    def test(self, log_interval=1, num_episodes=10):
+    def test(self, num_episodes=10, test_mode='sampling'):
         for env in self.test_envs:
-            self.test_env(env, log_interval=log_interval, num_episodes=num_episodes)
+            logging.info('Starting Evaluation for {} dialog ------------------------------------'.format(env.mode))
+            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode)
 
-    def test_env(self, env, log_interval=1, num_episodes=10):
+    def test_env(self, env, num_episodes=10, test_mode='sampling'):
         for m in self.test_metrics.values():
-            m.train_test = env.mode
+            m.train_test = env.mode + '_' + test_mode
         self.generated_text = []
         self.policy.eval()
-        running_reward, idx_step = 0, 0
+        truncation = {"no_trunc": False, "with_trunc": True} if self.pretrained_lm else {"no_trunc": False}
+        dialogs = {}
         for i_episode in range(num_episodes):
-            state, ep_reward = env.reset(), 0
-            for t in range(0, env.max_len):
-                action, log_probs, value, (
-                    valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
-                                                                                                  num_truncated=self.num_truncated)
-                idx_step += 1
-                new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
-                for key, metric in self.test_metrics.items():
-                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
-                                ref_question=env.ref_questions_decoded, reward=reward,
-                                closest_question=closest_question, new_state=new_state, log_probs=log_probs,
-                                log_probs_truncated=log_probs_truncated)
-                state = new_state
+            logging.info('-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(i_episode))
+            seed = np.random.seed() # setting the seed to generate the episode with the same image. #TODO: does not work...
+            for key, trunc in truncation.items():
+                for m in self.test_metrics.values():
+                    m.train_test = m.train_test + '_' + key
+                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode)
+                dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question
+            for _, dialog in dialogs.items():
+                logging.info(dialog)
+            logging.info('----------------------------------------------------------------------------------------------------------------------')
+        #TODO: add bleu score over 2 dialogs.
+        #TODO: add mean and variance of metrics.
 
-                if done:
-                    break
-            for key, metric in self.test_metrics.items():
-                metric.compute(state=state, closest_question=closest_question,
-                               reward=reward)
-            if i_episode % log_interval == 0:
-                for key, metric in self.test_metrics.items():
-                    metric.write()
-
-            # TODO: add the mean's reward and variance.
 
     def learn(self, num_episodes=100):
         start_time = time.time()
@@ -236,8 +257,8 @@ class Agent:
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % self.log_interval == 0:
                 logging.info(
-                    "----------------------------------------- Episode {} -------------------------------------------------------".format(
-                        i_episode))
+                    "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
+                        i_episode, self.env.img_idx))
                 logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, running_reward))
                 # logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
@@ -266,9 +287,10 @@ class Agent:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
         if self.pretrained_lm is not None:
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
-                                                                                       'train_action_probs_truncated',
-                                                                                       'train_action_probs_lm']]}})
-        logging.info(
-            "--------------------------------------------END OF TRAINING ----------------------------------------------------")
+                                                                                               'train_action_probs_truncated',
+                                                                                               'train_action_probs_lm']]}})
+
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info("running_reward: {}".format(running_reward))
+        logging.info(
+            "--------------------------------------------END OF TRAINING ----------------------------------------------------")
