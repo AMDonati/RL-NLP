@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import time
+import logging
+
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -168,9 +170,11 @@ class LMVAMetric(Metric):
             if len(closest_question) > self.idx_word:
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
+                    logging.info("+VA")
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
+
 
 class PoliciesRatioMetric(Metric):
     def __init__(self, agent, train_test):
@@ -179,11 +183,13 @@ class PoliciesRatioMetric(Metric):
         self.key = "policies_discrepancy"
 
     def fill_(self, **kwargs):
-        ratios = np.exp(kwargs["log_probs"].detach().cpu().numpy() - kwargs["log_probs_truncated"].detach().cpu().numpy())
+        ratios = np.exp(
+            kwargs["log_probs"].detach().cpu().numpy() - kwargs["log_probs_truncated"].detach().cpu().numpy())
         self.measure.append(ratios)
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
+
 
 class LMPolicyProbsRatio(Metric):
     def __init__(self, agent, train_test):
@@ -203,7 +209,7 @@ class LMPolicyProbsRatio(Metric):
         self.metric.append(np.mean(self.measure))
 
 
-metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric, "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio}
+metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio}
 
-
-#TODO: add TTR metric, BLEU score.
+# TODO: add TTR metric, BLEU score.
