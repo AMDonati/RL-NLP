@@ -2,18 +2,14 @@
 # https://pypi.org/project/colorlog/
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
 
-
 import logging
 import random
-
 import torch
 import torch.optim as optim
 from nltk.translate.bleu_score import sentence_bleu
-
 from eval.metric import metrics
 import time
 import os
-
 import numpy as np
 
 

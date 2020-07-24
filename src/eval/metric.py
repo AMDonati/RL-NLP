@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import time
 import logging
-
+from nltk.translate.bleu_score import sentence_bleu
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -208,8 +208,42 @@ class LMPolicyProbsRatio(Metric):
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
 
+class TTRMetric(Metric):
+    def __init__(self, agent):
+        Metric.__init__(self, agent)
+        self.type = "scalar"
+        self.key = "ttr"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["state"].text.numpy()[0])
+
+    def compute_(self, **kwargs):
+        last_text = [item for sublist in self.measure[-min(10, len(self.measure)):] for item in sublist]
+        diversity_metric = len(set(last_text)) / len(last_text)
+        self.metric.append(diversity_metric)
+
+
+class BleuMetric(Metric):
+    def __init__(self, agent):
+        Metric.__init__(self, agent)
+        self.type = "scalar"
+        self.key = "bleu"
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            question_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=["<SOS>"],
+                                                                     stop_at_end=True)
+            ref_questions = [q.split() for q in self.agent.env.ref_questions_decoded]
+            question_tokens = question_decoded.split()
+            score = sentence_bleu(ref_questions, question_tokens)
+            self.measure.append(score)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+        self.step_compute()
+
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric}
 
 # TODO: add TTR metric, BLEU score.
