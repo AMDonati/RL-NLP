@@ -155,9 +155,11 @@ class PolicyLSTMWordBatch(nn.Module):
         return policy_dist_truncated
 
     def mask_inf_truncature(self, valid_actions, logits):
-        mask = torch.ones(logits.size(0), self.num_tokens) * -float("Inf")
-        mask[:, valid_actions] = logits[:, valid_actions] #TODO: add a detach here ?
+        mask = torch.ones(logits.size(0), self.num_tokens) * -1e32
+        mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
         probs_truncated = F.softmax(mask, dim=-1)
+        # check that the truncation is right.
+        assert probs_truncated[:, valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 
@@ -263,14 +265,19 @@ if __name__ == '__main__':
     print('features shape', img_feat.shape)  # shape (num_samples, 1024, 14, 14).
 
     img_feat = torch.tensor(img_feat, dtype=torch.float32)
+    img_feat_RL = img_feat[0].unsqueeze(0)
     seq_len = 10
     num_tokens = 85
     word_emb_size = 64
     hidden_size = 128
     dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
+    dummy_text_input_RL = torch.ones(img_feat_RL.size(0), seq_len, dtype=torch.long)
 
+    # RL mode.
     model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
-    policy_dist, policy_dist_truncated, value = model(dummy_text_input, img_feat, valid_actions=[0,4,8,10])
+    policy_dist, policy_dist_truncated, value = model(dummy_text_input_RL, img_feat_RL, valid_actions=[0,4,8,10])
+    model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size, truncate_mode="masked_inf")
+    policy_dist, policy_dist_truncated, value = model(dummy_text_input_RL, img_feat_RL, valid_actions=[0, 4, 8, 10])
 
     # SL mode.
     model = PolicyLSTMBatch_SL(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
