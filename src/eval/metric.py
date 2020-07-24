@@ -65,7 +65,7 @@ class VAMetric(Metric):
         self.key = "valid_actions"
 
     def fill_(self, **kwargs):
-        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, :-1].numpy()[0])
+        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=['<PAD>'])
         if kwargs["valid_actions"] is not None:
             top_words_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["valid_actions"].cpu().numpy()[0])
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
@@ -73,16 +73,10 @@ class VAMetric(Metric):
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
         else:
             string = ""
-        ref_questions = [w + ' <EOS>' for w in kwargs["ref_question"]]
-        target_words = [w.split()[self.idx_word] for w in ref_questions]
-        string = string + '--- target words: {}'.format(', '.join(target_words)) + '--- true action: {}'.format(
-            self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, -1].numpy()))
         self.measure.append(string)
 
-    # self.idx_word += 1
-
     def compute_(self, **kwargs):
-        self.metric = [self.measure[-1]]
+        self.metric = self.measure
         pass
 
 

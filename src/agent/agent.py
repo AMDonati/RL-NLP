@@ -81,7 +81,7 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -249,10 +249,13 @@ class Agent:
                 if valid_actions is not None:
                     logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
                     logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(ep_lm_probs))
-                logging.info("--------------------------------------------------------------------------------------------------------------")
+                    logging.info('---------------------Valid action space------------------------------')
+                    logging.info('\n'.join(self.train_metrics["valid_actions"].metric))
+                logging.info("---------------------------------------------------------------------------------------------------------------------------------------")
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():
-                    metric.write()
+                    if key != 'valid_actions': #not taking the valid_actions metric.
+                        metric.write()
 
             if i_episode + 1 % 1000 == 0:
                 elapsed = time.time() - current_time
