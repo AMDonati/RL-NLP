@@ -81,7 +81,7 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["lm_valid_actions", "policies_discrepancy"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -208,7 +208,7 @@ class Agent:
 
                 timestep += 1
                 for key, metric in self.train_metrics.items():
-                    metric.fill(state=state, done=done, dist=dist, valid_actions=valid_actions,
+                    metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
                                 actions_probs=actions_probs,
                                 ref_question=self.env.ref_questions_decoded, reward=reward,
                                 closest_question=closest_question, new_state=new_state, log_probs=log_probs,

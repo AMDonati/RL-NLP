@@ -191,8 +191,25 @@ class PoliciesRatioMetric(Metric):
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
 
+class LMPolicyProbsRatio(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "lm_policy_probs_ratio"
 
-metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric, "policies_discrepancy": PoliciesRatioMetric}
+    def fill_(self, **kwargs):
+        if kwargs["valid_actions"] is not None:
+            lm_log_probs = kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]].detach().cpu().numpy()
+            ratios = np.exp(lm_log_probs - kwargs["log_probs"].detach().cpu().numpy())
+        else:
+            ratios = 0
+        self.measure.append(ratios)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
+metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric, "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio}
 
 
 #TODO: add TTR metric, BLEU score.
