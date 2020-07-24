@@ -191,7 +191,7 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
-            ep_log_probs, ep_log_probs_truncated = [], []
+            ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], [] #TODO: use a class or a dictionnary instead.
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
@@ -200,6 +200,8 @@ class Agent:
                                                                                               num_truncated=self.num_truncated)
                 ep_log_probs.append(log_probs)
                 ep_log_probs_truncated.append(log_probs_truncated)
+                if valid_actions is not None:
+                    lm_log_probs.append(actions_probs[valid_actions == action])
                 new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
@@ -233,16 +235,20 @@ class Agent:
             ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
             ep_log_probs_truncated = torch.stack(ep_log_probs_truncated).clone().detach()
             ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
+            if valid_actions is not None:
+                lm_log_probs = torch.stack(lm_log_probs).clone().detach()
+                ep_lm_probs = np.round(np.exp(lm_log_probs.cpu().squeeze().numpy()), decimals=5)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % self.log_interval == 0:
                 logging.info("----------------------------------------- Episode {} -------------------------------------------------------".format(i_episode))
-                logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
-                    i_episode, ep_reward, running_reward))
+                logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, running_reward))
                 #logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
                 logging.info('episode action probs: {}'.format(ep_probs))
-                logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
+                if valid_actions is not None:
+                    logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
+                    logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(ep_lm_probs))
                 logging.info("--------------------------------------------------------------------------------------------------------------")
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():
