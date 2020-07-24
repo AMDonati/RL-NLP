@@ -101,6 +101,7 @@ def run(args):
     if args.resume_training is not None:
         epoch, loss = agent.load_ckpt()
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
+        agent.start_episode = epoch
     agent.learn(num_episodes=args.num_episodes_train)
     agent.save(out_policy_file)
     agent.test(num_episodes=args.num_episodes_test)

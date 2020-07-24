@@ -1,3 +1,8 @@
+#TODO: add color logging:
+# https://pypi.org/project/colorlog/
+# https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
+
+
 import logging
 import random
 
@@ -71,11 +76,12 @@ class Agent:
             os.makedirs(self.checkpoints_path)
         self.generated_text = []
         self.init_metrics()
+        self.start_episode = 0
 
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["reward", "lm_valid_actions", "policies_discrepancy"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["lm_valid_actions", "policies_discrepancy"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -185,7 +191,7 @@ class Agent:
         current_time = time.time()
         running_reward = 0
         timestep = 1
-        for i_episode in range(num_episodes):
+        for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
             ep_log_probs, ep_log_probs_truncated = [], []
@@ -237,24 +243,21 @@ class Agent:
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 #logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
-                logging.info(
-                    'LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
+                logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
                 logging.info('episode action probs: {}'.format(ep_probs))
                 logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
                 logging.info("--------------------------------------------------------------------------------------------------------------")
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
-                self.writer.add_scalar('train_episode_reward', ep_reward, i_episode+1)
                 for key, metric in self.train_metrics.items():
                     metric.write()
 
-            if i_episode % 1000 == 0:
+            if i_episode + 1 % 1000 == 0:
                 elapsed = time.time() - current_time
                 logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
-
-        logging.info("TRAINING DONE")
+        logging.info("--------------------------------------------END OF TRAINING ----------------------------------------------------")
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info("running_reward: {}".format(running_reward))

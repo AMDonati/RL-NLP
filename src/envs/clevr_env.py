@@ -153,3 +153,5 @@ if __name__ == '__main__':
     make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
     # env = VectorEnv(make_env_fn, n=4)
     # env = DummyVecEnv([make_env_fn])
+
+

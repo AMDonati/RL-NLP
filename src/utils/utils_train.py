@@ -1,6 +1,9 @@
 import argparse
 import csv
 import logging
+#TODO: add color logging:
+# https://pypi.org/project/colorlog/
+# https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
 
 def str2bool(v):
     if isinstance(v, bool):
