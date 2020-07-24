@@ -147,7 +147,8 @@ class PolicyLSTMWordBatch(nn.Module):
         mask = torch.zeros(logits.size(0), self.num_tokens).to(self.device)
         mask[0, valid_actions] = 1
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
-        #probs_truncated = masked_softmax(logits, mask)
+        # check that the truncation is right.
+        assert probs_truncated[:,valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 
@@ -265,13 +266,9 @@ if __name__ == '__main__':
     word_emb_size = 64
     hidden_size = 128
     dummy_text_input = torch.ones(img_feat.size(0), seq_len, dtype=torch.long)
-    # model = PolicyGRUWord(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
-    # policy_dist, value = model(dummy_text_input, img_feat)
-    # print('policy dist', policy_dist.shape)
-    # print('value', value.shape)
 
     model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
-    policy_dist, value = model(dummy_text_input, img_feat)
+    policy_dist, policy_dist_truncated, value = model(dummy_text_input, img_feat, valid_actions=[0,4,8,10])
 
     # SL mode.
     model = PolicyLSTMBatch_SL(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)

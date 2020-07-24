@@ -111,9 +111,6 @@ class Agent:
     def finish_episode(self):
         pass
 
-    # def learn(self, env, writer, output_path="lm", log_interval=10, num_episodes=100, pretrain=False,
-    #          num_truncated=10):
-    #    pass
 
     def save(self, out_file):
         with open(out_file, 'wb') as f:
@@ -227,7 +224,6 @@ class Agent:
                 if done:
                     for key, metric in self.train_metrics.items():
                         metric.compute()
-                    #self.writer.add_scalar('train_TTR', self.get_metrics(state.text), i_episode + 1)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         loss = self.update()
                         logging.info("UPDATING POLICY WEIGHTS...")

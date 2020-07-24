@@ -13,7 +13,7 @@ class ClevrEnv(gym.Env):
     """Clevr Env"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_path, max_len, reward_type="levenshtein",
+    def __init__(self, data_path, max_len, reward_type="levenshtein_",
                  reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False):
         super(ClevrEnv, self).__init__()
         self.mode = mode
@@ -37,7 +37,9 @@ class ClevrEnv(gym.Env):
         self.State = namedtuple('State', ('text', 'img'))
         self.max_len = max_len
 
+        self.reward_type = reward_type
         self.reward_func = rewards[reward_type](reward_path)
+        self.diff_reward = diff_reward
         if diff_reward:
             self.reward_func = Differential(self.reward_func)
         self.step_idx = 0
@@ -60,7 +62,7 @@ class ClevrEnv(gym.Env):
         return self.state, (reward, closest_question), done, {}
 
     def reset(self):
-        range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != ["test_images"] else [0,
+        range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
                                                                                                       self.clevr_dataset.all_feats.shape[
                                                                                                           0]]
         self.img_idx = np.random.randint(range_images[0], range_images[1])
@@ -76,6 +78,11 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
+        # check the correctness of the reward function.
+        if self.reward_type == "levenshtein_" and not self.diff_reward:
+            reward_true_question = self.reward_func.get(question=self.ref_questions_decoded[0], ep_questions_decoded=self.ref_questions_decoded,
+                                                        step_idx=self.step_idx, done=True)
+            assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
 
         return self.state
 
@@ -120,7 +127,7 @@ class VectorEnv:
 
 
 if __name__ == '__main__':
-    env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,1')
+    env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,1', mode="test_images")
     state = env.reset()
     dict_tokens, reduced_vocab = env.get_reduced_action_space()
     print(dict_tokens)
