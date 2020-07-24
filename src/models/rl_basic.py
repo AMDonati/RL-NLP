@@ -124,11 +124,13 @@ class PolicyLSTMWordBatch(nn.Module):
         embedding = self._get_embed_text(state_text)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
-        if valid_actions is not None:
-            logits = torch.gather(logits, -1, valid_actions)
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
-        return policy_dist, policy_dist, value
+        if valid_actions is not None:
+            policy_dist_truncated = self.truncate(valid_actions, logits)
+        else:
+            policy_dist_truncated = policy_dist
+        return policy_dist, policy_dist_truncated, value
 
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
