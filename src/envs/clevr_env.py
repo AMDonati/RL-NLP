@@ -22,7 +22,6 @@ class ClevrEnv(gym.Env):
         h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
         h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(modes[self.mode]))
         vocab_path = os.path.join(data_path, 'vocab.json')
-        # self.debug_true_questions = torch.randint(0,debug_len_vocab, (2,))
         self.debug = debug.split(",")
         self.num_questions = num_questions
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
@@ -30,20 +29,13 @@ class ClevrEnv(gym.Env):
                                            vocab_path=vocab_path,
                                            max_samples=max_samples)
 
-        # num_tokens = self.clevr_dataset.len_vocab
-        # feats_shape = self.clevr_dataset.feats_shape
         SOS_idx = self.clevr_dataset.vocab_questions["<SOS>"]
         EOS_idx = self.clevr_dataset.vocab_questions["<EOS>"]
 
         Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx'))
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
         self.State = namedtuple('State', ('text', 'img'))
-        self.Episode = namedtuple('Episode',
-                                  ('img_idx', 'closest_question', 'dialog', 'rewards', 'valid_actions'))
         self.max_len = max_len
-        # self.ref_questions = torch.randint(0, self.debug_len_vocab,
-        #                                  (3, self.max_len)) if self.debug_len_vocab is not None else None
-        # self.reset()
 
         self.reward_func = rewards[reward_type](reward_path)
         if diff_reward:
@@ -57,7 +49,7 @@ class ClevrEnv(gym.Env):
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
-        question = self.clevr_dataset.idx2word(self.state.text[:,:-1].numpy()[0]) if action.item() == self.special_tokens.EOS_idx else self.clevr_dataset.idx2word(self.state.text.numpy()[0])
+        question = self.clevr_dataset.idx2word(self.state.text[:,:-1].numpy()[0]) if action.item() == self.special_tokens.EOS_idx else self.clevr_dataset.idx2word(self.state.text.numpy()[0]) #remove the EOS token if needed.
 
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded,
@@ -72,32 +64,20 @@ class ClevrEnv(gym.Env):
                                                                                                       self.clevr_dataset.all_feats.shape[
                                                                                                           0]]
         self.img_idx = np.random.randint(range_images[0], range_images[1])
-        # self.img_idx = 2
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
-        # if self.debug > 0:
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions]
         elif self.mode == "test_text":
             self.ref_questions[self.num_questions:]
-        # if self.debug:
-        # self.ref_questions = torch.tensor([[7, 8, 10, 12, 14]])
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
-        # logging.info("Questions for image {} : {}".format(self.img_idx, self.ref_questions_decoded))
-        # self.ref_questions_decoded = [self.ref_questions_decoded[0]]  # FOR DEBUGGING.
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0
         self.dialog = None
-        self.current_episode = self.Episode(self.img_idx, None, None, None, None)
 
         return self.state
-
-    def clean_ref_questions(self):
-        questions_decoded = [tokens.replace('<PAD>', '') for tokens in self.ref_questions_decoded]
-        questions_decoded = [q.strip() for q in questions_decoded]
-        self.ref_questions_decoded = questions_decoded
 
     def render(self, mode='human', close=False):
         pass
