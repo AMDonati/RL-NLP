@@ -80,7 +80,7 @@ class ClevrEnv(gym.Env):
         self.dialog = None
         # check the correctness of the reward function.
         if self.reward_type == "levenshtein_" and not self.diff_reward:
-            reward_true_question = self.reward_func.get(question=self.ref_questions_decoded[0], ep_questions_decoded=self.ref_questions_decoded,
+            reward_true_question, _ = self.reward_func.get(question=self.ref_questions_decoded[0], ep_questions_decoded=self.ref_questions_decoded,
                                                         step_idx=self.step_idx, done=True)
             assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
 

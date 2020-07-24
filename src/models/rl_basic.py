@@ -147,13 +147,13 @@ class PolicyLSTMWordBatch(nn.Module):
 
     def mask_truncature(self, valid_actions, logits):
         mask = torch.zeros(logits.size(0), self.num_tokens).to(self.device)
-        mask[0, valid_actions] = 1
+        mask[:, valid_actions] = 1
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
         # check that the truncation is right.
-        assert probs_truncated[:,valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
-        for word in range(self.num_tokens):
-            if word not in valid_actions:
-                assert probs_truncated[:,word] == 0, "ERROR IN TRUNCATION FUNCTION"
+        sum_probs_va = torch.round(probs_truncated[:, valid_actions].sum(dim=-1))
+        #assert torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))), "ERROR IN TRUNCATION FUNCTION"
+        #if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
+            #print(sum_probs_va)
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 

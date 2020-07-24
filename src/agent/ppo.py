@@ -39,8 +39,8 @@ class PPO(Agent):
         return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
-        valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
-        policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions)
+        #valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
+        policy_dist, _, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
 
