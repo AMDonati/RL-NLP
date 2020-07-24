@@ -46,7 +46,7 @@ class Agent:
     def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, log_interval=1, test_envs=[]):
+                 num_truncated=10, log_interval=10, test_envs=[]):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
@@ -71,8 +71,7 @@ class Agent:
             os.makedirs(self.checkpoints_path)
         self.generated_text = []
         self.init_metrics()
-        # self.metrics = [PPLMetric(self), RewardMetric(self), LMMetric(self), DialogMetric(self)]
-        # self.test_metrics = [RewardMetric(self, train_test="test"), LMMetric(self, train_test="test"), DialogMetric(self, train_test="test")]
+
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
@@ -181,7 +180,7 @@ class Agent:
 
             # TODO: add the mean's reward and variance.
 
-    def learn(self, log_interval=10, num_episodes=100):
+    def learn(self, num_episodes=100):
         start_time = time.time()
         current_time = time.time()
         running_reward = 0
@@ -233,16 +232,17 @@ class Agent:
             ep_log_probs_truncated = torch.stack(ep_log_probs_truncated).clone().detach()
             ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-            #if i_episode % log_interval == 0:
-            if i_episode % 1 == 0:
+            if i_episode % self.log_interval == 0:
+                logging.info("----------------------------------------- Episode {} -------------------------------------------------------".format(i_episode))
                 logging.info('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                     i_episode, ep_reward, running_reward))
                 #logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info(
-                    'Last Dialog: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
+                    'LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
                 logging.info('episode action probs: {}'.format(ep_probs))
                 logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
+                logging.info("--------------------------------------------------------------------------------------------------------------")
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 self.writer.add_scalar('train_episode_reward', ep_reward, i_episode+1)
                 for key, metric in self.train_metrics.items():
