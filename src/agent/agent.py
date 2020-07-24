@@ -1,4 +1,4 @@
-#TODO: add color logging:
+# TODO: add color logging:
 # https://pypi.org/project/colorlog/
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
 
@@ -78,10 +78,10 @@ class Agent:
         self.init_metrics()
         self.start_episode = 0
 
-
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions"]}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in
+                              ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -110,7 +110,6 @@ class Agent:
 
     def finish_episode(self):
         pass
-
 
     def save(self, out_file):
         with open(out_file, 'wb') as f:
@@ -191,13 +190,13 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
-            ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], [] #TODO: use a class or a dictionnary instead.
+            ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], []  # TODO: use a class or a dictionnary instead.
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
-                valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
-                                                                                              forced=forced,
-                                                                                              num_truncated=self.num_truncated)
+                    valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
+                                                                                                  forced=forced,
+                                                                                                  num_truncated=self.num_truncated)
                 ep_log_probs.append(log_probs)
                 ep_log_probs_truncated.append(log_probs_truncated)
                 if valid_actions is not None:
@@ -240,9 +239,11 @@ class Agent:
                 ep_lm_probs = np.round(np.exp(lm_log_probs.cpu().squeeze().numpy()), decimals=5)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
             if i_episode % self.log_interval == 0:
-                logging.info("----------------------------------------- Episode {} -------------------------------------------------------".format(i_episode))
+                logging.info(
+                    "----------------------------------------- Episode {} -------------------------------------------------------".format(
+                        i_episode))
                 logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, running_reward))
-                #logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
+                # logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
                 logging.info('episode action probs: {}'.format(ep_probs))
@@ -251,10 +252,14 @@ class Agent:
                     logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(ep_lm_probs))
                     logging.info('---------------------Valid action space------------------------------')
                     logging.info('\n'.join(self.train_metrics["valid_actions"].metric))
-                logging.info("---------------------------------------------------------------------------------------------------------------------------------------")
+                logging.info(
+                    "---------------------------------------------------------------------------------------------------------------------------------------")
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
+                self.writer.add_scalar("train_action_probs", np.mean(ep_probs), i_episode + 1)
+                self.writer.add_scalar("train_action_probs_truncated", np.mean(ep_probs_truncated), i_episode + 1)
+                self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
                 for key, metric in self.train_metrics.items():
-                    if key != 'valid_actions': #not taking the valid_actions metric.
+                    if key != 'valid_actions':  # not taking the valid_actions metric.
                         metric.write()
 
             if i_episode + 1 % 1000 == 0:
@@ -263,6 +268,11 @@ class Agent:
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
-        logging.info("--------------------------------------------END OF TRAINING ----------------------------------------------------")
+        if self.pretrained_lm is not None:
+            self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
+                                                                                       'train_action_probs_truncated',
+                                                                                       'train_action_probs_lm']]}})
+        logging.info(
+            "--------------------------------------------END OF TRAINING ----------------------------------------------------")
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info("running_reward: {}".format(running_reward))

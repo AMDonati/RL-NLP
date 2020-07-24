@@ -90,8 +90,8 @@ class PPO(Agent):
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
-            self.writer.add_scalar('vf_loss', vf_loss.mean(), self.writer_iteration + 1)
-            self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
+            self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
+            #self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
             # take gradient step
@@ -103,7 +103,7 @@ class PPO(Agent):
             self.optimizer.step()
             # compute grad norm:
             grad_norm = compute_grad_norm(self.policy)
-            self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
+            #self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
             self.writer_iteration += 1
 
         # Copy new weights into old policy:
