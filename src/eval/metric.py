@@ -3,6 +3,7 @@ import torch
 import time
 import logging
 from nltk.translate.bleu_score import sentence_bleu
+import os
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -94,7 +95,12 @@ class DialogMetric(Metric):
     def compute_(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
         closest_question_decoded = kwargs["closest_question"]
-        self.metric.append(state_decoded + '---closest question---' + closest_question_decoded)
+        string = state_decoded + '---closest question---' + closest_question_decoded
+        self.metric.append(string)
+        # write dialog in a .txt file:
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        with open(self.out_dialog_file, 'a') as f:
+            f.write(string + '\n')
         pass
 
 

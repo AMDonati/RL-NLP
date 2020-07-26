@@ -66,6 +66,7 @@ class Agent:
         self.memory = Memory()
         self.num_truncated = num_truncated
         self.writer = writer
+        self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
         if not os.path.isdir(self.checkpoints_path):
             os.makedirs(self.checkpoints_path)
@@ -76,7 +77,7 @@ class Agent:
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions"]}
+                              ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions", "dialog"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -119,8 +120,8 @@ class Agent:
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
-    def generate_one_episode_test(self, env, truncation, test_mode):
-            state, ep_reward = env.reset(), 0
+    def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
+            state = env.reset(seed=seed)
             for t in range(0, env.max_len):
                 action, log_probs, value, _, dist = self.generate_action_test(state=state,
                                                                               truncation=truncation,
@@ -186,11 +187,11 @@ class Agent:
         dialogs = {}
         for i_episode in range(num_episodes):
             logging.info('-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(i_episode))
-            seed = np.random.seed() # setting the seed to generate the episode with the same image. #TODO: does not work...
+            seed = np.random.randint(1000000) # setting the seed to generate the episode with the same image.
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
                     m.train_test = m.train_test + '_' + key
-                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode)
+                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
                 dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question
             for _, dialog in dialogs.items():
                 logging.info(dialog)
@@ -207,7 +208,7 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
-            ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], []  # TODO: use a class or a dictionnary instead.
+            ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], []  # TODO: use the Memory Class or the Metric Class instead.
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
@@ -241,7 +242,7 @@ class Agent:
                 ep_reward += reward
                 if done:
                     for key, metric in self.train_metrics.items():
-                        metric.compute()
+                        metric.compute(state=state, closest_question=closest_question)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         loss = self.update()
                         logging.info("UPDATING POLICY WEIGHTS...")
@@ -276,7 +277,7 @@ class Agent:
                 self.writer.add_scalar("train_action_probs_truncated", np.mean(ep_probs_truncated), i_episode + 1)
                 self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
                 for key, metric in self.train_metrics.items():
-                    if key != 'valid_actions':  # not taking the valid_actions metric.
+                    if key != 'valid_actions' or key!='reward':  # not taking the valid_actions metric. #TODO: not outputting in Tensorboard and only in the logging? In that case, overwrite the write function for these metric.
                         metric.write()
 
             if i_episode + 1 % 1000 == 0:

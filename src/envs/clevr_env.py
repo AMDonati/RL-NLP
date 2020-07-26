@@ -61,17 +61,19 @@ class ClevrEnv(gym.Env):
             self.dialog = question
         return self.state, (reward, closest_question), done, {}
 
-    def reset(self):
+    def reset(self, seed=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
                                                                                                       self.clevr_dataset.all_feats.shape[
                                                                                                           0]]
+        if seed is not None:
+            np.random.seed(seed)
         self.img_idx = np.random.randint(range_images[0], range_images[1])
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
         if self.mode == "train":
-            self.ref_questions = self.ref_questions[0:self.num_questions]
+            self.ref_questions = self.ref_questions[0:self.num_questions, :]
         elif self.mode == "test_text":
-            self.ref_questions[self.num_questions:]
+            self.ref_questions[self.num_questions:, :]
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
@@ -127,15 +129,13 @@ class VectorEnv:
 
 
 if __name__ == '__main__':
-    env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,1', mode="test_images")
-    state = env.reset()
-    dict_tokens, reduced_vocab = env.get_reduced_action_space()
-    print(dict_tokens)
-    print(list(dict_tokens.values()))
-    print('len', len(dict_tokens))
-    act_idx = 5
-    action = dict_tokens[5]
-    print(act_idx, action)
+    env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,20', mode="test_images")
+    seed = 123
+    seed = np.random.randint(100000)
+    state = env.reset(seed)
+    print('Img Idx', env.img_idx)
+    state = env.reset(seed)
+    print('Img Idx', env.img_idx)
 
     make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
     # env = VectorEnv(make_env_fn, n=4)
