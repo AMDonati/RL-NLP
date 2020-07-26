@@ -73,7 +73,7 @@ class ClevrEnv(gym.Env):
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
         elif self.mode == "test_text":
-            self.ref_questions[self.num_questions:, :]
+            self.ref_questions = self.ref_questions[self.num_questions:, :]
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
