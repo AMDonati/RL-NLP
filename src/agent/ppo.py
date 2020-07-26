@@ -89,7 +89,7 @@ class PPO(Agent):
             #                                                 vf_loss.mean()))
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
-            self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
+            #self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
             #self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)

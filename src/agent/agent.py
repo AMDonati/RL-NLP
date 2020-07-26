@@ -275,7 +275,8 @@ class Agent:
                 self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 self.writer.add_scalar("train_action_probs", np.mean(ep_probs), i_episode + 1)
                 self.writer.add_scalar("train_action_probs_truncated", np.mean(ep_probs_truncated), i_episode + 1)
-                self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
+                if valid_actions is not None:
+                    self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
                 for key, metric in self.train_metrics.items():
                     if key != 'valid_actions' or key!='reward':  # not taking the valid_actions metric. #TODO: not outputting in Tensorboard and only in the logging? In that case, overwrite the write function for these metric.
                         metric.write()
