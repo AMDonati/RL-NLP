@@ -151,7 +151,6 @@ class Agent:
         #TODO: do it even for algo not using the truncation.
         pass
 
-    #TODO: add a save dialog function (writing to .txt file)
 
     def save(self, out_file):
         with open(out_file, 'wb') as f:
