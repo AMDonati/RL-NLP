@@ -163,17 +163,49 @@ class PPLMetric(Metric):
         #         target_word_log_prob = kwargs["dist"].log_prob(ref_question[self.idx_word].to(self.agent.device))
         #         self.measure.append(target_word_log_prob)
         if kwargs["done"]:
-            for ref_question in kwargs["ref_question"]:
+            for ref_question in kwargs["ref_question"]: #TODO: add SOS and EOS token.
                 inp_question = ref_question[:-1]
                 target_question = ref_question[1:]
                 for i in range(len(inp_question)):
                     inputs = inp_question[:i + 1].unsqueeze(0)
-                    policy_dist, _, _ = self.agent.policy(inputs, kwargs["img"], valid_actions=None)
+                    policy_dist, _, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=None) #TODO: "img" not needed. use state instead.
                     log_prob = policy_dist.log_prob(target_question[i])
                     self.measure.append(log_prob)
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().numpy().item()
+        self.metric.append(ppl)
+        if not self.train_test + '_' + self.key in self.dict_ppl:
+            self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_ppl[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def write_to_csv(self):
+        for key, value in self.dict_ppl.items():
+            self.dict_ppl[key].append(np.mean(value))
+            self.dict_ppl[key].append(np.std(value))
+        write_to_csv(self.out_csv_file, self.dict_ppl)
+
+    def write(self):
+        pass
+
+class PPLDialogfromLM(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "ppl_dialog_lm"
+        self.dict_ppl = {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            with torch.no_grad():
+                log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:,:-1])
+                for i, word in enumerate(kwargs["new_state"].text[:,1:].view(-1)):
+                    self.measure.append(log_probas[i,word.numpy()])
+
+    def compute_(self, **kwargs):
+        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).numpy().item()
         self.metric.append(ppl)
         if not self.train_test + '_' + self.key in self.dict_ppl:
             self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
@@ -310,5 +342,5 @@ class LMMetric(Metric):
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM}
 

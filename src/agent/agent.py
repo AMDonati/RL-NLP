@@ -76,7 +76,7 @@ class Agent:
         self.start_episode = 0
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
 
@@ -134,12 +134,12 @@ class Agent:
                 ep_reward += reward
                 for key, metric in self.test_metrics.items():
                     if key != "ppl":
-                        metric.fill(state=state, done=done,
+                        metric.fill(state=state, done=done, new_state=new_state,
                                 ref_question=env.ref_questions, reward=reward,
                                 closest_question=closest_question, dist=dist, img=env.img_feats.unsqueeze(0))
                     else:
                         if not truncation and test_mode == "sampling":
-                            metric.fill(state=state, done=done,
+                            metric.fill(state=state, done=done, new_state=new_state,
                                         ref_question=env.ref_questions, reward=reward,
                                         closest_question=closest_question,
                                         dist=dist,
