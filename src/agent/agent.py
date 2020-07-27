@@ -107,6 +107,7 @@ class Agent:
         pass
 
     def generate_action_test(self, state, truncation=False, test_mode='sampling', num_truncated=10):
+        #TODO: add a torch.no_grad() ?
         if truncation:
             valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
         else:
@@ -135,13 +136,14 @@ class Agent:
                     if key != "ppl":
                         metric.fill(state=state, done=done,
                                 ref_question=env.ref_questions, reward=reward,
-                                closest_question=closest_question, dist=dist)
+                                closest_question=closest_question, dist=dist, img=env.img_feats.unsqueeze(0))
                     else:
                         if not truncation and test_mode == "sampling":
                             metric.fill(state=state, done=done,
                                         ref_question=env.ref_questions, reward=reward,
                                         closest_question=closest_question,
-                                        dist=dist)
+                                        dist=dist,
+                                        img=env.img_feats.unsqueeze(0))
                 state = new_state
                 if done:
                     break

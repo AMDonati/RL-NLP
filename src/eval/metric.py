@@ -158,10 +158,19 @@ class PPLMetric(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
 
     def fill_(self, **kwargs):
-        for ref_question in kwargs["ref_question"]:
-            if len(ref_question) > self.idx_word:
-                target_word_log_prob = kwargs["dist"].log_prob(ref_question[self.idx_word].to(self.agent.device))
-                self.measure.append(target_word_log_prob)
+        # for ref_question in kwargs["ref_question"]:
+        #     if len(ref_question) > self.idx_word:
+        #         target_word_log_prob = kwargs["dist"].log_prob(ref_question[self.idx_word].to(self.agent.device))
+        #         self.measure.append(target_word_log_prob)
+        if kwargs["done"]:
+            for ref_question in kwargs["ref_question"]:
+                inp_question = ref_question[:-1]
+                target_question = ref_question[1:]
+                for i in range(len(inp_question)):
+                    inputs = inp_question[:i + 1].unsqueeze(0)
+                    policy_dist, _, _ = self.agent.policy(inputs, kwargs["img"], valid_actions=None)
+                    log_prob = policy_dist.log_prob(target_question[i])
+                    self.measure.append(log_prob)
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().numpy().item()
@@ -170,7 +179,6 @@ class PPLMetric(Metric):
             self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
             self.dict_ppl[self.train_test + '_' + self.key].append(self.metric[-1])
-        self.reset()
 
     def write_to_csv(self):
         for key, value in self.dict_ppl.items():
