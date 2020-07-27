@@ -118,7 +118,8 @@ class PolicyLSTMWordBatch(nn.Module):
 
         truncature = {"masked": self.mask_truncature, "gather": self.gather_truncature,
                       "masked_inf": self.mask_inf_truncature}
-        self.truncate = truncature[truncate_mode]
+        #self.truncate = truncature[truncate_mode]
+        self.truncate = truncature["masked"]
 
     def forward(self, state_text, state_img, valid_actions=None):
         embedding = self._get_embed_text(state_text)
@@ -151,7 +152,7 @@ class PolicyLSTMWordBatch(nn.Module):
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
         # check that the truncation is right.
         sum_probs_va = torch.round(probs_truncated[:, valid_actions].sum(dim=-1))
-        #assert torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))), "ERROR IN TRUNCATION FUNCTION"
+        assert torch.all(sum_probs_va - torch.ones(sum_probs_va.size()) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
         #if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
             #print(sum_probs_va)
         policy_dist_truncated = Categorical(probs_truncated)
@@ -192,7 +193,6 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
-
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:

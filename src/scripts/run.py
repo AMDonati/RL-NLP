@@ -1,10 +1,8 @@
 import argparse
 import datetime
 import os
-
 import torch
 from torch.utils.tensorboard import SummaryWriter
-
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
@@ -25,8 +23,13 @@ def run(args):
     out_policy_file = os.path.join(output_path, 'model.pth')
 
     logger = create_logger(out_file_log, level=args.logger_level)
-    truncated = "basic" if args.lm_path is None else "truncated"
+    truncated = "basic" if args.truncate_mode is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
+    logger.info("RL from {} ...".format(pre_trained))
+    if args.truncate_mode is not None:
+        logger.info("with truncation")
+    else:
+        logger.info("without truncation")
     out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_eps-adam{}_gradclip{}_trunc_{}_diffrew{}".format(
         args.agent,
         args.model,
@@ -69,8 +72,7 @@ def run(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
-                                stride=args.stride, num_filters=args.num_filters, rl=True,
-                                truncate_mode=args.truncate_mode)
+                                stride=args.stride, num_filters=args.num_filters, rl=True)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
@@ -82,6 +84,7 @@ def run(args):
                       "eps": args.eps,
                       "grad_clip": args.grad_clip,
                       "num_truncated": args.num_truncated, "writer": writer,
+                      "truncate_mode": args.truncate_mode,
                       "out_path": output_path,
                       "log_interval": args.log_interval, "env": envs[0],
                       "test_envs": envs}
@@ -124,9 +127,8 @@ def get_parser():
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=500, help="number of episodes test")
-
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -137,13 +139,13 @@ def get_parser():
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-eps', type=float, default=1e-08, help='epsilon value for adam optimizer')
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
-    parser.add_argument('-truncate_mode', type=str, default="masked", help="truncation mode")
+    parser.add_argument('-truncate_mode', type=str, help="truncation mode")
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
     parser.add_argument('-grad_clip', type=float, help="value of gradient norm clipping")
-    parser.add_argument('-lm_path', type=str, default=None,
+    parser.add_argument('-lm_path', type=str, required=True,
                         help="if specified, the language model truncate the action space")
     parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
     parser.add_argument('-policy_path', type=str, default=None,

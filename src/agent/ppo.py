@@ -9,6 +9,7 @@ from agent.agent import Agent
 class PPO(Agent):
     def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, eps_clip=0.2, grad_clip=None,
                  pretrained_lm=None,
+                 truncate_mode="masked",
                  lm_sl=True,
                  update_every=100, num_truncated=10,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
@@ -17,6 +18,7 @@ class PPO(Agent):
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
+                       truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs)
         self.policy_old = policy
         self.policy_old.to(self.device)

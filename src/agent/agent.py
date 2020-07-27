@@ -47,8 +47,7 @@ class Agent:
     def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, log_interval=10, test_envs=[]):
-
+                 num_truncated=10, truncate_mode="masked", log_interval=10, test_envs=[]):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
@@ -58,6 +57,7 @@ class Agent:
         self.log_interval = log_interval
         self.test_envs = test_envs
         self.pretrained_lm = pretrained_lm
+        self.truncate_mode = truncate_mode
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.lm_sl = lm_sl
@@ -87,20 +87,21 @@ class Agent:
         :param top_k: number of words
         :return: top k words
         """
-        if self.lm_sl:
-            seq_len = state_text.size(1)
-            if self.pretrained_lm is None:
-                return None, None
-            log_probas, _ = self.pretrained_lm(state_text.to(self.device))
-            log_probas = log_probas.view(len(state_text), seq_len, -1)
-            log_probas = log_probas[:, -1, :]
-            top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+        if self.truncate_mode is None:
+            return None, None
         else:
-            dist, dist_, value = self.pretrained_lm(state_text, state_img)
-            probs = dist.probs
-            top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
+            if self.lm_sl:
+                seq_len = state_text.size(1)
+                log_probas, _ = self.pretrained_lm(state_text.to(self.device))
+                log_probas = log_probas.view(len(state_text), seq_len, -1)
+                log_probas = log_probas[:, -1, :]
+                top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+            else:
+                dist, dist_, value = self.pretrained_lm(state_text, state_img)
+                probs = dist.probs
+                top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
 
-        return top_k_indices, top_k_weights
+            return top_k_indices, top_k_weights
 
     def select_action(self, state, forced=None, num_truncated=10):
         pass
@@ -205,7 +206,7 @@ class Agent:
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.generated_text = []
         self.policy.eval()
-        truncation = {"no_trunc": False, "with_trunc": True} if self.pretrained_lm else {"no_trunc": False}
+        truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
         dialogs = {}
         for i_episode in range(num_episodes):
             logging.info('-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(i_episode))
@@ -215,9 +216,8 @@ class Agent:
                     m.reinit_train_test(m.train_test + '_' + key)
                 state, ep_reward, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
                 dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
-            if self.pretrained_lm is not None:
-                _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
-                dialogs["from_lm"] = 'DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
+            _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
+            dialogs["from_lm"] = 'DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
             for _, dialog in dialogs.items():
                 logging.info(dialog)
             logging.info('-------------------------------------------------------------------------------------------------------------------------------------------------------')
@@ -311,7 +311,7 @@ class Agent:
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
-        if self.pretrained_lm is not None:
+        if valid_actions is not None:
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})

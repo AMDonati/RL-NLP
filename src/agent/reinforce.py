@@ -9,12 +9,13 @@ from RL_toolbox.RL_functions import compute_grad_norm
 class REINFORCE(Agent):
     def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
                  lm_sl=True,
-                 pretrain=False, update_every=50, num_truncated=10, log_interval=10):
+                 pretrain=False, update_every=50, num_truncated=10, truncate_mode="masked" ,log_interval=10):
         Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, eps=eps, grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
+                       truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs)
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
@@ -32,8 +33,8 @@ class REINFORCE(Agent):
         return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
-        valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
-        policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions)
+        #valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
+        policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
 
@@ -71,7 +72,7 @@ class REINFORCE(Agent):
         self.optimizer.step()
         # compute grad norm:
         grad_norm = compute_grad_norm(self.policy)
-        self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
+        #self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
         self.writer_iteration += 1
 
         # compute new log_probs for comparison with old ones:
