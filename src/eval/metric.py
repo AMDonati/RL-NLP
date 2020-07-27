@@ -173,7 +173,7 @@ class RewardMetric(Metric):
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
-            self.measure.append(kwargs["reward"])
+            self.measure.append(kwargs["reward"]) #TODO: does not work with differential reward ?
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))

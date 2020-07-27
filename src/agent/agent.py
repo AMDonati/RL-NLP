@@ -166,6 +166,12 @@ class Agent:
         reward, closest_question = env.reward_func.get(question=state_decoded,
                                                         ep_questions_decoded=env.ref_questions_decoded,
                                                         step_idx=env.max_len, done=True)
+        self.test_metrics["reward"].reinit_train_test(self.test_metrics["reward"].train_test + '_' + 'fromLM')
+        self.test_metrics["reward"].fill(done=True, reward=reward) #TODO: does not work with differential reward.
+        self.test_metrics["reward"].compute()
+        # reset metrics key value for writing:
+        for m in self.test_metrics.values():
+            m.reinit_train_test(env.mode + '_' + test_mode)
         return state, state_decoded, reward, closest_question
 
 
