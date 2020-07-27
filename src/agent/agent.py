@@ -76,7 +76,7 @@ class Agent:
         self.start_episode = 0
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
 
@@ -132,16 +132,29 @@ class Agent:
                 new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
                 ep_reward += reward
                 for key, metric in self.test_metrics.items():
-                    metric.fill(state=state, done=done,
-                                ref_question=env.ref_questions_decoded, reward=reward,
-                                closest_question=closest_question)
+                    if key != "ppl":
+                        metric.fill(state=state, done=done,
+                                ref_question=env.ref_questions, reward=reward,
+                                closest_question=closest_question, dist=dist)
+                    else:
+                        if not truncation and test_mode == "sampling":
+                            metric.fill(state=state, done=done,
+                                        ref_question=env.ref_questions, reward=reward,
+                                        closest_question=closest_question,
+                                        dist=dist)
                 state = new_state
                 if done:
                     break
             for key, metric in self.test_metrics.items():
-                metric.compute(state=state, closest_question=closest_question,
+                if key != "ppl":
+                    metric.compute(state=state, closest_question=closest_question,
                                reward=reward)
-                metric.write()
+                    metric.write()
+                else:
+                    if not truncation and test_mode == "sampling":
+                        metric.compute(state=state, closest_question=closest_question,
+                                       reward=reward)
+                        metric.write()
             logging.info('Episode Img Idx: {}'.format(env.img_idx))
             # reset metrics key value for writing:
             for m in self.test_metrics.values():
@@ -205,7 +218,7 @@ class Agent:
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.generated_text = []
-        self.policy.eval()
+        self.policy.eval() #TODO: add a with torch.no_grad() as well ? (avoid the .detach() everywhere).
         truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
         dialogs = {}
         for i_episode in range(num_episodes):

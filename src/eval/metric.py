@@ -1,11 +1,9 @@
 import numpy as np
 import torch
-import time
 import logging
 from nltk.translate.bleu_score import sentence_bleu
 import os
-from utils.utils_train import append_list_as_row, write_to_csv
-import pandas as pd
+from utils.utils_train import write_to_csv
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -47,26 +45,7 @@ class Metric:
         pass
 
 
-class LMMetric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "text"
-        self.key = "lm"
-
-    def fill_(self, **kwargs):
-        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
-        top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, self.agent.num_truncated, sorted=True)
-        if self.agent.pretrained_lm != None:
-            top_k_indices = torch.gather(kwargs["valid_actions"], 1, top_k_indices)
-        top_words_decoded = self.agent.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
-        weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                         zip(top_words_decoded.split(), top_k_weights[0].cpu().detach().numpy())]
-        self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
-
-    def compute_(self, **kwargs):
-        self.metric = [self.measure[-1]]
-        pass
-
+# ----------------------------------    TRAIN METRICS -------------------------------------------------------------------------------------
 
 class VAMetric(Metric):
     def __init__(self, agent, train_test):
@@ -88,106 +67,6 @@ class VAMetric(Metric):
     def compute_(self, **kwargs):
         self.metric = self.measure
         pass
-
-
-class DialogMetric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "text"
-        self.key = "dialog"
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
-
-    def fill_(self, **kwargs):
-        pass
-
-    def reinit_train_test(self, train_test):
-        self.train_test = train_test
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
-
-    def compute_(self, **kwargs):
-        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
-        closest_question_decoded = kwargs["closest_question"]
-        string = state_decoded + '---closest question---' + closest_question_decoded
-        self.metric.append(string)
-        # write dialog in a .txt file:
-        with open(self.out_dialog_file, 'a') as f:
-            f.write(string + '\n')
-        pass
-
-
-class RefQuestionsMetric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "ratio_closest_questions"
-
-    def fill_(self, **kwargs):
-        if kwargs["done"]:
-            self.measure.append(kwargs["closest_question"])
-
-    def compute_(self, **kwargs):
-        unique_ratio = len(list(set(self.measure))) / len(self.measure)
-        self.metric.append(unique_ratio)
-
-
-class PPLMetric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "ppl"
-
-    def fill_(self, **kwargs):
-        if self.agent.pretrained_lm is None:
-            target_word_log_prob = kwargs["dist"].log_prob(kwargs["ref_question"][self.idx_word].to(self.agent.device))
-            self.measure.append(target_word_log_prob)
-        else:
-            if kwargs["ref_question"].to(self.agent.device) in kwargs["valid_actions"]:
-                target_word = list(kwargs["valid_actions"].view(-1).cpu().numpy()).index(
-                    kwargs["ref_question"][self.idx_word])
-                target_word_log_prob = kwargs["dist"].log_prob(
-                    torch.tensor([target_word]).float().to(self.agent.device))
-                self.measure.append(target_word_log_prob)
-            # else:
-            # case where the target word is not in the top words of the language model
-            # target_word_log_prob = torch.tensor([-10]).float().to(self.device) #TODO: remove the else.
-        # self.idx_word += 1
-        # self.idx_step += 1
-
-    def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / self.idx_step).detach().numpy()
-        self.metric.append(ppl)
-        self.reset()
-
-
-class RewardMetric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "reward"
-        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
-        self.dict_rewards = {}
-
-    def reinit_train_test(self, train_test):
-        self.train_test = train_test
-
-    def fill_(self, **kwargs):
-        condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
-        if condition:
-            self.measure.append(kwargs["reward"]) #TODO: does not work with differential reward ?
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-        if not self.train_test + '_' + self.key in self.dict_rewards:
-            self.dict_rewards[self.train_test + '_' + self.key] = [self.metric[-1]]
-        else:
-            self.dict_rewards[self.train_test + '_' + self.key].append(self.metric[-1])
-
-    def write_to_csv(self):
-        for key, value in self.dict_rewards.items():
-            self.dict_rewards[key].append(np.mean(value))
-            self.dict_rewards[key].append(np.std(value))
-        write_to_csv(self.out_csv_file, self.dict_rewards)
-
 
 class LMVAMetric(Metric):
     def __init__(self, agent, train_test):
@@ -240,20 +119,98 @@ class LMPolicyProbsRatio(Metric):
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
 
-class TTRMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
-        self.type = "scalar"
-        self.key = "ttr"
+
+# --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
+
+class DialogMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "text"
+        self.key = "dialog"
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["state"].text.numpy()[0])
+        pass
+
+    def reinit_train_test(self, train_test):
+        self.train_test = train_test
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
 
     def compute_(self, **kwargs):
-        last_text = [item for sublist in self.measure[-min(10, len(self.measure)):] for item in sublist]
-        diversity_metric = len(set(last_text)) / len(last_text)
-        self.metric.append(diversity_metric)
+        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
+        closest_question_decoded = kwargs["closest_question"]
+        string = state_decoded + '---closest question---' + closest_question_decoded
+        self.metric.append(string)
+        # write dialog in a .txt file:
+        with open(self.out_dialog_file, 'a') as f:
+            f.write(string + '\n')
+        pass
 
+class PPLMetric(Metric):
+    """
+    https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
+    """
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "ppl"
+        self.dict_ppl = {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+
+    def fill_(self, **kwargs):
+        for ref_question in kwargs["ref_question"]:
+            if len(ref_question) > self.idx_word:
+                target_word_log_prob = kwargs["dist"].log_prob(ref_question[self.idx_word].to(self.agent.device))
+                self.measure.append(target_word_log_prob)
+
+    def compute_(self, **kwargs):
+        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().numpy().item()
+        self.metric.append(ppl)
+        if not self.train_test + '_' + self.key in self.dict_ppl:
+            self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_ppl[self.train_test + '_' + self.key].append(self.metric[-1])
+        self.reset()
+
+    def write_to_csv(self):
+        for key, value in self.dict_ppl.items():
+            self.dict_ppl[key].append(np.mean(value))
+            self.dict_ppl[key].append(np.std(value))
+        write_to_csv(self.out_csv_file, self.dict_ppl)
+
+    def write(self):
+        pass
+
+
+class RewardMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "reward"
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_rewards = {}
+
+    def fill_(self, **kwargs):
+        condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
+        if condition:
+            self.measure.append(kwargs["reward"]) #TODO: does not work with differential reward ?
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+        if not self.train_test + '_' + self.key in self.dict_rewards:
+            self.dict_rewards[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_rewards[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def write_to_csv(self):
+        for key, value in self.dict_rewards.items():
+            self.dict_rewards[key].append(np.mean(value))
+            self.dict_rewards[key].append(np.std(value))
+        write_to_csv(self.out_csv_file, self.dict_rewards)
+
+    def write(self):
+        '''Overwrite write function to avoid logging on tensorboard.'''
+        pass
 
 class BleuMetric(Metric):
     def __init__(self, agent, train_test):
@@ -286,8 +243,64 @@ class BleuMetric(Metric):
             self.dict_bleus[key].append(np.std(value))
         write_to_csv(self.out_csv_file, self.dict_bleus)
 
+    def write(self):
+        '''Overwrite write function to avoid logging on tensorboard.'''
+        pass
+
+# ------------------------ DIVERSITY METRICS -------------------------------------------------------------------------------------------------------------------
+
+class RefQuestionsMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "ratio_closest_questions"
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            self.measure.append(kwargs["closest_question"])
+
+    def compute_(self, **kwargs):
+        unique_ratio = len(list(set(self.measure))) / len(self.measure)
+        self.metric.append(unique_ratio)
+
+
+class TTRMetric(Metric):
+    def __init__(self, agent):
+        Metric.__init__(self, agent)
+        self.type = "scalar"
+        self.key = "ttr"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["state"].text.numpy()[0])
+
+    def compute_(self, **kwargs):
+        last_text = [item for sublist in self.measure[-min(10, len(self.measure)):] for item in sublist]
+        diversity_metric = len(set(last_text)) / len(last_text)
+        self.metric.append(diversity_metric)
+
+# --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
+
+class LMMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "text"
+        self.key = "lm"
+
+    def fill_(self, **kwargs):
+        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
+        top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, self.agent.num_truncated, sorted=True)
+        if self.agent.pretrained_lm != None:
+            top_k_indices = torch.gather(kwargs["valid_actions"], 1, top_k_indices)
+        top_words_decoded = self.agent.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
+        weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
+                         zip(top_words_decoded.split(), top_k_weights[0].cpu().detach().numpy())]
+        self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
+
+    def compute_(self, **kwargs):
+        self.metric = [self.measure[-1]]
+        pass
+
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric}
 
-# TODO: add TTR metric, BLEU score.
