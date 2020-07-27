@@ -10,6 +10,7 @@ from eval.metric import metrics
 import time
 import os
 import numpy as np
+from torch.distributions import Categorical
 
 
 class Memory:
@@ -77,7 +78,7 @@ class Agent:
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions", "dialog"]}
+                              ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
 
     def get_top_k_words(self, state_text, top_k=10, state_img=None):
         """
@@ -146,11 +147,26 @@ class Agent:
                 m.reinit_train_test(env.mode + '_' + test_mode)
             return state, ep_reward, closest_question, self.test_metrics
 
-
     def generate_one_episode_with_lm(self, env, test_mode='sampling'):
-        #TODO: to complete.
-        #TODO: do it even for algo not using the truncation.
-        pass
+        state = env.special_tokens.SOS_idx
+        state = torch.LongTensor([state]).view(1, 1).to(self.device)
+        with torch.no_grad():
+            for i in range(env.max_len):
+                log_probas, hidden = self.pretrained_lm(state)  # output (1, num_tokens)
+                if test_mode == 'sampling':
+                    softmax = log_probas[-1,:].squeeze().exp()
+                    word_idx = Categorical(softmax).sample()
+                elif test_mode == 'greedy':
+                    word_idx = log_probas[-1,:].squeeze().argmax()
+                state = torch.cat([state, word_idx.view(1,1)], dim=1)
+                if word_idx == env.special_tokens.EOS_idx:
+                    break
+        state_decoded = self.env.clevr_dataset.idx2word(state.squeeze().cpu().numpy(), stop_at_end=True, ignored=['<SOS>'])
+        # compute associated reward with reward function:
+        reward, closest_question = env.reward_func.get(question=state_decoded,
+                                                        ep_questions_decoded=env.ref_questions_decoded,
+                                                        step_idx=env.max_len, done=True)
+        return state, state_decoded, reward, closest_question
 
 
     def save(self, out_file):
@@ -175,7 +191,7 @@ class Agent:
 
     def test(self, num_episodes=10, test_mode='sampling'):
         for env in self.test_envs:
-            logging.info('Starting Evaluation for {} dialog ------------------------------------'.format(env.mode))
+            logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode)
 
     def test_env(self, env, num_episodes=10, test_mode='sampling'):
@@ -191,13 +207,15 @@ class Agent:
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
                     m.reinit_train_test(m.train_test + '_' + key)
-                state, ep_reward, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, i_episode=i_episode, seed=seed)
+                state, ep_reward, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
                 dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
+            if self.pretrained_lm is not None:
+                _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
+                dialogs["from_lm"] = 'DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
             for _, dialog in dialogs.items():
                 logging.info(dialog)
-            logging.info('----------------------------------------------------------------------------------------------------------------------')
+            logging.info('-------------------------------------------------------------------------------------------------------------------------------------------------------')
         #TODO: add bleu score over 2 dialogs.
-        #TODO: add mean and variance of metrics.
 
 
     def learn(self, num_episodes=100):
@@ -278,7 +296,7 @@ class Agent:
                 if valid_actions is not None:
                     self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
                 for key, metric in self.train_metrics.items():
-                    if key != 'lm_valid_actions' or key!='reward':  # not taking the valid_actions metric. #TODO: not outputting in Tensorboard and only in the logging? In that case, overwrite the write function for these metric.
+                    if key != "valid_actions":  # not taking the valid_actions metric.
                         metric.write()
 
             if i_episode + 1 % 1000 == 0:

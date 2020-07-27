@@ -165,14 +165,10 @@ class RewardMetric(Metric):
         self.type = "scalar"
         self.key = "reward"
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
-        #self.reward_df = pd.DataFrame(columns=[range(100)])
         self.dict_rewards = {}
 
     def reinit_train_test(self, train_test):
         self.train_test = train_test
-        #if self.idx_write == 1:
-            #append_list_as_row(self.out_csv_file, [self.train_test + '_' + self.key])
-
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
@@ -181,8 +177,6 @@ class RewardMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
-        #s = pd.Series({kwargs["i_episode"]: self.metric[-1]}, name=self.train_test + '_' + self.key)
-        #self.reward_df.append(s)
         if not self.train_test + '_' + self.key in self.dict_rewards:
             self.dict_rewards[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
@@ -267,6 +261,8 @@ class BleuMetric(Metric):
         self.type = "scalar"
         self.key = "bleu"
         self.train_test = train_test
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_bleus = {}
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -279,6 +275,16 @@ class BleuMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
+        if not self.train_test + '_' + self.key in self.dict_bleus:
+            self.dict_bleus[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_bleus[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def write_to_csv(self):
+        for key, value in self.dict_bleus.items():
+            self.dict_bleus[key].append(np.mean(value))
+            self.dict_bleus[key].append(np.std(value))
+        write_to_csv(self.out_csv_file, self.dict_bleus)
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
