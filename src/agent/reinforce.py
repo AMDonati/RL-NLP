@@ -72,7 +72,7 @@ class REINFORCE(Agent):
         self.optimizer.step()
         # compute grad norm:
         grad_norm = compute_grad_norm(self.policy)
-        #self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
+        self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
         self.writer_iteration += 1
 
         # compute new log_probs for comparison with old ones:
