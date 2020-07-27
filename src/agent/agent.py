@@ -120,7 +120,7 @@ class Agent:
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
-    def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
+    def generate_one_episode_test(self, env, truncation, test_mode, i_episode, seed=None):
             state = env.reset(seed=seed)
             for t in range(0, env.max_len):
                 action, log_probs, value, _, dist = self.generate_action_test(state=state,
@@ -137,12 +137,12 @@ class Agent:
                     break
             for key, metric in self.test_metrics.items():
                 metric.compute(state=state, closest_question=closest_question,
-                               reward=reward)
+                               reward=reward, i_episode=i_episode)
                 metric.write()
             logging.info('Episode Img Idx: {}'.format(env.img_idx))
             # reset metrics key value for writing:
             for m in self.test_metrics.values():
-                m.train_test = env.mode + '_' + test_mode
+                m.reinit_train_test(env.mode + '_' + test_mode)
             return state, closest_question, self.test_metrics
 
 
@@ -179,7 +179,7 @@ class Agent:
 
     def test_env(self, env, num_episodes=10, test_mode='sampling'):
         for m in self.test_metrics.values():
-            m.train_test = env.mode + '_' + test_mode
+            m.reinit_train_test(env.mode + '_' + test_mode)
         self.generated_text = []
         self.policy.eval()
         truncation = {"no_trunc": False, "with_trunc": True} if self.pretrained_lm else {"no_trunc": False}
@@ -189,8 +189,8 @@ class Agent:
             seed = np.random.randint(1000000) # setting the seed to generate the episode with the same image.
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
-                    m.train_test = m.train_test + '_' + key
-                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
+                    m.reinit_train_test(m.train_test + '_' + key)
+                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, i_episode=i_episode, seed=seed)
                 dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question
             for _, dialog in dialogs.items():
                 logging.info(dialog)

@@ -1,6 +1,7 @@
 import argparse
 import csv
 import logging
+from csv import writer
 #TODO: add color logging:
 # https://pypi.org/project/colorlog/
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
@@ -46,3 +47,13 @@ def create_logger(out_file_log, level="INFO"):
 def saving_training_history(keys, values, output_path):
     history = dict(zip(keys, values))
     write_to_csv(output_path, history)
+
+
+def append_list_as_row(file_name, list_of_elem):
+    # Open file in append mode
+    with open(file_name, 'a+', newline='') as write_obj:
+        # Create a writer object from csv module
+        csv_writer = writer(write_obj)
+        # Add contents of list as last row in the csv file
+        csv_writer.writerow(list_of_elem)
+

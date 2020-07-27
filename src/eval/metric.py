@@ -4,6 +4,8 @@ import time
 import logging
 from nltk.translate.bleu_score import sentence_bleu
 import os
+from utils.utils_train import append_list_as_row, write_to_csv
+import pandas as pd
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -30,6 +32,9 @@ class Metric:
     def reset(self):
         self.idx_word = 0
 
+    def reinit_train_test(self, train_test):
+        self.train_test = train_test
+
     def write(self, **kwargs):
         if self.type == "scalar":
             self.agent.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
@@ -38,6 +43,8 @@ class Metric:
         self.idx_write += 1
         self.metric_history.extend(self.metric)
         self.metric = []
+    def write_to_csv(self):
+        pass
 
 
 class LMMetric(Metric):
@@ -88,9 +95,14 @@ class DialogMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
         self.key = "dialog"
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
 
     def fill_(self, **kwargs):
         pass
+
+    def reinit_train_test(self, train_test):
+        self.train_test = train_test
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
 
     def compute_(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
@@ -98,7 +110,6 @@ class DialogMetric(Metric):
         string = state_decoded + '---closest question---' + closest_question_decoded
         self.metric.append(string)
         # write dialog in a .txt file:
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
         with open(self.out_dialog_file, 'a') as f:
             f.write(string + '\n')
         pass
@@ -153,6 +164,15 @@ class RewardMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "reward"
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        #self.reward_df = pd.DataFrame(columns=[range(100)])
+        self.dict_rewards = {}
+
+    def reinit_train_test(self, train_test):
+        self.train_test = train_test
+        #if self.idx_write == 1:
+            #append_list_as_row(self.out_csv_file, [self.train_test + '_' + self.key])
+
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
@@ -161,6 +181,18 @@ class RewardMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
+        #s = pd.Series({kwargs["i_episode"]: self.metric[-1]}, name=self.train_test + '_' + self.key)
+        #self.reward_df.append(s)
+        if not self.train_test + '_' + self.key in self.dict_rewards:
+            self.dict_rewards[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_rewards[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def write_to_csv(self):
+        for key, value in self.dict_rewards.items():
+            self.dict_rewards[key].append(np.mean(value))
+            self.dict_rewards[key].append(np.std(value))
+        write_to_csv(self.out_csv_file, self.dict_rewards)
 
 
 class LMVAMetric(Metric):
