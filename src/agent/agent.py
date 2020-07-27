@@ -75,7 +75,7 @@ class Agent:
         self.start_episode = 0
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "lm_policy_probs_ratio", "valid_actions", "dialog"]}
 
@@ -120,14 +120,15 @@ class Agent:
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
-    def generate_one_episode_test(self, env, truncation, test_mode, i_episode, seed=None):
-            state = env.reset(seed=seed)
+    def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
+            state, ep_reward = env.reset(seed=seed), 0
             for t in range(0, env.max_len):
                 action, log_probs, value, _, dist = self.generate_action_test(state=state,
                                                                               truncation=truncation,
                                                                               num_truncated=self.num_truncated,
                                                                               test_mode=test_mode)
                 new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+                ep_reward += reward
                 for key, metric in self.test_metrics.items():
                     metric.fill(state=state, done=done,
                                 ref_question=env.ref_questions_decoded, reward=reward,
@@ -137,13 +138,13 @@ class Agent:
                     break
             for key, metric in self.test_metrics.items():
                 metric.compute(state=state, closest_question=closest_question,
-                               reward=reward, i_episode=i_episode)
+                               reward=reward)
                 metric.write()
             logging.info('Episode Img Idx: {}'.format(env.img_idx))
             # reset metrics key value for writing:
             for m in self.test_metrics.values():
                 m.reinit_train_test(env.mode + '_' + test_mode)
-            return state, closest_question, self.test_metrics
+            return state, ep_reward, closest_question, self.test_metrics
 
 
     def generate_one_episode_with_lm(self, env, test_mode='sampling'):
@@ -190,8 +191,8 @@ class Agent:
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
                     m.reinit_train_test(m.train_test + '_' + key)
-                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, i_episode=i_episode, seed=seed)
-                dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question
+                state, ep_reward, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, i_episode=i_episode, seed=seed)
+                dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
             for _, dialog in dialogs.items():
                 logging.info(dialog)
             logging.info('----------------------------------------------------------------------------------------------------------------------')
@@ -277,7 +278,7 @@ class Agent:
                 if valid_actions is not None:
                     self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
                 for key, metric in self.train_metrics.items():
-                    if key != 'valid_actions' or key!='reward':  # not taking the valid_actions metric. #TODO: not outputting in Tensorboard and only in the logging? In that case, overwrite the write function for these metric.
+                    if key != 'lm_valid_actions' or key!='reward':  # not taking the valid_actions metric. #TODO: not outputting in Tensorboard and only in the logging? In that case, overwrite the write function for these metric.
                         metric.write()
 
             if i_episode + 1 % 1000 == 0:

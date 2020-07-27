@@ -200,7 +200,7 @@ class LMVAMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.counter = 0
-        self.key = "invalid_actions"
+        self.key = "lm_valid_actions"
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
@@ -262,10 +262,11 @@ class TTRMetric(Metric):
 
 
 class BleuMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "bleu"
+        self.train_test = train_test
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
