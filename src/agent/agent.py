@@ -121,13 +121,14 @@ class Agent:
         return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
     def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
-            state = env.reset(seed=seed)
+            state, ep_reward = env.reset(seed=seed), 0
             for t in range(0, env.max_len):
                 action, log_probs, value, _, dist = self.generate_action_test(state=state,
                                                                               truncation=truncation,
                                                                               num_truncated=self.num_truncated,
                                                                               test_mode=test_mode)
                 new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+                ep_reward += reward
                 for key, metric in self.test_metrics.items():
                     metric.fill(state=state, done=done,
                                 ref_question=env.ref_questions_decoded, reward=reward,
@@ -143,7 +144,7 @@ class Agent:
             # reset metrics key value for writing:
             for m in self.test_metrics.values():
                 m.train_test = env.mode + '_' + test_mode
-            return state, closest_question, self.test_metrics
+            return state, ep_reward, closest_question, self.test_metrics
 
 
     def generate_one_episode_with_lm(self, env, test_mode='sampling'):
@@ -191,8 +192,8 @@ class Agent:
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
                     m.train_test = m.train_test + '_' + key
-                state, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
-                dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question
+                state, ep_reward, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
+                dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
             for _, dialog in dialogs.items():
                 logging.info(dialog)
             logging.info('----------------------------------------------------------------------------------------------------------------------')
