@@ -45,10 +45,10 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
+    def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, p_th=0.01, k_min=5, truncate_mode="masked", log_interval=10, test_envs=[]):
+                 num_truncated=10, p_th=None, k_min=1, truncate_mode="top_k", log_interval=10, test_envs=[]):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
@@ -59,7 +59,6 @@ class Agent:
         self.test_envs = test_envs
         self.pretrained_lm = pretrained_lm
         self.truncate_mode = truncate_mode
-        self.truncation = truncations[truncate_mode](num_truncated=num_truncated, p_th=p_th, k_min=k_min) # adding the truncation class.
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.lm_sl = lm_sl
@@ -68,6 +67,12 @@ class Agent:
         self.update_every = update_every
         self.memory = Memory()
         self.num_truncated = num_truncated
+        p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
+        if truncate_mode is not None:
+            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_,
+                                                         k_min=k_min)  # adding the truncation class.
+        else:
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, k_min=k_min)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -106,25 +111,30 @@ class Agent:
     #         return top_k_indices, top_k_weights
 
     def select_action(self, state):
-
+        valid_actions, action_probs = self.truncation.get_valid_actions(state)
+        policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions)
+        action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated, valid_actions=valid_actions)
+        log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
+        log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
+        return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
 
     def generate_action_test(self, state, truncation=False, test_mode='sampling', num_truncated=10):
-        #TODO: add a torch.no_grad() ?
-        if truncation:
-            valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
-        else:
-            valid_actions, actions_probs = None, None
-        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        if test_mode == 'sampling':
-            action = policy_dist_truncated.sample()
-        elif test_mode == 'greedy':
-            action = torch.argmax(policy_dist_truncated.probs).view(1).detach()
-        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-            action = torch.gather(valid_actions, 1, action.view(1, 1))
-        log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
-        log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
-        return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
+        with torch.no_grad():
+            if truncation:
+                valid_actions, action_probs = self.truncation.get_valid_actions(state)
+            else:
+                valid_actions, action_probs = None, None
+            policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
+            if test_mode == 'sampling':
+                action = policy_dist_truncated.sample()
+            elif test_mode == 'greedy':
+                action = torch.argmax(policy_dist_truncated.probs).view(1).detach() #TODO: remove the detach here?
+            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+                action = torch.gather(valid_actions, 1, action.view(1, 1))
+            log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
+            log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
+        return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
     def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
             state, ep_reward = env.reset(seed=seed), 0
@@ -254,9 +264,7 @@ class Agent:
             for t in range(0, self.env.max_len):
                 forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
-                    valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
-                                                                                                  forced=forced,
-                                                                                                  num_truncated=self.num_truncated)
+                    valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state)
                 ep_log_probs.append(log_probs)
                 ep_log_probs_truncated.append(log_probs_truncated)
                 if valid_actions is not None:

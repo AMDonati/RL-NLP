@@ -58,7 +58,7 @@ class VAMetric(Metric):
         if kwargs["valid_actions"] is not None:
             top_words_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["valid_actions"].cpu().numpy()[0])
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                             zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().exp().numpy()[0])] #TODO: remove the exp() here.
+                             zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
         else:
             string = ""

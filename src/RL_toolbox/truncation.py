@@ -31,9 +31,17 @@ class Truncation:
                 action = policy_dist.sample()
         return action
 
+class NoTruncation(Truncation):
+    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
+        Truncation.__init__(self, agent, dist_action)
+        self.dist_action = "dist_truncated"
+
+    def get_valid_actions(self, state):
+        return None, None
+
 
 class TopK(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", **kwargs): #TODO: use **kwargs instead.
+    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
         Truncation.__init__(self, agent, dist_action)
         self.num_truncated = kwargs["num_truncated"]
 
@@ -49,7 +57,7 @@ class TopK(Truncation):
                 dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
                 probs = dist.probs
                 top_k_weights, top_k_indices = torch.topk(probs, self.num_truncated, sorted=True)
-        return top_k_indices, top_k_weights.exp() #TODO: remove it from lm metric then.
+        return top_k_indices, top_k_weights.exp()
 
 
 class ProbaThreshold(Truncation):
@@ -70,7 +78,8 @@ class ProbaThreshold(Truncation):
             probas_mask = torch.ge(probas, self.p_th)
             valid_actions = torch.nonzero(probas_mask)[:,1] # slice trick to get only the indices.
             action_probs = probas[:,valid_actions]
-        return valid_actions, action_probs
+            assert torch.all(action_probs >= self.p_th), "ERROR in proba threshold truncation function"
+        return valid_actions.unsqueeze(0), action_probs
 
 class SampleVA(Truncation):
     def __init__(self, agent, dist_action="dist_truncated", **kwargs):
@@ -93,9 +102,9 @@ class SampleVA(Truncation):
                 actions = dist.sample(sample_shape=[self.k_max])
                 valid_actions = torch.unique(actions)
             action_probs = dist.probs[:,valid_actions]
-        return valid_actions, action_probs
+        return valid_actions.unsqueeze(0), action_probs
 
-truncations = {"top_k": TopK, "proba_threshold":ProbaThreshold, "sample_va": SampleVA}
+truncations = {"no_trunc": NoTruncation, "top_k": TopK, "proba_thr":ProbaThreshold, "sample_va": SampleVA}
 
 
 if __name__ == '__main__':
@@ -128,37 +137,46 @@ if __name__ == '__main__':
     state = env.reset()
 
     # test Top k
-    print("top_k")
-    top_k = TopK(agent=agent)
+    print("top_k...")
+    top_k = TopK(agent=agent, num_truncated=10)
     valid_actions, action_probs = top_k.get_valid_actions(state)
     print('valid_actions', valid_actions)
+    print('valid_actions shape', valid_actions.size())
+    print("action_probs", action_probs)
+    print("action_probs", action_probs.size())
     print('valid actions decoded:', env.clevr_dataset.idx2word(valid_actions.squeeze().cpu().numpy()))
     dist, dist_truncated, val = top_k.get_policy_distributions(state, valid_actions)
     print('action sampled from policy dist truncated', dist_truncated.sample())
     action = top_k.sample_action(dist, dist_truncated, valid_actions)
     print("action", action)
+    print("action shape", action.size())
 
-    print("proba threshold")
+    print("proba threshold...")
     # test proba threshold
-    proba_thr = ProbaThreshold(agent=agent)
+    proba_thr = ProbaThreshold(agent=agent, p_th=0.01)
     valid_actions, action_probs = proba_thr.get_valid_actions(state)
     print('valid_actions:', valid_actions)
     print('action probs', action_probs)
+    print("action_probs", action_probs.size())
     print('valid actions decoded:', env.clevr_dataset.idx2word(valid_actions.squeeze().cpu().numpy()))
     dist, dist_truncated, val = proba_thr.get_policy_distributions(state, valid_actions)
     print('action sampled from policy dist truncated', dist_truncated.sample())
     action = proba_thr.sample_action(dist, dist_truncated, valid_actions)
     print("action", action)
+    print("action shape", action.size())
 
-    print("sample_va")
+    print("sample_va...")
     # test sample_va:
-    sample_va = SampleVA(agent=agent, k_max=10, dist_action='dist')
+    sample_va = SampleVA(agent=agent, num_truncated=10, k_min=5, dist_action='dist')
     valid_actions, action_probs = sample_va.get_valid_actions(state)
     print('valid_actions:', valid_actions)
+    print('valid_actions shape', valid_actions.size())
     print('action probs', action_probs)
+    print("action_probs shape", action_probs.size())
     print('valid actions decoded:', env.clevr_dataset.idx2word(valid_actions.squeeze().cpu().numpy()))
     dist, dist_truncated, val = sample_va.get_policy_distributions(state, valid_actions)
     print('action sampled from policy dist truncated', dist_truncated.sample())
     # test action sample from policy dist:
     action = sample_va.sample_action(dist, dist_truncated, valid_actions)
     print("action", action)
+    print("action shape", action.size())

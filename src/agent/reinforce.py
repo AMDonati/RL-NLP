@@ -7,14 +7,16 @@ from RL_toolbox.RL_functions import compute_grad_norm
 
 
 class REINFORCE(Agent):
-    def __init__(self, policy, env, test_envs, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
+    def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None,
                  lm_sl=True,
-                 pretrain=False, update_every=50, num_truncated=10, truncate_mode="masked",log_interval=10):
-        Agent.__init__(self, policy, env, writer, out_path, gamma=gamma, lr=lr, eps=eps, grad_clip=grad_clip,
+                 pretrain=False, update_every=50, num_truncated=10, k_min=1, p_th=None, truncate_mode="top_k", log_interval=10):
+        Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr, eps=eps, grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
+                       k_min=k_min,
+                       p_th=p_th,
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs)
         self.MSE_loss = nn.MSELoss(reduction="none")
@@ -22,15 +24,15 @@ class REINFORCE(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def select_action(self, state, num_truncated=10, forced=None):
-        valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
-        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        action = policy_dist_truncated.sample() if forced is None else forced
-        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-            action = torch.gather(valid_actions, 1, action.view(1, 1))
-        log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
-        log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
-        return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
+    # def select_action(self, state, num_truncated=10, forced=None):
+    #     valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
+    #     policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
+    #     action = policy_dist_truncated.sample() if forced is None else forced
+    #     if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+    #         action = torch.gather(valid_actions, 1, action.view(1, 1))
+    #     log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
+    #     log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
+    #     return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
         #valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
