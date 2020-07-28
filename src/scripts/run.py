@@ -111,6 +111,8 @@ def run(args):
     if args.num_episodes_train > 0: # trick to avoid a bug inside the agent.learn function in case of no training.
         agent.learn(num_episodes=args.num_episodes_train)
         agent.save(out_policy_file)
+    else:
+        logger.info("skipping training...")
     logger.info('---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
     for mode in eval_mode:
         logger.info("-----------------------------Starting evaluation for {} action selection-------------------------".format(mode))
