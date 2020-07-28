@@ -164,8 +164,8 @@ class PPLMetric(Metric):
         #         self.measure.append(target_word_log_prob)
         if kwargs["done"]:
             for ref_question in kwargs["ref_question"]: #TODO: add SOS and EOS token.
-                inp_question = ref_question[:-1]
-                target_question = ref_question[1:]
+                inp_question = ref_question[:-1].to(self.agent.device)
+                target_question = ref_question[1:].to(self.agent.device)
                 for i in range(len(inp_question)):
                     inputs = inp_question[:i + 1].unsqueeze(0)
                     policy_dist, _, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=None) #TODO: "img" not needed. use state instead.
@@ -173,7 +173,7 @@ class PPLMetric(Metric):
                     self.measure.append(log_prob)
 
     def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().numpy().item()
+        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().cpu().numpy().item()
         self.metric.append(ppl)
         if not self.train_test + '_' + self.key in self.dict_ppl:
             self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
