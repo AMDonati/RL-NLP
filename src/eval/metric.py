@@ -155,7 +155,8 @@ class PPLMetric(Metric):
         self.type = "scalar"
         self.key = "ppl"
         self.dict_ppl = {}
-        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_stats = {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
         # for ref_question in kwargs["ref_question"]:
@@ -182,9 +183,11 @@ class PPLMetric(Metric):
 
     def write_to_csv(self):
         for key, value in self.dict_ppl.items():
+            self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             self.dict_ppl[key].append(np.mean(value))
             self.dict_ppl[key].append(np.std(value))
-        write_to_csv(self.out_csv_file, self.dict_ppl)
+        write_to_csv(self.out_csv_file + '.csv', self.dict_ppl)
+        write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         pass
@@ -194,8 +197,8 @@ class PPLDialogfromLM(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ppl_dialog_lm"
-        self.dict_ppl = {}
-        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_ppl, self.dict_stats = {}, {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -214,9 +217,11 @@ class PPLDialogfromLM(Metric):
 
     def write_to_csv(self):
         for key, value in self.dict_ppl.items():
+            self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             self.dict_ppl[key].append(np.mean(value))
             self.dict_ppl[key].append(np.std(value))
-        write_to_csv(self.out_csv_file, self.dict_ppl)
+        write_to_csv(self.out_csv_file + '.csv', self.dict_ppl)
+        write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         pass
@@ -227,8 +232,8 @@ class RewardMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "reward"
-        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
-        self.dict_rewards = {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
+        self.dict_rewards, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
@@ -244,9 +249,11 @@ class RewardMetric(Metric):
 
     def write_to_csv(self):
         for key, value in self.dict_rewards.items():
+            self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             self.dict_rewards[key].append(np.mean(value))
             self.dict_rewards[key].append(np.std(value))
-        write_to_csv(self.out_csv_file, self.dict_rewards)
+        write_to_csv(self.out_csv_file+'.csv', self.dict_rewards)
+        write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         '''Overwrite write function to avoid logging on tensorboard.'''
@@ -258,8 +265,8 @@ class BleuMetric(Metric):
         self.type = "scalar"
         self.key = "bleu"
         self.train_test = train_test
-        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
-        self.dict_bleus = {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
+        self.dict_bleus, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -279,9 +286,11 @@ class BleuMetric(Metric):
 
     def write_to_csv(self):
         for key, value in self.dict_bleus.items():
+            self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             self.dict_bleus[key].append(np.mean(value))
             self.dict_bleus[key].append(np.std(value))
-        write_to_csv(self.out_csv_file, self.dict_bleus)
+        write_to_csv(self.out_csv_file+'.csv', self.dict_bleus)
+        write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         '''Overwrite write function to avoid logging on tensorboard.'''
