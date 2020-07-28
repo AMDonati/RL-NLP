@@ -200,7 +200,7 @@ class PPLDialogfromLM(Metric):
     def fill_(self, **kwargs):
         if kwargs["done"]:
             with torch.no_grad():
-                log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:,:-1]).to(self.agent.device)
+                log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:,:-1].to(self.agent.device))
                 for i, word in enumerate(kwargs["new_state"].text[:,1:].view(-1)):
                     self.measure.append(log_probas[i,word.numpy()])
 
