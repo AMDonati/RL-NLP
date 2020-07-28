@@ -3,130 +3,102 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
+#TODO: add logits fusion truncation function.
+
 class Truncation:
-    def __init__(self, agent, sample_action="dist_truncated"):
+    def __init__(self, agent, dist_action="dist_truncated"):
         self.agent = agent
-        self.sample_action = sample_action
+        self.dist_action = dist_action
 
     def get_valid_actions(self, state_text, state_img):
         pass
 
-    def get_policy_distributions(self):
-        pass
+    def get_policy_distributions(self, state, valid_actions):
+        if type(self.agent).__name__ == 'PPO': #trick to distinguish between PPO and REINFORCE in select_action.
+            policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions)
+        elif type(self.agent).__name__ == 'REINFORCE':
+            policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions)
+        return policy_dist, policy_dist_truncated, value
 
-    def sample_action(self):
-        pass
+    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions):
+        if self.dist_action == 'dist_truncated':
+            action = policy_dist_truncated.sample()
+            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+                action = torch.gather(valid_actions, 1, action.view(1, 1))
+        elif self.dist_action == 'dist':
+            action = policy_dist.sample()
+            while action not in valid_actions:
+                action = policy_dist.sample()
+        return action
 
-#TODO: add with torch.no_grad() everywhere.
 
 class TopK(Truncation):
-    def __init__(self, agent, sample_action="dist_truncated", num_truncated=10):
-        Truncation.__init__(self, agent, sample_action)
+    def __init__(self, agent, dist_action="dist_truncated", num_truncated=10): #TODO: use **kwargs instead.
+        Truncation.__init__(self, agent, dist_action)
         self.num_truncated = num_truncated
 
     def get_valid_actions(self, state):
-        if self.agent.lm_sl:
-            seq_len = state.text.size(1)
-            log_probas, _ = self.agent.pretrained_lm(state.text.to(self.agent.device))
-            log_probas = log_probas.view(len(state.text), seq_len, -1)
-            log_probas = log_probas[:, -1, :]
-            top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
-        else:
-            dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
-            probs = dist.probs
-            top_k_weights, top_k_indices = torch.topk(probs, self.num_truncated, sorted=True)
+        with torch.no_grad():
+            if self.agent.lm_sl:
+                seq_len = state.text.size(1)
+                log_probas, _ = self.agent.pretrained_lm(state.text.to(self.agent.device))
+                log_probas = log_probas.view(len(state.text), seq_len, -1)
+                log_probas = log_probas[:, -1, :]
+                top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
+            else:
+                dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
+                probs = dist.probs
+                top_k_weights, top_k_indices = torch.topk(probs, self.num_truncated, sorted=True)
         return top_k_indices, top_k_weights.exp() #TODO: remove it from lm metric then.
 
-    def get_policy_distributions(self, state, valid_actions):
-        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        #TODO: change here between self.policy_old and self.policy depending on PPO and REINFORCE.
-        return policy_dist, policy_dist_truncated, value
-
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions):
-        if self.sample_action == 'dist_truncated':
-            action = policy_dist_truncated.sample()
-            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-                action = torch.gather(valid_actions, 1, action.view(1, 1))
-        elif self.sample_action == 'dist': #TODO: debug here.
-            action = policy_dist.sample()
-            while action not in valid_actions:
-                action = policy_dist.sample()
-        return action
 
 class PThreshold(Truncation):
-    def __init__(self, agent, sample_action="dist_truncated", p_th=0.01):
-        Truncation.__init__(self, agent, sample_action)
+    def __init__(self, agent, dist_action="dist_truncated", p_th=0.01):
+        Truncation.__init__(self, agent, dist_action)
         self.p_th = p_th
 
     def get_valid_actions(self, state):
-        if self.agent.lm_sl:
-            seq_len = state.text.size(1)
-            log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
-            logits = logits.view(len(state.text), seq_len, -1)
-            probas = F.softmax(logits[:,-1,:], dim=-1)
-        else:
-            dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
-            probas = dist.probs
-        probas_mask = torch.ge(probas, self.p_th)
-        valid_actions = torch.nonzero(probas_mask)[:,1] # slice trick to get only the indices.
-        action_probs = probas[:,valid_actions]
+        with torch.no_grad():
+            if self.agent.lm_sl:
+                seq_len = state.text.size(1)
+                log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
+                logits = logits.view(len(state.text), seq_len, -1)
+                probas = F.softmax(logits[:,-1,:], dim=-1)
+            else:
+                dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
+                probas = dist.probs
+            probas_mask = torch.ge(probas, self.p_th)
+            valid_actions = torch.nonzero(probas_mask)[:,1] # slice trick to get only the indices.
+            action_probs = probas[:,valid_actions]
         return valid_actions, action_probs
 
-    def get_policy_distributions(self, state, valid_actions):
-        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        #TODO: change here between self.policy_old and self.policy depending on PPO and REINFORCE.
-        return policy_dist, policy_dist_truncated, value
-
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions):
-        if self.sample_action == 'dist_truncated':
-            action = policy_dist_truncated.sample()
-            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-                action = torch.gather(valid_actions, 1, action.view(1, 1))
-        elif self.sample_action == 'dist': #TODO: debug here.
-            action = policy_dist.sample()
-            while action not in valid_actions:
-                action = policy_dist.sample()
-        return action
-
 class SampleVA(Truncation):
-    def __init__(self, agent, sample_action="dist_truncated", k_max=20, k_min=5):
-        Truncation.__init__(self, agent, sample_action)
+    def __init__(self, agent, dist_action="dist_truncated", k_max=20, k_min=5):
+        Truncation.__init__(self, agent, dist_action)
         self.k_min = k_min
         self.k_max = k_max
 
     def get_valid_actions(self, state):
-        if self.agent.lm_sl:
-            seq_len = state.text.size(1)
-            log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
-            logits = logits.view(len(state.text), seq_len, -1)
-            probas = F.softmax(logits[:,-1,:], dim=-1)
-            dist = Categorical(probas)
-        else:
-            dist, _, _ = self.agent.pretrained_lm(state.text, state.img)
-        valid_actions = []
-        while len(valid_actions) < self.k_min:
-            actions = dist.sample(sample_shape=[self.k_max])
-            valid_actions = torch.unique(actions)
-        action_probs = dist.probs[:,valid_actions]
+        with torch.no_grad():
+            if self.agent.lm_sl:
+                seq_len = state.text.size(1)
+                log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
+                logits = logits.view(len(state.text), seq_len, -1)
+                probas = F.softmax(logits[:,-1,:], dim=-1)
+                dist = Categorical(probas)
+            else:
+                dist, _, _ = self.agent.pretrained_lm(state.text, state.img)
+            valid_actions = []
+            while len(valid_actions) < self.k_min:
+                actions = dist.sample(sample_shape=[self.k_max])
+                valid_actions = torch.unique(actions)
+            action_probs = dist.probs[:,valid_actions]
         return valid_actions, action_probs
 
-    def get_policy_distributions(self, state, valid_actions):
-        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
-        #TODO: change here between self.policy_old and self.policy depending on PPO and REINFORCE.
-        return policy_dist, policy_dist_truncated, value
 
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions):
-        if self.sample_action == 'dist_truncated':
-            action = policy_dist_truncated.sample()
-            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-                action = torch.gather(valid_actions, 1, action.view(1, 1))
-        elif self.sample_action == 'dist': #TODO: debug here.
-            action = policy_dist.sample()
-            while action not in valid_actions:
-                action = policy_dist.sample()
-        return action
 
 if __name__ == '__main__':
+
     temp = torch.tensor([0.1, 0.2, 0.5, 0.7, 0.9])
     temp_mask = temp.ge_(0.5)
     print(temp_mask.size())
@@ -155,21 +127,37 @@ if __name__ == '__main__':
     state = env.reset()
 
     # test Top k
+    print("top_k")
     top_k = TopK(agent=agent)
-    valid_actions, action_probs = top_k.get_valid_actions(state) #TODO: caution here: this is not action_log_probs.
-    print(valid_actions)
+    valid_actions, action_probs = top_k.get_valid_actions(state)
+    print('valid_actions', valid_actions)
     print('valid actions decoded:', env.clevr_dataset.idx2word(valid_actions.squeeze().cpu().numpy()))
+    dist, dist_truncated, val = top_k.get_policy_distributions(state, valid_actions)
+    print('action sampled from policy dist truncated', dist_truncated.sample())
+    action = top_k.sample_action(dist, dist_truncated, valid_actions)
+    print("action", action)
 
+    print("proba threshold")
     # test proba threshold
     proba_thr = PThreshold(agent=agent)
     valid_actions, action_probs = proba_thr.get_valid_actions(state)
     print('valid_actions:', valid_actions)
     print('action probs', action_probs)
     print('valid actions decoded:', env.clevr_dataset.idx2word(valid_actions.squeeze().cpu().numpy()))
+    dist, dist_truncated, val = proba_thr.get_policy_distributions(state, valid_actions)
+    print('action sampled from policy dist truncated', dist_truncated.sample())
+    action = proba_thr.sample_action(dist, dist_truncated, valid_actions)
+    print("action", action)
 
+    print("sample_va")
     # test sample_va:
-    sample_va = SampleVA(agent=agent, k_max=10)
+    sample_va = SampleVA(agent=agent, k_max=10, dist_action='dist')
     valid_actions, action_probs = sample_va.get_valid_actions(state)
     print('valid_actions:', valid_actions)
     print('action probs', action_probs)
     print('valid actions decoded:', env.clevr_dataset.idx2word(valid_actions.squeeze().cpu().numpy()))
+    dist, dist_truncated, val = sample_va.get_policy_distributions(state, valid_actions)
+    print('action sampled from policy dist truncated', dist_truncated.sample())
+    # test action sample from policy dist:
+    action = sample_va.sample_action(dist, dist_truncated, valid_actions)
+    print("action", action)
