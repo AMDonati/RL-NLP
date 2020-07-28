@@ -7,6 +7,7 @@ import random
 import torch
 import torch.optim as optim
 from eval.metric import metrics
+from RL_toolbox.truncation import truncations
 import time
 import os
 import numpy as np
@@ -47,7 +48,7 @@ class Agent:
     def __init__(self, policy, env, writer, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None, pretrained_lm=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, truncate_mode="masked", log_interval=10, test_envs=[]):
+                 num_truncated=10, p_th=0.01, k_min=5, truncate_mode="masked", log_interval=10, test_envs=[]):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
@@ -58,6 +59,7 @@ class Agent:
         self.test_envs = test_envs
         self.pretrained_lm = pretrained_lm
         self.truncate_mode = truncate_mode
+        self.truncation = truncations[truncate_mode](num_truncated=num_truncated, p_th=p_th, k_min=k_min) # adding the truncation class.
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.lm_sl = lm_sl
@@ -80,31 +82,32 @@ class Agent:
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
 
-    def get_top_k_words(self, state_text, top_k=10, state_img=None):
-        """
-        Truncate the action space with the top k words of a pretrained language model
-        :param state: state
-        :param top_k: number of words
-        :return: top k words
-        """
-        if self.truncate_mode is None:
-            return None, None
-        else:
-            if self.lm_sl:
-                seq_len = state_text.size(1)
-                log_probas, _ = self.pretrained_lm(state_text.to(self.device))
-                log_probas = log_probas.view(len(state_text), seq_len, -1)
-                log_probas = log_probas[:, -1, :]
-                top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
-            else:
-                dist, dist_, value = self.pretrained_lm(state_text, state_img)
-                probs = dist.probs
-                top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
+    # def get_top_k_words(self, state_text, top_k=10, state_img=None):
+    #     """
+    #     Truncate the action space with the top k words of a pretrained language model
+    #     :param state: state
+    #     :param top_k: number of words
+    #     :return: top k words
+    #     """
+    #     if self.truncate_mode is None:
+    #         return None, None
+    #     else:
+    #         if self.lm_sl:
+    #             seq_len = state_text.size(1)
+    #             log_probas, _ = self.pretrained_lm(state_text.to(self.device))
+    #             log_probas = log_probas.view(len(state_text), seq_len, -1)
+    #             log_probas = log_probas[:, -1, :]
+    #             top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
+    #         else:
+    #             dist, dist_, value = self.pretrained_lm(state_text, state_img)
+    #             probs = dist.probs
+    #             top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
+    #
+    #         return top_k_indices, top_k_weights
 
-            return top_k_indices, top_k_weights
+    def select_action(self, state):
 
-    def select_action(self, state, forced=None, num_truncated=10):
-        pass
+
 
     def generate_action_test(self, state, truncation=False, test_mode='sampling', num_truncated=10):
         #TODO: add a torch.no_grad() ?

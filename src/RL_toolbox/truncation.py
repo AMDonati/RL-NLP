@@ -33,9 +33,9 @@ class Truncation:
 
 
 class TopK(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", num_truncated=10): #TODO: use **kwargs instead.
+    def __init__(self, agent, dist_action="dist_truncated", **kwargs): #TODO: use **kwargs instead.
         Truncation.__init__(self, agent, dist_action)
-        self.num_truncated = num_truncated
+        self.num_truncated = kwargs["num_truncated"]
 
     def get_valid_actions(self, state):
         with torch.no_grad():
@@ -52,10 +52,10 @@ class TopK(Truncation):
         return top_k_indices, top_k_weights.exp() #TODO: remove it from lm metric then.
 
 
-class PThreshold(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", p_th=0.01):
+class ProbaThreshold(Truncation):
+    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
         Truncation.__init__(self, agent, dist_action)
-        self.p_th = p_th
+        self.p_th = kwargs["p_th"]
 
     def get_valid_actions(self, state):
         with torch.no_grad():
@@ -73,10 +73,10 @@ class PThreshold(Truncation):
         return valid_actions, action_probs
 
 class SampleVA(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", k_max=20, k_min=5):
+    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
         Truncation.__init__(self, agent, dist_action)
-        self.k_min = k_min
-        self.k_max = k_max
+        self.k_min = kwargs["k_min"]
+        self.k_max = kwargs["num_truncated"]
 
     def get_valid_actions(self, state):
         with torch.no_grad():
@@ -95,6 +95,7 @@ class SampleVA(Truncation):
             action_probs = dist.probs[:,valid_actions]
         return valid_actions, action_probs
 
+truncations = {"top_k": TopK, "proba_threshold":ProbaThreshold, "sample_va": SampleVA}
 
 
 if __name__ == '__main__':
@@ -139,7 +140,7 @@ if __name__ == '__main__':
 
     print("proba threshold")
     # test proba threshold
-    proba_thr = PThreshold(agent=agent)
+    proba_thr = ProbaThreshold(agent=agent)
     valid_actions, action_probs = proba_thr.get_valid_actions(state)
     print('valid_actions:', valid_actions)
     print('action probs', action_probs)

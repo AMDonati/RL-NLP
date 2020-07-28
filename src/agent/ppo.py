@@ -46,7 +46,6 @@ class PPO(Agent):
         policy_dist, _, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
-
         return log_prob, value, dist_entropy
 
     def update(self):
