@@ -108,9 +108,10 @@ def run(args):
         epoch, loss = agent.load_ckpt()
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
         agent.start_episode = epoch
-    agent.learn(num_episodes=args.num_episodes_train)
+    if args.num_episodes_train > 0: # trick to avoid a bug inside the agent.learn function in case of no training.
+        agent.learn(num_episodes=args.num_episodes_train)
+        agent.save(out_policy_file)
     logger.info('---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    agent.save(out_policy_file)
     for mode in eval_mode:
         logger.info("-----------------------------Starting evaluation for {} action selection-------------------------".format(mode))
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
