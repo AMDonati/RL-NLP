@@ -35,12 +35,12 @@ class GRUModel(nn.Module):
         output, hidden = self.gru(
             emb)  # output (B,seq_len,hidden_size*num_directions) , hidden: (num_layers * num_directions, B, hidden_size)
         output = self.dropout(output)
-        dec_output = self.fc(output)  # (B, S, num_tokens) #TODO: no activation function.
-        dec_output = dec_output.view(-1, self.num_tokens)  # (S * B, num_tokens) # resizing for the NLL Loss.
-        log_probas = F.log_softmax(dec_output,
+        logits = self.fc(output)  # (B, S, num_tokens) #TODO: no activation function.
+        logits = logits.view(-1, self.num_tokens)  # (S * B, num_tokens) # resizing for the NLL Loss.
+        log_probas = F.log_softmax(logits,
                                    dim=1)  # when outputting the log_probas, use torch.nn.NLLLoss and not torch.nn.CrossEntropy.
 
-        return log_probas, hidden
+        return log_probas, logits
 
 
 class LSTMModel(nn.Module):
@@ -72,11 +72,11 @@ class LSTMModel(nn.Module):
         output, hidden = self.lstm(
             emb)  # output (B, seq_len, hidden_size*num_dimension) # hidden: (num_layers * num_directions, B, hidden_size)
         output = self.dropout(output)
-        dec_output = self.fc(output)  # (S,B,num_tokens)
-        dec_output = dec_output.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        log_probas = F.log_softmax(dec_output, dim=-1)
+        logits = self.fc(output)  # (S,B,num_tokens)
+        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
+        log_probas = F.log_softmax(logits, dim=-1)
 
-        return log_probas, hidden
+        return log_probas, logits
 
 
 class LayerNormLSTMModel(nn.Module):
@@ -98,11 +98,11 @@ class LayerNormLSTMModel(nn.Module):
         output, hidden = self.ln_lstm(
             input=emb)  # output (S,B,hidden_size), hidden = (h,c): (num_layers, B, hidden_size)
         output = self.dropout(output)
-        dec_output = self.fc(output)  # (S,B,num_tokens)
-        dec_output = dec_output.view(-1, self.num_tokens)  # (S*B, num_tokens) # resizing for the loss.
-        log_probas = F.log_softmax(dec_output, dim=1)
+        logits = self.fc(output)  # (S,B,num_tokens)
+        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens) # resizing for the loss.
+        log_probas = F.log_softmax(logits, dim=1)
 
-        return log_probas, hidden
+        return log_probas, logits
 
 
 if __name__ == '__main__':
