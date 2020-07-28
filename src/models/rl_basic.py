@@ -151,8 +151,8 @@ class PolicyLSTMWordBatch(nn.Module):
         mask[:, valid_actions] = 1
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
         # check that the truncation is right.
-        sum_probs_va = torch.round(probs_truncated[:, valid_actions].sum(dim=-1))
-        assert torch.all(sum_probs_va - torch.ones(sum_probs_va.size()) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
+        sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
+        assert torch.all(sum_probs_va - torch.ones(sum_probs_va.size()).to(self.device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
         #if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
             #print(sum_probs_va)
         policy_dist_truncated = Categorical(probs_truncated)
