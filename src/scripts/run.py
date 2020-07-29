@@ -49,7 +49,7 @@ def run(args):
         args.truncate_mode,
         args.diff_reward)
 
-    if args.p_th is None:
+    if args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
 
     if args.agent == 'PPO':
