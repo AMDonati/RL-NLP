@@ -110,9 +110,12 @@ def run(args):
         epoch, loss = agent.load_ckpt()
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
         agent.start_episode = epoch
-    agent.learn(num_episodes=args.num_episodes_train)
+    if args.num_episodes_train > 0: # trick to avoid a bug inside the agent.learn function in case of no training.
+        agent.learn(num_episodes=args.num_episodes_train)
+        agent.save(out_policy_file)
+    else:
+        logger.info("skipping training...")
     logger.info('---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    agent.save(out_policy_file)
     for mode in eval_mode:
         logger.info("-----------------------------Starting evaluation for {} action selection-------------------------".format(mode))
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
@@ -129,8 +132,8 @@ def get_parser():
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=300, help="number of episodes training")
-    parser.add_argument("-num_episodes_test", type=int, default=50, help="number of episodes test")
+    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
+    parser.add_argument("-num_episodes_test", type=int, default=500, help="number of episodes test")
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
