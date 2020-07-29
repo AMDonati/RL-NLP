@@ -49,6 +49,9 @@ def run(args):
         args.truncate_mode,
         args.diff_reward)
 
+    if args.p_th is None:
+        out_folder = out_folder + '_pth{}'.format(args.p_th)
+
     if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
 
