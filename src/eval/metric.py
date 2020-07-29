@@ -206,7 +206,7 @@ class PPLDialogfromLM(Metric):
             with torch.no_grad():
                 log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:,:-1].to(self.agent.device))
                 for i, word in enumerate(kwargs["new_state"].text[:,1:].view(-1)):
-                    self.measure.append(log_probas[i,word.numpy()])
+                    self.measure.append(log_probas[i,word.cpu().numpy()])
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
