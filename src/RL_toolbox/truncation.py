@@ -76,7 +76,7 @@ class ProbaThreshold(Truncation):
                 dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
                 probas = dist.probs
             probas_mask = torch.ge(probas, self.p_th)
-            valid_actions = torch.nonzero(probas_mask)[:,1] # slice trick to get only the indices.
+            valid_actions = torch.nonzero(probas_mask, as_tuple=False)[:,1] # slice trick to get only the indices.
             action_probs = probas[:,valid_actions]
             assert torch.all(action_probs >= self.p_th), "ERROR in proba threshold truncation function"
         return valid_actions.unsqueeze(0), action_probs
