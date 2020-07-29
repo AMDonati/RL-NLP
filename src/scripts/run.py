@@ -27,9 +27,12 @@ def run(args):
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
     logger.info("RL from {} ...".format(pre_trained))
     if args.truncate_mode is not None:
-        logger.info("with truncation")
+        logger.info("with truncation...")
+        if args.train_policy == 'truncated':
+            logger.info("learning the truncated policy")
     else:
-        logger.info("without truncation")
+        logger.info("without truncation...")
+
     out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_eps-adam{}_gradclip{}_trunc_{}_diffrew{}".format(
         args.agent,
         args.model,
@@ -49,7 +52,7 @@ def run(args):
         args.truncate_mode,
         args.diff_reward)
 
-    if args.p_th is None:
+    if args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
 
     if args.agent == 'PPO':
