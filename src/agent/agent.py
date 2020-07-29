@@ -118,7 +118,6 @@ class Agent:
             for t in range(0, env.max_len):
                 action, log_probs, value, _, dist = self.generate_action_test(state=state,
                                                                               truncation=truncation,
-                                                                              num_truncated=self.num_truncated,
                                                                               test_mode=test_mode)
                 new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
                 ep_reward += reward
@@ -126,14 +125,13 @@ class Agent:
                     if key != "ppl":
                         metric.fill(state=state, done=done, new_state=new_state,
                                 ref_question=env.ref_questions, reward=reward,
-                                closest_question=closest_question, dist=dist, img=env.img_feats.unsqueeze(0))
+                                closest_question=closest_question, dist=dist)
                     else:
                         if not truncation and test_mode == "sampling":
                             metric.fill(state=state, done=done, new_state=new_state,
                                         ref_question=env.ref_questions, reward=reward,
                                         closest_question=closest_question,
-                                        dist=dist,
-                                        img=env.img_feats.unsqueeze(0))
+                                        dist=dist)
                 state = new_state
                 if done:
                     break
@@ -167,14 +165,17 @@ class Agent:
                 state = torch.cat([state, word_idx.view(1,1)], dim=1)
                 if word_idx == env.special_tokens.EOS_idx:
                     break
+        new_state = env.State(state, None) # trick to have a state.text in the metric.
         state_decoded = self.env.clevr_dataset.idx2word(state.squeeze().cpu().numpy(), stop_at_end=True, ignored=['<SOS>'])
         # compute associated reward with reward function:
         reward, closest_question = env.reward_func.get(question=state_decoded,
                                                         ep_questions_decoded=env.ref_questions_decoded,
                                                         step_idx=env.max_len, done=True)
-        self.test_metrics["reward"].reinit_train_test(self.test_metrics["reward"].train_test + '_' + 'fromLM')
-        self.test_metrics["reward"].fill(done=True, reward=reward) #TODO: does not work with differential reward.
-        self.test_metrics["reward"].compute()
+
+        for key in ["reward", "ppl_dialog_lm"]:
+            self.test_metrics[key].reinit_train_test(self.test_metrics[key].train_test + '_' + 'fromLM')
+            self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward) #TODO: does not work with differential reward.
+            self.test_metrics[key].compute()
         # reset metrics key value for writing:
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)

@@ -44,7 +44,6 @@ class Metric:
     def write_to_csv(self):
         pass
 
-
 # ----------------------------------    TRAIN METRICS -------------------------------------------------------------------------------------
 
 class VAMetric(Metric):
@@ -184,6 +183,8 @@ class PPLMetric(Metric):
     def write_to_csv(self):
         for key, value in self.dict_ppl.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
+            logging.info('{} mean: {}'.format(key, np.mean(value)))
+            logging.info('{} std: {}'.format(key, np.std(value)))
             self.dict_ppl[key].append(np.mean(value))
             self.dict_ppl[key].append(np.std(value))
         write_to_csv(self.out_csv_file + '.csv', self.dict_ppl)
@@ -218,6 +219,8 @@ class PPLDialogfromLM(Metric):
     def write_to_csv(self):
         for key, value in self.dict_ppl.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
+            logging.info('{} mean: {}'.format(key, np.mean(value)))
+            logging.info('{} std: {}'.format(key, np.std(value)))
             self.dict_ppl[key].append(np.mean(value))
             self.dict_ppl[key].append(np.std(value))
         write_to_csv(self.out_csv_file + '.csv', self.dict_ppl)
@@ -250,6 +253,8 @@ class RewardMetric(Metric):
     def write_to_csv(self):
         for key, value in self.dict_rewards.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
+            logging.info('{} mean: {}'.format(key, np.mean(value)))
+            logging.info('{} std: {}'.format(key, np.std(value)))
             self.dict_rewards[key].append(np.mean(value))
             self.dict_rewards[key].append(np.std(value))
         write_to_csv(self.out_csv_file+'.csv', self.dict_rewards)
@@ -287,6 +292,8 @@ class BleuMetric(Metric):
     def write_to_csv(self):
         for key, value in self.dict_bleus.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
+            logging.info('{} mean: {}'.format(key, np.mean(value)))
+            logging.info('{} std: {}'.format(key, np.std(value)))
             self.dict_bleus[key].append(np.mean(value))
             self.dict_bleus[key].append(np.std(value))
         write_to_csv(self.out_csv_file+'.csv', self.dict_bleus)
