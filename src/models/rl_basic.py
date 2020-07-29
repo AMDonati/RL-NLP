@@ -103,7 +103,7 @@ class PolicyGRUWord(nn.Module):
 class PolicyLSTMWordBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1,
-                 rl=True, truncate_mode="masked", **kwargs):
+                 rl=True, train_policy="all_space", **kwargs):
         super(PolicyLSTMWordBatch, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
@@ -118,8 +118,8 @@ class PolicyLSTMWordBatch(nn.Module):
 
         truncature = {"masked": self.mask_truncature, "gather": self.gather_truncature,
                       "masked_inf": self.mask_inf_truncature}
-        #self.truncate = truncature[truncate_mode]
         self.truncate = truncature["masked"]
+        self.train_policy = train_policy
 
     def forward(self, state_text, state_img, valid_actions=None):
         embedding = self._get_embed_text(state_text)
@@ -131,7 +131,10 @@ class PolicyLSTMWordBatch(nn.Module):
             policy_dist_truncated = self.truncate(valid_actions, logits)
         else:
             policy_dist_truncated = policy_dist
-        return policy_dist, policy_dist_truncated, value
+        if self.train_policy == 'truncated' and valid_actions is not None:
+            return policy_dist_truncated, policy_dist_truncated, value
+        else:
+            return policy_dist, policy_dist_truncated, value
 
     def _get_embed_text(self, text):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
@@ -171,9 +174,9 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, truncate_mode="masked"):
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space"):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
-                                     truncate_mode=truncate_mode)
+                                     train_policy=train_policy)
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
@@ -199,7 +202,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
             policy_dist_truncated = self.truncate(valid_actions, logits)
         else:
             policy_dist_truncated = policy_dist
-        return policy_dist, policy_dist_truncated, value
+        if self.train_policy == 'truncated' and valid_actions is not None:
+            return policy_dist_truncated, policy_dist_truncated, value
+        else:
+            return policy_dist, policy_dist_truncated, value
 
 
 class PolicyLSTMWordBatch_SL(nn.Module):

@@ -93,6 +93,8 @@ class Agent:
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated, valid_actions=valid_actions)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
+        if self.policy.train_policy == 'truncated':
+            assert torch.all(torch.eq(policy_dist_truncated.probs, policy_dist.probs))
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
 

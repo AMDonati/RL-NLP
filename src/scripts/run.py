@@ -75,7 +75,7 @@ def run(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
-                                stride=args.stride, num_filters=args.num_filters, rl=True)
+                                stride=args.stride, num_filters=args.num_filters, rl=True, train_policy=args.train_policy)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
@@ -140,8 +140,8 @@ def get_parser():
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
-    parser.add_argument("-num_episodes_test", type=int, default=20, help="number of episodes test")
+    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
+    parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -153,6 +153,7 @@ def get_parser():
     parser.add_argument('-eps', type=float, default=1e-08, help='epsilon value for adam optimizer')
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
     parser.add_argument('-truncate_mode', type=str, help="truncation mode") # arg that says now if are truncating the action space or not.
+    parser.add_argument('-train_policy', type=str, default="all_space", help="train policy over all space or the truncated action space")
     parser.add_argument('-k_min', type=int, default=1, help="minimum of truncated action space size for sample_va truncation mode")
     parser.add_argument('-p_th', type=float, help="probability threshold for proba threshold truncation mode")
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
