@@ -87,29 +87,6 @@ class Agent:
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
 
-    # def get_top_k_words(self, state_text, top_k=10, state_img=None):
-    #     """
-    #     Truncate the action space with the top k words of a pretrained language model
-    #     :param state: state
-    #     :param top_k: number of words
-    #     :return: top k words
-    #     """
-    #     if self.truncate_mode is None:
-    #         return None, None
-    #     else:
-    #         if self.lm_sl:
-    #             seq_len = state_text.size(1)
-    #             log_probas, _ = self.pretrained_lm(state_text.to(self.device))
-    #             log_probas = log_probas.view(len(state_text), seq_len, -1)
-    #             log_probas = log_probas[:, -1, :]
-    #             top_k_weights, top_k_indices = torch.topk(log_probas, top_k, sorted=True)
-    #         else:
-    #             dist, dist_, value = self.pretrained_lm(state_text, state_img)
-    #             probs = dist.probs
-    #             top_k_weights, top_k_indices = torch.topk(probs, top_k, sorted=True)
-    #
-    #         return top_k_indices, top_k_weights
-
     def select_action(self, state):
         valid_actions, action_probs = self.truncation.get_valid_actions(state)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions)
@@ -119,7 +96,7 @@ class Agent:
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
 
-    def generate_action_test(self, state, truncation=False, test_mode='sampling', num_truncated=10):
+    def generate_action_test(self, state, truncation=False, test_mode='sampling'):
         with torch.no_grad():
             if truncation:
                 valid_actions, action_probs = self.truncation.get_valid_actions(state)
@@ -233,7 +210,7 @@ class Agent:
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.generated_text = []
-        self.policy.eval() #TODO: add a with torch.no_grad() as well ? (avoid the .detach() everywhere).
+        self.policy.eval()
         truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
         dialogs = {}
         for i_episode in range(num_episodes):

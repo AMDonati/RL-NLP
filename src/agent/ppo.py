@@ -33,17 +33,6 @@ class PPO(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    # def select_action(self, state, num_truncated=10, forced=None):
-    #     #TODO: refactor select_action function in agent and use Truncation class functions instead.
-    #     valid_actions, actions_probs = self.get_top_k_words(state.text, num_truncated, state.img)
-    #     policy_dist, policy_dist_truncated, value = self.policy_old(state.text, state.img, valid_actions)
-    #     action = policy_dist_truncated.sample() if forced is None else forced
-    #     if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-    #         action = torch.gather(valid_actions, 1, action.view(1, 1))
-    #     log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
-    #     log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
-    #     return action, log_prob, value, (valid_actions, actions_probs, log_prob_truncated), policy_dist
-
     def evaluate(self, state_text, state_img, action, num_truncated=10):
         #valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated) #not needed and actually has a bug for batch of valid actions in LSTM models.
         policy_dist, _, value = self.policy(state_text, state_img, valid_actions=None)
