@@ -236,27 +236,39 @@ class RewardMetric(Metric):
         self.type = "scalar"
         self.key = "reward"
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
+        self.measure = {}
         self.dict_rewards, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
-            self.measure.append(kwargs["reward"]) #TODO: does not work with differential reward ?
+            self.measure["reward"] = [kwargs["reward"]] #TODO: does not work with differential reward ?
+            norm_reward = [kwargs["reward"]/max(kwargs["new_state"].text[:,1:].squeeze().cpu().numpy().size, len(kwargs["closest_question"].split()))]
+            self.measure["norm_reward"] = norm_reward
+            self.measure["len_dialog"] = [kwargs["new_state"].text[:,1:].squeeze().cpu().numpy().size]
 
     def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
         if not self.train_test + '_' + self.key in self.dict_rewards:
-            self.dict_rewards[self.train_test + '_' + self.key] = [self.metric[-1]]
+            self.dict_rewards[self.train_test + '_' + self.key] = self.measure
         else:
-            self.dict_rewards[self.train_test + '_' + self.key].append(self.metric[-1])
+            for key, value in self.measure.items():
+                self.dict_rewards[self.train_test + '_' + self.key][key].append(value[-1])
+
+    def compute(self, **kwargs):
+        self.compute_(**kwargs)
+        self.measure = {}
+        self.idx_word = 0
+        self.idx_step = 0
 
     def write_to_csv(self):
         for key, value in self.dict_rewards.items():
-            self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
-            logging.info('{} mean: {}'.format(key, np.mean(value)))
-            logging.info('{} std: {}'.format(key, np.std(value)))
-            self.dict_rewards[key].append(np.mean(value))
-            self.dict_rewards[key].append(np.std(value))
+            self.dict_stats[key] = {}
+            for k, v in value.items():
+                self.dict_stats[key][k] = [np.mean(v), np.std(v), len(v)]
+                logging.info('{} mean: {}'.format(key + '___' + k, np.mean(v)))
+                logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
+                self.dict_rewards[key][k].append(np.mean(v))
+                self.dict_rewards[key][k].append(np.std(v))
         write_to_csv(self.out_csv_file+'.csv', self.dict_rewards)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 

@@ -174,7 +174,7 @@ class Agent:
 
         for key in ["reward", "ppl_dialog_lm"]:
             self.test_metrics[key].reinit_train_test(self.test_metrics[key].train_test + '_' + 'fromLM')
-            self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward) #TODO: does not work with differential reward.
+            self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward, closest_question=closest_question) #TODO: does not work with differential reward.
             self.test_metrics[key].compute()
         # reset metrics key value for writing:
         for m in self.test_metrics.values():
