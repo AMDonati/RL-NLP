@@ -58,6 +58,9 @@ def run(args):
     if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
 
+    if args.train_policy == "truncated":
+        out_folder = out_folder + '_truncated_policy'
+
     writer = SummaryWriter(log_dir=os.path.join(output_path,
                                                 out_folder))
 
