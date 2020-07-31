@@ -169,7 +169,7 @@ def get_parser():
     parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
     parser.add_argument('-grad_clip', type=float, help="value of gradient norm clipping")
     parser.add_argument('-lm_path', type=str, required=True,
-                        help="if specified, the language model truncate the action space")
+                        help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
     parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
@@ -184,7 +184,7 @@ def get_parser():
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
     parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
-    parser.add_argument('-eval_no_trunc', type=int, default=0, help="if using truncation at training: at test time, evaluate also langage generated without truncation")
+    parser.add_argument('-eval_no_trunc', type=int, default=0, help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     return parser
 
 
