@@ -182,7 +182,7 @@ class PPLMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ppl"
-        self.dict_ppl = {}
+        self.dict_metric = {}
         self.dict_stats = {}
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
@@ -202,19 +202,19 @@ class PPLMetric(Metric):
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().cpu().numpy().item()
         self.metric.append(ppl)
-        if not self.train_test + '_' + self.key in self.dict_ppl:
-            self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
+        if not self.train_test + '_' + self.key in self.dict_metric:
+            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
-            self.dict_ppl[self.train_test + '_' + self.key].append(self.metric[-1])
+            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def write_to_csv(self):
-        for key, value in self.dict_ppl.items():
+        for key, value in self.dict_metric.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             logging.info('{} mean: {}'.format(key, np.mean(value)))
             logging.info('{} std: {}'.format(key, np.std(value)))
-            self.dict_ppl[key].append(np.mean(value))
-            self.dict_ppl[key].append(np.std(value))
-        write_to_csv(self.out_csv_file + '.csv', self.dict_ppl)
+            self.dict_metric[key].append(np.mean(value))
+            self.dict_metric[key].append(np.std(value))
+        write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
@@ -225,7 +225,7 @@ class PPLDialogfromLM(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ppl_dialog_lm"
-        self.dict_ppl, self.dict_stats = {}, {}
+        self.dict_metric, self.dict_stats = {}, {}
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
@@ -238,19 +238,19 @@ class PPLDialogfromLM(Metric):
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
         self.metric.append(ppl)
-        if not self.train_test + '_' + self.key in self.dict_ppl:
-            self.dict_ppl[self.train_test + '_' + self.key] = [self.metric[-1]]
+        if not self.train_test + '_' + self.key in self.dict_metric:
+            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
-            self.dict_ppl[self.train_test + '_' + self.key].append(self.metric[-1])
+            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def write_to_csv(self):
-        for key, value in self.dict_ppl.items():
+        for key, value in self.dict_metric.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             logging.info('{} mean: {}'.format(key, np.mean(value)))
             logging.info('{} std: {}'.format(key, np.std(value)))
-            self.dict_ppl[key].append(np.mean(value))
-            self.dict_ppl[key].append(np.std(value))
-        write_to_csv(self.out_csv_file + '.csv', self.dict_ppl)
+            self.dict_metric[key].append(np.mean(value))
+            self.dict_metric[key].append(np.std(value))
+        write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
@@ -264,7 +264,7 @@ class RewardMetric(Metric):
         self.key = "reward"
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
         self.measure = {}
-        self.dict_rewards, self.dict_stats = {}, {}
+        self.dict_metric, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
@@ -275,11 +275,11 @@ class RewardMetric(Metric):
             self.measure["len_dialog"] = [kwargs["new_state"].text[:,1:].squeeze().cpu().numpy().size]
 
     def compute_(self, **kwargs):
-        if not self.train_test + '_' + self.key in self.dict_rewards:
-            self.dict_rewards[self.train_test + '_' + self.key] = self.measure
+        if not self.train_test + '_' + self.key in self.dict_metric:
+            self.dict_metric[self.train_test + '_' + self.key] = self.measure
         else:
             for key, value in self.measure.items():
-                self.dict_rewards[self.train_test + '_' + self.key][key].append(value[-1])
+                self.dict_metric[self.train_test + '_' + self.key][key].append(value[-1])
 
     def compute(self, **kwargs):
         self.compute_(**kwargs)
@@ -288,15 +288,15 @@ class RewardMetric(Metric):
         self.idx_step = 0
 
     def write_to_csv(self):
-        for key, value in self.dict_rewards.items():
+        for key, value in self.dict_metric.items():
             self.dict_stats[key] = {}
             for k, v in value.items():
                 self.dict_stats[key][k] = [np.mean(v), np.std(v), len(v)]
                 logging.info('{} mean: {}'.format(key + '___' + k, np.mean(v)))
                 logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
-                self.dict_rewards[key][k].append(np.mean(v))
-                self.dict_rewards[key][k].append(np.std(v))
-        write_to_csv(self.out_csv_file+'.csv', self.dict_rewards)
+                self.dict_metric[key][k].append(np.mean(v))
+                self.dict_metric[key][k].append(np.std(v))
+        write_to_csv(self.out_csv_file +'.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
@@ -310,7 +310,7 @@ class BleuMetric(Metric):
         self.key = "bleu"
         self.train_test = train_test
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
-        self.dict_bleus, self.dict_stats = {}, {}
+        self.dict_metric, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -323,19 +323,19 @@ class BleuMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
-        if not self.train_test + '_' + self.key in self.dict_bleus:
-            self.dict_bleus[self.train_test + '_' + self.key] = [self.metric[-1]]
+        if not self.train_test + '_' + self.key in self.dict_metric:
+            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
-            self.dict_bleus[self.train_test + '_' + self.key].append(self.metric[-1])
+            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def write_to_csv(self):
-        for key, value in self.dict_bleus.items():
+        for key, value in self.dict_metric.items():
             self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
             logging.info('{} mean: {}'.format(key, np.mean(value)))
             logging.info('{} std: {}'.format(key, np.std(value)))
-            self.dict_bleus[key].append(np.mean(value))
-            self.dict_bleus[key].append(np.std(value))
-        write_to_csv(self.out_csv_file+'.csv', self.dict_bleus)
+            self.dict_metric[key].append(np.mean(value))
+            self.dict_metric[key].append(np.std(value))
+        write_to_csv(self.out_csv_file +'.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
@@ -357,6 +357,37 @@ class RefQuestionsMetric(Metric):
     def compute_(self, **kwargs):
         unique_ratio = len(list(set(self.measure))) / len(self.measure)
         self.metric.append(unique_ratio)
+
+class TTRQuestionMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "ttr_question"
+        self.dict_metric, self.dict_stats = {}, {}
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            self.measure = kwargs["new_state"].text.numpy()[0]
+
+    def compute_(self, **kwargs):
+        diversity_metric = len(set(list(self.measure))) / len(self.measure)
+        self.metric.append(diversity_metric)
+        if not self.train_test + '_' + self.key in self.dict_metric:
+            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def write_to_csv(self):
+        for key, value in self.dict_metric.items():
+            self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
+            logging.info('{} mean: {}'.format(key, np.mean(value)))
+            logging.info('{} std: {}'.format(key, np.std(value)))
+            self.dict_metric[key].append(np.mean(value))
+            self.dict_metric[key].append(np.std(value))
+        write_to_csv(self.out_csv_file +'.csv', self.dict_metric)
+        write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
+
 
 
 class TTRMetric(Metric):
@@ -397,5 +428,5 @@ class LMMetric(Metric):
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric, "ttr_question": TTRQuestionMetric}
 

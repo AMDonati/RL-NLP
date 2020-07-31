@@ -84,7 +84,7 @@ class Agent:
         self.start_episode = 0
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
@@ -243,7 +243,7 @@ class Agent:
         self.dict_running_return = {}
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
-            ref_question = random.choice(self.env.ref_questions)
+            #ref_question = random.choice(self.env.ref_questions)
             ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], []  # TODO: use the Memory Class or the Metric Class instead.
             for t in range(0, self.env.max_len):
                 #forced = ref_question[t] if self.pretrain else None
