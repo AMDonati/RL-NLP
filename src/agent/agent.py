@@ -146,12 +146,12 @@ class Agent:
         for key, metric in self.test_metrics.items():
             if key != "ppl":
                 metric.compute(state=state, closest_question=closest_question,
-                               reward=reward)
+                               reward=reward, img_idx=env.img_idx)
                 metric.write()
             else:
                 if not truncation and test_mode == "sampling":
                     metric.compute(state=state, closest_question=closest_question,
-                                   reward=reward)
+                                   reward=reward, img_idx=env.img_idx)
                     metric.write()
         return state, ep_reward, closest_question, env.img_idx
 
@@ -218,6 +218,8 @@ class Agent:
 
 
     def test_env(self, env, num_episodes=10, test_mode='sampling'):
+        # init env:
+        env.reset()
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.generated_text = []
@@ -232,14 +234,14 @@ class Agent:
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
                     m.reinit_train_test(m.train_test + '_' + key)
-                for i in range(env.num_questions): # loop multiple time over the same image to measure langage diversity
+                for i in range(env.ref_questions.size(0)): # loop multiple time over the same image to measure langage diversity
                     state, ep_reward, closest_question, img_idx = self.generate_one_episode_test(env=env, truncation=trunc,
                                                                                                       test_mode=test_mode,
                                                                                                       seed=seed)
                     dialogs[key].append('DIALOG {} for img {}: {}:'.format(i, img_idx, key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[
                                                                                                   0]) + '----- closest question:' + closest_question + '------reward: {}'.format(
                         ep_reward))
-                    if i == env.num_questions - 1:
+                    if i == env.ref_questions.size(0) - 1:
                         # reset metrics key value for writing:
                         for m in self.test_metrics.values():
                             m.reinit_train_test(env.mode + '_' + test_mode)
@@ -294,7 +296,7 @@ class Agent:
                 ep_reward += reward
                 if done:
                     for key, metric in self.train_metrics.items():
-                        metric.compute(state=state, closest_question=closest_question)
+                        metric.compute(state=state, closest_question=closest_question, img_idx=self.env.img_idx)
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         loss = self.update()
                         logging.info("UPDATING POLICY WEIGHTS...")

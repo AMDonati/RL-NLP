@@ -176,7 +176,7 @@ class DialogMetric(Metric):
     def compute_(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
         closest_question_decoded = kwargs["closest_question"]
-        string = ' img {}:'.format(self.agent.env.img_idx) + state_decoded + '\n' + '---closest question---' + closest_question_decoded
+        string = ' img {}:'.format(kwargs["img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-'*40
         self.metric.append(string)
         # write dialog in a .txt file:
         with open(self.out_dialog_file, 'a') as f:
