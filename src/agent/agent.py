@@ -84,7 +84,8 @@ class Agent:
         self.start_episode = 0
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question"]}
+        self.test_metrics = {key: metrics[key](self, train_test="test") for key in
+                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
@@ -93,13 +94,13 @@ class Agent:
     def select_action(self, state):
         valid_actions, action_probs = self.truncation.get_valid_actions(state)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions)
-        action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated, valid_actions=valid_actions)
+        action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
+                                               valid_actions=valid_actions)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         if self.policy.train_policy == 'truncated':
             assert torch.all(torch.eq(policy_dist_truncated.probs, policy_dist.probs))
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
-
 
     def generate_action_test(self, state, truncation=False, test_mode='sampling'):
         with torch.no_grad():
@@ -111,7 +112,7 @@ class Agent:
             if test_mode == 'sampling':
                 action = policy_dist_truncated.sample()
             elif test_mode == 'greedy':
-                action = torch.argmax(policy_dist_truncated.probs).view(1).detach() #TODO: remove the detach here?
+                action = torch.argmax(policy_dist_truncated.probs).view(1).detach()  # TODO: remove the detach here?
             if policy_dist_truncated.probs.size() != policy_dist.probs.size():
                 action = torch.gather(valid_actions, 1, action.view(1, 1))
             log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
@@ -119,43 +120,41 @@ class Agent:
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
     def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
-            state, ep_reward = env.reset(seed=seed), 0
-            for t in range(0, env.max_len):
-                action, log_probs, value, (valid_actions, action_probs, log_prob_truncated), dist = self.generate_action_test(state=state,
-                                                                              truncation=truncation,
-                                                                              test_mode=test_mode)
-                new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
-                ep_reward += reward
-                for key, metric in self.test_metrics.items():
-                    if key != "ppl":
-                        metric.fill(state=state, done=done, new_state=new_state,
-                                ref_question=env.ref_questions, reward=reward,
-                                closest_question=closest_question, dist=dist, valid_actions=valid_actions)
-                    else:
-                        # computing ppl on ref questions only in one case (otherwise redundant).
-                        if not truncation and test_mode == "sampling":
-                            metric.fill(state=state, done=done, new_state=new_state,
-                                        ref_question=env.ref_questions, reward=reward,
-                                        closest_question=closest_question,
-                                        dist=dist, valid_actions=valid_actions)
-                state = new_state
-                if done:
-                    break
+        state, ep_reward = env.reset(seed=seed), 0
+        for t in range(0, env.max_len):
+            action, log_probs, value, (
+            valid_actions, action_probs, log_prob_truncated), dist = self.generate_action_test(state=state,
+                                                                                               truncation=truncation,
+                                                                                               test_mode=test_mode)
+            new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+            ep_reward += reward
             for key, metric in self.test_metrics.items():
                 if key != "ppl":
-                    metric.compute(state=state, closest_question=closest_question,
-                               reward=reward)
-                    metric.write()
+                    metric.fill(state=state, done=done, new_state=new_state,
+                                ref_question=env.ref_questions, reward=reward,
+                                closest_question=closest_question, dist=dist, valid_actions=valid_actions)
                 else:
+                    # computing ppl on ref questions only in one case (otherwise redundant).
                     if not truncation and test_mode == "sampling":
-                        metric.compute(state=state, closest_question=closest_question,
-                                       reward=reward)
-                        metric.write()
-            logging.info('Episode Img Idx: {}'.format(env.img_idx))
-            # reset metrics key value for writing:
-            for m in self.test_metrics.values():
-                m.reinit_train_test(env.mode + '_' + test_mode)
-            return state, ep_reward, closest_question, self.test_metrics
+                        metric.fill(state=state, done=done, new_state=new_state,
+                                    ref_question=env.ref_questions, reward=reward,
+                                    closest_question=closest_question,
+                                    dist=dist, valid_actions=valid_actions)
+            state = new_state
+            if done:
+                break
+        for key, metric in self.test_metrics.items():
+            if key != "ppl":
+                metric.compute(state=state, closest_question=closest_question,
+                               reward=reward)
+                metric.write()
+            else:
+                if not truncation and test_mode == "sampling":
+                    metric.compute(state=state, closest_question=closest_question,
+                                   reward=reward)
+                    metric.write()
+        return state, ep_reward, closest_question, env.img_idx
+
 
     def generate_one_episode_with_lm(self, env, test_mode='sampling'):
         state = env.special_tokens.SOS_idx
@@ -164,23 +163,24 @@ class Agent:
             for i in range(env.max_len):
                 log_probas, hidden = self.pretrained_lm(state)  # output (1, num_tokens)
                 if test_mode == 'sampling':
-                    softmax = log_probas[-1,:].squeeze().exp()
+                    softmax = log_probas[-1, :].squeeze().exp()
                     word_idx = Categorical(softmax).sample()
                 elif test_mode == 'greedy':
-                    word_idx = log_probas[-1,:].squeeze().argmax()
-                state = torch.cat([state, word_idx.view(1,1)], dim=1)
+                    word_idx = log_probas[-1, :].squeeze().argmax()
+                state = torch.cat([state, word_idx.view(1, 1)], dim=1)
                 if word_idx == env.special_tokens.EOS_idx:
                     break
-        new_state = env.State(state, None) # trick to have a state.text in the metric.
+        new_state = env.State(state, None)  # trick to have a state.text in the metric.
         state_decoded = self.env.clevr_dataset.idx2word(state.squeeze().cpu().numpy(), stop_at_end=True, ignored=['<SOS>'])
         # compute associated reward with reward function:
         reward, closest_question = env.reward_func.get(question=state_decoded,
-                                                        ep_questions_decoded=env.ref_questions_decoded,
-                                                        step_idx=env.max_len, done=True)
+                                                       ep_questions_decoded=env.ref_questions_decoded,
+                                                       step_idx=env.max_len, done=True)
 
         for key in ["reward", "ppl_dialog_lm"]:
             self.test_metrics[key].reinit_train_test(self.test_metrics[key].train_test + '_' + 'fromLM')
-            self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward, closest_question=closest_question) #TODO: does not work with differential reward.
+            self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward,
+                                        closest_question=closest_question)  # TODO: does not work with differential reward.
             self.test_metrics[key].compute()
         # reset metrics key value for writing:
         for m in self.test_metrics.values():
@@ -192,6 +192,7 @@ class Agent:
         with open(out_file, 'wb') as f:
             torch.save(self.policy.state_dict(), f)
 
+
     def save_ckpt(self, EPOCH, loss):
         torch.save({
             'epoch': EPOCH,
@@ -199,6 +200,7 @@ class Agent:
             'optimizer_state_dict': self.optimizer.state_dict(),
             'loss': loss,
         }, os.path.join(self.checkpoints_path, 'model.pt'))
+
 
     def load_ckpt(self):
         checkpoint = torch.load(os.path.join(self.checkpoints_path, 'model.pt'))
@@ -208,10 +210,12 @@ class Agent:
         loss = checkpoint['loss']
         return epoch, loss
 
+
     def test(self, num_episodes=10, test_mode='sampling'):
         for env in self.test_envs:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode)
+
 
     def test_env(self, env, num_episodes=10, test_mode='sampling'):
         for m in self.test_metrics.values():
@@ -219,20 +223,34 @@ class Agent:
         self.generated_text = []
         self.policy.eval()
         truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
-        dialogs = {}
         for i_episode in range(num_episodes):
-            logging.info('-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(i_episode))
-            seed = np.random.randint(1000000) # setting the seed to generate the episode with the same image.
+            dialogs = {key:[] for key in truncation.keys()}
+            logging.info(
+                '-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(
+                    i_episode))
+            seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
             for key, trunc in truncation.items():
                 for m in self.test_metrics.values():
                     m.reinit_train_test(m.train_test + '_' + key)
-                state, ep_reward, closest_question, test_metrics = self.generate_one_episode_test(env=env, truncation=trunc, test_mode=test_mode, seed=seed)
-                dialogs[key] = 'DIALOG {}:'.format(key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0]) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
+                for i in range(env.num_questions): # loop multiple time over the same image to measure langage diversity
+                    state, ep_reward, closest_question, img_idx = self.generate_one_episode_test(env=env, truncation=trunc,
+                                                                                                      test_mode=test_mode,
+                                                                                                      seed=seed)
+                    dialogs[key].append('DIALOG {} for img {}: {}:'.format(i, img_idx, key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[
+                                                                                                  0]) + '----- closest question:' + closest_question + '------reward: {}'.format(
+                        ep_reward))
+                    if i == env.num_questions - 1:
+                        # reset metrics key value for writing:
+                        for m in self.test_metrics.values():
+                            m.reinit_train_test(env.mode + '_' + test_mode)
+            # generate one question with the lm as a comparison
             _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
-            dialogs["from_lm"] = 'DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(ep_reward)
+            dialogs["from_lm"] = ['DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(
+                            ep_reward)]
             for _, dialog in dialogs.items():
-                logging.info(dialog)
-            logging.info('-------------------------------------------------------------------------------------------------------------------------------------------------------')
+                logging.info('\n'.join(dialog))
+            logging.info(
+                '-------------------------------------------------------------------------------------------------------------------------------------------------------')
 
 
     def learn(self, num_episodes=100):
@@ -243,10 +261,10 @@ class Agent:
         self.dict_running_return = {}
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
-            #ref_question = random.choice(self.env.ref_questions)
+            # ref_question = random.choice(self.env.ref_questions)
             ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], []  # TODO: use the Memory Class or the Metric Class instead.
             for t in range(0, self.env.max_len):
-                #forced = ref_question[t] if self.pretrain else None
+                # forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
                     valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state)
                 ep_log_probs.append(log_probs)
@@ -301,7 +319,8 @@ class Agent:
                 logging.info('Closest Question: {}'.format(closest_question))
                 logging.info('episode action probs: {}'.format(ep_probs))
                 if valid_actions is not None:
-                    logging.info('episode action probs truncated: {}'.format(ep_probs_truncated)) # to monitor the discrepancy between the truncated softmax and the softmax over the whole action space.
+                    logging.info('episode action probs truncated: {}'.format(
+                        ep_probs_truncated))  # to monitor the discrepancy between the truncated softmax and the softmax over the whole action space.
                     logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(ep_lm_probs))
                     logging.info('---------------------Valid action space------------------------------')
                     logging.info('\n'.join(self.train_metrics["valid_actions"].metric))
@@ -322,12 +341,13 @@ class Agent:
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
-        if valid_actions is not None: # to compare the discrepancy between the 'truncated policy' and the 'all space' policy that is being learned. (Plus comparison with the language model).
+        if valid_actions is not None:  # to compare the discrepancy between the 'truncated policy' and the 'all space' policy that is being learned. (Plus comparison with the language model).
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
         # writing to csv the history of running return:
-        write_to_csv(os.path.join(self.out_path, "train_running_return_history.csv"), self.dict_running_return) # useful to have a metric to monitor the convergence speed.
+        write_to_csv(os.path.join(self.out_path, "train_running_return_history.csv"),
+                     self.dict_running_return)  # useful to have a metric to monitor the convergence speed.
         # write to csv other metric:
         for _, metric in self.train_metrics.items():
             metric.write_to_csv()

@@ -176,7 +176,7 @@ class DialogMetric(Metric):
     def compute_(self, **kwargs):
         state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0])
         closest_question_decoded = kwargs["closest_question"]
-        string = state_decoded + '---closest question---' + closest_question_decoded
+        string = ' img {}:'.format(self.agent.env.img_idx) + state_decoded + '\n' + '---closest question---' + closest_question_decoded
         self.metric.append(string)
         # write dialog in a .txt file:
         with open(self.out_dialog_file, 'a') as f:
@@ -191,40 +191,29 @@ class PPLMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ppl"
-        #self.dict_metric = {}
-        #self.dict_stats = {}
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            for ref_question in kwargs["ref_question"]:
-                inp_question = ref_question[:-1]
-                inp_question = torch.cat([torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(self.agent.device) # adding SOS token.
-                target_question = ref_question[1:]
-                target_question = torch.cat([target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(self.agent.device) # adding EOS token.
-                for i in range(len(inp_question)):
-                    inputs = inp_question[:i + 1].unsqueeze(0)
-                    policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=kwargs["valid_actions"])
-                    log_prob = policy_dist_truncated.log_prob(target_question[i])
-                    self.measure.append(log_prob)
+        with torch.no_grad():
+            if kwargs["done"]:
+                for ref_question in kwargs["ref_question"]:
+                    inp_question = ref_question[:-1]
+                    inp_question = torch.cat([torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(self.agent.device) # adding SOS token.
+                    target_question = ref_question[1:]
+                    target_question = torch.cat([target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(self.agent.device) # adding EOS token.
+                    for i in range(len(inp_question)):
+                        inputs = inp_question[:i + 1].unsqueeze(0)
+                        policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=kwargs["valid_actions"])
+                        log_prob = policy_dist_truncated.log_prob(target_question[i])
+                        self.measure.append(log_prob)
 
     def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).detach().cpu().numpy().item()
+        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
         self.metric.append(ppl)
         if not self.train_test + '_' + self.key in self.dict_metric:
             self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
             self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
-    #
-    # def write_to_csv(self):
-    #     for key, value in self.dict_metric.items():
-    #         self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
-    #         logging.info('{} mean: {}'.format(key, np.mean(value)))
-    #         logging.info('{} std: {}'.format(key, np.std(value)))
-    #         self.dict_metric[key].append(np.mean(value))
-    #         self.dict_metric[key].append(np.std(value))
-    #     write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
-    #     write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         pass
@@ -234,7 +223,6 @@ class PPLDialogfromLM(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ppl_dialog_lm"
-        #self.dict_metric, self.dict_stats = {}, {}
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
@@ -252,16 +240,6 @@ class PPLDialogfromLM(Metric):
         else:
             self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
-    # def write_to_csv(self):
-    #     for key, value in self.dict_metric.items():
-    #         self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
-    #         logging.info('{} mean: {}'.format(key, np.mean(value)))
-    #         logging.info('{} std: {}'.format(key, np.std(value)))
-    #         self.dict_metric[key].append(np.mean(value))
-    #         self.dict_metric[key].append(np.std(value))
-    #     write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
-    #     write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
-
     def write(self):
         pass
 
@@ -273,7 +251,6 @@ class RewardMetric(Metric):
         self.key = "reward"
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
         self.measure = {}
-        #self.dict_metric, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
@@ -319,7 +296,6 @@ class BleuMetric(Metric):
         self.key = "bleu"
         self.train_test = train_test
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
-        #self.dict_metric, self.dict_stats = {}, {}
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -336,16 +312,6 @@ class BleuMetric(Metric):
             self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
             self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
-
-    # def write_to_csv(self):
-    #     for key, value in self.dict_metric.items():
-    #         self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
-    #         logging.info('{} mean: {}'.format(key, np.mean(value)))
-    #         logging.info('{} std: {}'.format(key, np.std(value)))
-    #         self.dict_metric[key].append(np.mean(value))
-    #         self.dict_metric[key].append(np.std(value))
-    #     write_to_csv(self.out_csv_file +'.csv', self.dict_metric)
-    #     write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         '''Overwrite write function to avoid logging on tensorboard.'''
@@ -364,15 +330,22 @@ class RefQuestionsMetric(Metric):
             self.measure.append(kwargs["closest_question"])
 
     def compute_(self, **kwargs):
-        unique_ratio = len(list(set(self.measure))) / len(self.measure)
-        self.metric.append(unique_ratio)
+        if len(self.measure) == 10:
+            unique_ratio = len(list(set(self.measure))) / len(self.measure)
+            self.metric.append(unique_ratio)
+            self.measure = []
+            #TODO: add csv writing.
+
+    def compute(self, **kwargs):
+        self.compute_(**kwargs)
+        self.idx_word = 0
+        self.idx_step = 0
 
 class TTRQuestionMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ttr_question"
-        #self.dict_metric, self.dict_stats = {}, {}
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
@@ -387,31 +360,33 @@ class TTRQuestionMetric(Metric):
         else:
             self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
-    # def write_to_csv(self):
-    #     for key, value in self.dict_metric.items():
-    #         self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
-    #         logging.info('{} mean: {}'.format(key, np.mean(value)))
-    #         logging.info('{} std: {}'.format(key, np.std(value)))
-    #         self.dict_metric[key].append(np.mean(value))
-    #         self.dict_metric[key].append(np.std(value))
-    #     write_to_csv(self.out_csv_file +'.csv', self.dict_metric)
-    #     write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
-
-
-class TTRMetric(Metric):
-    def __init__(self, agent):
-        Metric.__init__(self, agent)
+class UniqueWordsMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
         self.type = "scalar"
-        self.key = "ttr"
+        self.key = "unique_words"
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["state"].text.numpy()[0])
+        self.measure.append(list(kwargs["state"].text.numpy()[0]))
 
     def compute_(self, **kwargs):
-        last_text = [item for sublist in self.measure[-min(10, len(self.measure)):] for item in sublist]
-        diversity_metric = len(set(last_text)) / len(last_text)
-        self.metric.append(diversity_metric)
+        if len(self.measure) == 10:
+            arr = np.array(self.measure).flatten()
+            unique_tokens = np.unique(arr)
+            diversity_metric = len(unique_tokens) / len(arr)
+            self.metric.append(diversity_metric)
+            self.measure = []
+            if not self.train_test + '_' + self.key in self.dict_metric:
+                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+            else:
+                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def compute(self, **kwargs):
+        self.compute_(**kwargs)
+        self.idx_word = 0
+        self.idx_step = 0
 
 # --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
 
@@ -437,5 +412,5 @@ class LMMetric(Metric):
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric, "ttr_question": TTRQuestionMetric}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric, "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric}
 
