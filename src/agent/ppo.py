@@ -13,7 +13,8 @@ class PPO(Agent):
                  update_every=100, num_truncated=10,
                  k_min=1, p_th=None,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
-                 log_interval=1):
+                 log_interval=1,
+                 eval_no_trunc=0):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path, gamma=gamma, lr=lr, eps=eps,
                        grad_clip=grad_clip,
                        lm_sl=lm_sl,
@@ -22,7 +23,8 @@ class PPO(Agent):
                        k_min=k_min,
                        p_th=p_th,
                        truncate_mode=truncate_mode,
-                       log_interval=log_interval, test_envs=test_envs)
+                       log_interval=log_interval, test_envs=test_envs,
+                       eval_no_trunc=eval_no_trunc)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs

@@ -49,7 +49,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, p_th=None, k_min=1, truncate_mode="top_k", log_interval=10, test_envs=[]):
+                 num_truncated=10, p_th=None, k_min=1, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
@@ -68,6 +68,7 @@ class Agent:
         self.update_every = update_every
         self.memory = Memory()
         self.num_truncated = num_truncated
+        self.eval_no_trunc = eval_no_trunc
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_,
@@ -224,7 +225,13 @@ class Agent:
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.generated_text = []
         self.policy.eval()
-        truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
+        if self.eval_no_trunc == 1:
+            # if using truncation, eval the test dialog with and without truncation
+            truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
+        else:
+            # if using truncation, eval the test dialog only with truncation
+            truncation = {"with_trunc": True} if self.truncate_mode is not None else {
+                "no_trunc": False}
         for i_episode in range(num_episodes):
             dialogs = {key:[] for key in truncation.keys()}
             logging.info(
