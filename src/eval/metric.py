@@ -363,6 +363,9 @@ class RefQuestionsMetric(Metric):
         self.idx_word = 0
         self.idx_step = 0
 
+    def write(self):
+        pass
+
 class TTRQuestionMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
@@ -381,6 +384,9 @@ class TTRQuestionMetric(Metric):
             self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
         else:
             self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+
+    def write(self):
+        pass
 
 
 class UniqueWordsMetric(Metric):
@@ -410,6 +416,9 @@ class UniqueWordsMetric(Metric):
         self.compute_(**kwargs)
         self.idx_word = 0
         self.idx_step = 0
+
+    def write(self):
+        pass
 
 # --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
 
