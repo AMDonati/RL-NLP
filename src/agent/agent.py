@@ -86,7 +86,7 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question"]}
+                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words', 'ratio_closest_questions']}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
@@ -147,12 +147,12 @@ class Agent:
         for key, metric in self.test_metrics.items():
             if key != "ppl":
                 metric.compute(state=state, closest_question=closest_question,
-                               reward=reward, img_idx=env.img_idx)
+                               reward=reward, img_idx=env.img_idx, ref_question=env.ref_questions)
                 metric.write()
             else:
                 if not truncation and test_mode == "sampling":
                     metric.compute(state=state, closest_question=closest_question,
-                                   reward=reward, img_idx=env.img_idx)
+                                   reward=reward, img_idx=env.img_idx, ref_question=env.ref_questions)
                     metric.write()
         return state, ep_reward, closest_question, env.img_idx
 

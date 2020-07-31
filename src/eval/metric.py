@@ -324,17 +324,21 @@ class RefQuestionsMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
         self.key = "ratio_closest_questions"
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
             self.measure.append(kwargs["closest_question"])
 
     def compute_(self, **kwargs):
-        if len(self.measure) == 10:
+        if len(self.measure) == kwargs["ref_question"].size(0):
             unique_ratio = len(list(set(self.measure))) / len(self.measure)
             self.metric.append(unique_ratio)
             self.measure = []
-            #TODO: add csv writing.
+            if not self.train_test + '_' + self.key in self.dict_metric:
+                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+            else:
+                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def compute(self, **kwargs):
         self.compute_(**kwargs)
@@ -369,10 +373,11 @@ class UniqueWordsMetric(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        self.measure.append(list(kwargs["state"].text.numpy()[0]))
+        if kwargs["done"]:
+            self.measure.append(list(kwargs["new_state"].text.numpy()[0]))
 
     def compute_(self, **kwargs):
-        if len(self.measure) == 10:
+        if len(self.measure) == kwargs["ref_question"].size(0):
             arr = np.array(self.measure).flatten()
             unique_tokens = np.unique(arr)
             diversity_metric = len(unique_tokens) / len(arr)
@@ -412,5 +417,5 @@ class LMMetric(Metric):
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric, "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric, "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric, "ratio_closest_questions": RefQuestionsMetric}
 
