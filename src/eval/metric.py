@@ -41,10 +41,11 @@ class Metric:
         self.idx_write += 1
         self.metric_history.extend(self.metric)
         self.metric = []
+
     def write_to_csv(self):
         pass
 
-# ----------------------------------    TRAIN METRICS -------------------------------------------------------------------------------------
+# ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
 
 class VAMetric(Metric):
     def __init__(self, agent, train_test):
@@ -67,6 +68,32 @@ class VAMetric(Metric):
         self.metric = self.measure
         pass
 
+class SizeVAMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.counter = 0
+        self.key = "size_valid_actions"
+        self.dict_size_va = {}
+        self.idx_csv = 1
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_size_va_history.csv')
+
+    def fill_(self, **kwargs):
+        if kwargs["valid_actions"] is not None:
+            self.measure.append(kwargs["valid_actions"].size(1))
+
+    def compute_(self, **kwargs):
+        self.metric = [np.round(np.mean(self.measure))]
+        self.dict_size_va[self.idx_csv] = self.measure
+        self.idx_csv += 1
+
+    def write_to_csv(self):
+        size_per_timestep = [[val[i] for val in self.dict_size_va.values()] for i in range(min([len(val) for val in self.dict_size_va.values()]))]
+        self.dict_size_va["mean_size"] = np.round(np.mean([np.mean(val) for val in self.dict_size_va.values()]))
+        self.dict_size_va["mean_by_timestep"] = [np.round(np.mean(item)) for item in size_per_timestep]
+        write_to_csv(self.out_csv_file, self.dict_size_va)
+
+
 class LMVAMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
@@ -87,6 +114,7 @@ class LMVAMetric(Metric):
 
 
 class PoliciesRatioMetric(Metric):
+    '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -102,6 +130,7 @@ class PoliciesRatioMetric(Metric):
 
 
 class LMPolicyProbsRatio(Metric):
+    '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -368,5 +397,5 @@ class LMMetric(Metric):
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM}
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric}
 

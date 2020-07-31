@@ -87,6 +87,8 @@ class Agent:
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm"]}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
+        if self.truncate_mode is not None:
+            self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
     def select_action(self, state):
         valid_actions, action_probs = self.truncation.get_valid_actions(state)
@@ -325,7 +327,10 @@ class Agent:
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
         # writing to csv the history of running return:
-        write_to_csv(os.path.join(self.out_path, "running_return_history.csv"), self.dict_running_return) # useful to have a metric to monitor the convergence speed.
+        write_to_csv(os.path.join(self.out_path, "train_running_return_history.csv"), self.dict_running_return) # useful to have a metric to monitor the convergence speed.
+        # write to csv other metric:
+        for _, metric in self.train_metrics.items():
+            metric.write_to_csv()
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info("running_reward: {}".format(running_reward))
         logging.info(
