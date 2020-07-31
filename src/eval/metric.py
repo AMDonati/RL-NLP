@@ -168,7 +168,7 @@ class PPLMetric(Metric):
                 target_question = ref_question[1:].to(self.agent.device)
                 for i in range(len(inp_question)):
                     inputs = inp_question[:i + 1].unsqueeze(0)
-                    policy_dist, _, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=None)
+                    policy_dist, _, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=None) #TODO: replace this by policy_dist_truncated and add valid_actions.
                     log_prob = policy_dist.log_prob(target_question[i])
                     self.measure.append(log_prob)
 
