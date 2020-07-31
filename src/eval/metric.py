@@ -159,11 +159,11 @@ class PPLMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            for ref_question in kwargs["ref_question"]: #TODO: add SOS and EOS token.
+            for ref_question in kwargs["ref_question"]:
                 inp_question = ref_question[:-1]
                 inp_question = torch.cat([torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(self.agent.device) # adding SOS token.
                 target_question = ref_question[1:]
-                target_question = torch.cat([target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(self.agent.device)
+                target_question = torch.cat([target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(self.agent.device) # adding EOS token.
                 for i in range(len(inp_question)):
                     inputs = inp_question[:i + 1].unsqueeze(0)
                     policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=kwargs["valid_actions"])

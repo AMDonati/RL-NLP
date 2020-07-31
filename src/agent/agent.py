@@ -12,6 +12,7 @@ import time
 import os
 import numpy as np
 from torch.distributions import Categorical
+from utils.utils_train import write_to_csv
 
 
 class Memory:
@@ -230,7 +231,6 @@ class Agent:
             for _, dialog in dialogs.items():
                 logging.info(dialog)
             logging.info('-------------------------------------------------------------------------------------------------------------------------------------------------------')
-        #TODO: add bleu score over 2 dialogs.
 
 
     def learn(self, num_episodes=100):
@@ -238,12 +238,13 @@ class Agent:
         current_time = time.time()
         running_reward = 0
         timestep = 1
+        self.dict_running_return = {}
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
             ref_question = random.choice(self.env.ref_questions)
             ep_log_probs, ep_log_probs_truncated, lm_log_probs = [], [], []  # TODO: use the Memory Class or the Metric Class instead.
             for t in range(0, self.env.max_len):
-                forced = ref_question[t] if self.pretrain else None
+                #forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
                     valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state)
                 ep_log_probs.append(log_probs)
@@ -287,6 +288,7 @@ class Agent:
                 lm_log_probs = torch.stack(lm_log_probs).clone().detach()
                 ep_lm_probs = np.round(np.exp(lm_log_probs.cpu().squeeze().numpy()), decimals=5)
             running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
+            self.dict_running_return[i_episode] = running_reward
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
@@ -297,7 +299,7 @@ class Agent:
                 logging.info('Closest Question: {}'.format(closest_question))
                 logging.info('episode action probs: {}'.format(ep_probs))
                 if valid_actions is not None:
-                    logging.info('episode action probs truncated: {}'.format(ep_probs_truncated))
+                    logging.info('episode action probs truncated: {}'.format(ep_probs_truncated)) # to monitor the discrepancy between the truncated softmax and the softmax over the whole action space.
                     logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(ep_lm_probs))
                     logging.info('---------------------Valid action space------------------------------')
                     logging.info('\n'.join(self.train_metrics["valid_actions"].metric))
@@ -309,7 +311,7 @@ class Agent:
                 if valid_actions is not None:
                     self.writer.add_scalar("train_action_probs_lm", np.mean(ep_lm_probs), i_episode + 1)
                 for key, metric in self.train_metrics.items():
-                    if key != "valid_actions":  # not taking the valid_actions metric.
+                    if key != "valid_actions":  # not taking the valid_actions metric. Used only in logging.
                         metric.write()
 
             if i_episode + 1 % 1000 == 0:
@@ -318,11 +320,12 @@ class Agent:
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
-        if valid_actions is not None:
+        if valid_actions is not None: # to compare the discrepancy between the 'truncated policy' and the 'all space' policy that is being learned. (Plus comparison with the language model).
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
-
+        # writing to csv the history of running return:
+        write_to_csv(os.path.join(self.out_path, "running_return_history.csv"), self.dict_running_return) # useful to have a metric to monitor the convergence speed.
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info("running_reward: {}".format(running_reward))
         logging.info(
