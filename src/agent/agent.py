@@ -118,7 +118,7 @@ class Agent:
     def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
             state, ep_reward = env.reset(seed=seed), 0
             for t in range(0, env.max_len):
-                action, log_probs, value, _, dist = self.generate_action_test(state=state,
+                action, log_probs, value, (valid_actions, action_probs, log_prob_truncated), dist = self.generate_action_test(state=state,
                                                                               truncation=truncation,
                                                                               test_mode=test_mode)
                 new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
@@ -127,13 +127,14 @@ class Agent:
                     if key != "ppl":
                         metric.fill(state=state, done=done, new_state=new_state,
                                 ref_question=env.ref_questions, reward=reward,
-                                closest_question=closest_question, dist=dist)
+                                closest_question=closest_question, dist=dist, valid_actions=valid_actions)
                     else:
+                        # computing ppl on ref questions only in one case (otherwise redundant).
                         if not truncation and test_mode == "sampling":
                             metric.fill(state=state, done=done, new_state=new_state,
                                         ref_question=env.ref_questions, reward=reward,
                                         closest_question=closest_question,
-                                        dist=dist)
+                                        dist=dist, valid_actions=valid_actions)
                 state = new_state
                 if done:
                     break
