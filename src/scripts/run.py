@@ -94,7 +94,6 @@ def run(args):
                       "grad_clip": args.grad_clip, "writer": writer,
                       "truncate_mode": args.truncate_mode,
                       "num_truncated": args.num_truncated,
-                      "k_min": args.k_min,
                       "p_th": args.p_th,
                       "out_path": output_path,
                       "log_interval": args.log_interval, "env": envs[0],
@@ -157,12 +156,11 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-eps', type=float, default=1e-08, help='epsilon value for adam optimizer')
+    parser.add_argument('-eps', type=float, default=1e-08, help='epsilon value for adam optimizer') # was useful to try to debug REINFROCE.
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
     parser.add_argument('-truncate_mode', type=str, help="truncation mode") # arg that says now if are truncating the action space or not.
-    parser.add_argument('-train_policy', type=str, default="all_space", help="train policy over all space or the truncated action space")
-    parser.add_argument('-k_min', type=int, default=1, help="minimum of truncated action space size for sample_va truncation mode")
-    parser.add_argument('-p_th', type=float, help="probability threshold for proba threshold truncation mode")
+    parser.add_argument('-train_policy', type=str, default="all_space", help="train policy over all space or the truncated action space") # arg to choose between trainig the complete policy or the truncated one in case of truncation.
+    parser.add_argument('-p_th', type=float, help="probability threshold for proba threshold truncation mode") # arg used in the proba_thr truncation function.
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
@@ -170,6 +168,7 @@ def get_parser():
     parser.add_argument('-grad_clip', type=float, help="value of gradient norm clipping")
     parser.add_argument('-lm_path', type=str, required=True,
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
+    # This argument is now required.
     parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")

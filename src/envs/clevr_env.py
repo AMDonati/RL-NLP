@@ -48,6 +48,7 @@ class ClevrEnv(gym.Env):
         self.img_idx, self.img_feats = None, None
 
     def step(self, action):
+        # note that the padding of ref questions and generated dialog has been removed.
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False

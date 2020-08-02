@@ -49,7 +49,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, p_th=None, k_min=1, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0):
+                 num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
@@ -71,10 +71,9 @@ class Agent:
         self.eval_no_trunc = eval_no_trunc
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
-            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_,
-                                                         k_min=k_min)  # adding the truncation class.
+            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_)  # adding the truncation class.
         else:
-            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, k_min=k_min)
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")

@@ -61,6 +61,7 @@ class TopK(Truncation):
 
 
 class ProbaThreshold(Truncation):
+    '''See OverLeaf for details on this truncation fn.'''
     def __init__(self, agent, dist_action="dist_truncated", **kwargs):
         Truncation.__init__(self, agent, dist_action)
         self.p_th = kwargs["p_th"]
@@ -83,9 +84,10 @@ class ProbaThreshold(Truncation):
 
 class SampleVA(Truncation):
     def __init__(self, agent, dist_action="dist_truncated", **kwargs):
+        '''See Overleaf for details on this truncation fn.'''
         Truncation.__init__(self, agent, dist_action)
-        self.k_min = kwargs["k_min"]
         self.k_max = kwargs["num_truncated"]
+        self.k_min = 1 # does not work with k_min > 1 because sometimes the lm has a proba equal to one.
 
     def get_valid_actions(self, state):
         with torch.no_grad():

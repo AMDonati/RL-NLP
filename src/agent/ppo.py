@@ -11,7 +11,7 @@ class PPO(Agent):
                  truncate_mode="top_k",
                  lm_sl=True,
                  update_every=100, num_truncated=10,
-                 k_min=1, p_th=None,
+                 p_th=None,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
                  log_interval=1,
                  eval_no_trunc=0):
@@ -20,7 +20,6 @@ class PPO(Agent):
                        lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
-                       k_min=k_min,
                        p_th=p_th,
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs,

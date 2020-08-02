@@ -80,6 +80,7 @@ class VAMetric(Metric):
         pass
 
 class SizeVAMetric(Metric):
+    '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -237,6 +238,7 @@ class PPLMetric(Metric):
         pass
 
 class PPLDialogfromLM(Metric):
+    '''Computes the PPL of the Language Model over the generated dialog'''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -263,6 +265,11 @@ class PPLDialogfromLM(Metric):
 
 
 class RewardMetric(Metric):
+    """Computes:
+    - The raw reward (the one used in the training algo)
+    - The normalised reward (the one monitored at test time)
+    - The length of each test episode
+    """
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -338,6 +345,9 @@ class BleuMetric(Metric):
 # ------------------------ DIVERSITY METRICS -------------------------------------------------------------------------------------------------------------------
 
 class RefQuestionsMetric(Metric):
+    '''
+    Compute the ratio of Unique closest questions on all the set of questions generated for the same image.
+    '''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -367,6 +377,9 @@ class RefQuestionsMetric(Metric):
         pass
 
 class TTRQuestionMetric(Metric):
+    '''
+    Compute the token-to-token ratio for each question (useful to measure language drift).
+    '''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -390,6 +403,7 @@ class TTRQuestionMetric(Metric):
 
 
 class UniqueWordsMetric(Metric):
+    '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
