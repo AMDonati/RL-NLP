@@ -3,8 +3,6 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-#TODO: add logits fusion truncation function.
-
 class Truncation:
     def __init__(self, agent, dist_action="dist_truncated"):
         self.agent = agent
