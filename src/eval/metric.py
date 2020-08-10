@@ -1,11 +1,14 @@
+import logging
+import os
+
+import h5py
 import numpy as np
 import torch
-import logging
 from nltk.translate.bleu_score import sentence_bleu
-import os
-from utils.utils_train import write_to_csv
 from torch.nn.utils.rnn import pad_sequence
-import h5py
+
+from utils.utils_train import write_to_csv
+
 
 class Metric:
     def __init__(self, agent, train_test):
@@ -17,7 +20,7 @@ class Metric:
         self.idx_write = 1
         self.agent = agent
         self.train_test = train_test
-        self.dict_metric, self.dict_stats = {}, {} # for csv writing.
+        self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
 
     def fill(self, **kwargs):
         self.fill_(**kwargs)
@@ -56,6 +59,7 @@ class Metric:
             write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
+
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
 
 class VAMetric(Metric):
@@ -79,8 +83,10 @@ class VAMetric(Metric):
         self.metric = self.measure
         pass
 
+
 class SizeVAMetric(Metric):
     '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -100,7 +106,8 @@ class SizeVAMetric(Metric):
         self.idx_csv += 1
 
     def write_to_csv(self):
-        size_per_timestep = [[val[i] for val in self.dict_metric.values()] for i in range(min([len(val) for val in self.dict_metric.values()]))]
+        size_per_timestep = [[val[i] for val in self.dict_metric.values()] for i in
+                             range(min([len(val) for val in self.dict_metric.values()]))]
         self.dict_metric["mean_size"] = np.round(np.mean([np.mean(val) for val in self.dict_metric.values()]))
         self.dict_metric["mean_by_timestep"] = [np.round(np.mean(item)) for item in size_per_timestep]
         write_to_csv(self.out_csv_file, self.dict_metric)
@@ -127,6 +134,7 @@ class LMVAMetric(Metric):
 
 class PoliciesRatioMetric(Metric):
     '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -143,6 +151,7 @@ class PoliciesRatioMetric(Metric):
 
 class LMPolicyProbsRatio(Metric):
     '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -183,15 +192,18 @@ class DialogMetric(Metric):
             if not self.train_test + '_' + self.key in self.generated_dialog.keys():
                 self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text[:, 1:].squeeze().cpu()]
             else:
-                self.generated_dialog[self.train_test + '_' + self.key].append(kwargs["state"].text[:, 1:].squeeze().cpu())
+                self.generated_dialog[self.train_test + '_' + self.key].append(
+                    kwargs["state"].text[:, 1:].squeeze().cpu())
             state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0], ignored=[])
             closest_question_decoded = kwargs["closest_question"]
-            string = ' img {}:'.format(kwargs["img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-'*40
+            string = ' img {}:'.format(kwargs[
+                                           "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
                 f.write(string + '\n')
             pass
+
     def write_to_csv(self):
         '''save padded array of generated dialog for later use (for example with word cloud)'''
         if self.train_test != "train":
@@ -201,11 +213,11 @@ class DialogMetric(Metric):
                     f.create_dataset(key, data=generated_dialog)
 
 
-
 class PPLMetric(Metric):
     """
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -217,12 +229,17 @@ class PPLMetric(Metric):
             if kwargs["done"]:
                 for ref_question in kwargs["ref_question"]:
                     inp_question = ref_question[:-1]
-                    inp_question = torch.cat([torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(self.agent.device) # adding SOS token.
+                    inp_question = torch.cat(
+                        [torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(
+                        self.agent.device)  # adding SOS token.
                     target_question = ref_question[1:]
-                    target_question = torch.cat([target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(self.agent.device) # adding EOS token.
+                    target_question = torch.cat(
+                        [target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(
+                        self.agent.device)  # adding EOS token.
                     for i in range(len(inp_question)):
                         inputs = inp_question[:i + 1].unsqueeze(0)
-                        policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img, valid_actions=kwargs["valid_actions"])
+                        policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
+                                                                                  valid_actions=kwargs["valid_actions"])
                         log_prob = policy_dist_truncated.log_prob(target_question[i])
                         self.measure.append(log_prob)
 
@@ -237,8 +254,10 @@ class PPLMetric(Metric):
     def write(self):
         pass
 
+
 class PPLDialogfromLM(Metric):
     '''Computes the PPL of the Language Model over the generated dialog'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -248,9 +267,9 @@ class PPLDialogfromLM(Metric):
     def fill_(self, **kwargs):
         if kwargs["done"]:
             with torch.no_grad():
-                log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:,:-1].to(self.agent.device))
-                for i, word in enumerate(kwargs["new_state"].text[:,1:].view(-1)):
-                    self.measure.append(log_probas[i,word.cpu().numpy()])
+                log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:, :-1].to(self.agent.device))
+                for i, word in enumerate(kwargs["new_state"].text[:, 1:].view(-1)):
+                    self.measure.append(log_probas[i, word.cpu().numpy()])
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
@@ -264,12 +283,26 @@ class PPLDialogfromLM(Metric):
         pass
 
 
+class Reward2Metric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "reward"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["reward"])
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.sum(self.measure))
+
+
 class RewardMetric(Metric):
     """Computes:
     - The raw reward (the one used in the training algo)
     - The normalised reward (the one monitored at test time)
     - The length of each test episode
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -280,10 +313,11 @@ class RewardMetric(Metric):
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
-            self.measure["reward"] = [kwargs["reward"]] #TODO: does not work with differential reward ?
-            norm_reward = [kwargs["reward"]/max(kwargs["new_state"].text[:,1:].squeeze().cpu().numpy().size, len(kwargs["closest_question"].split()))]
+            self.measure["reward"] = [kwargs["reward"]]  # TODO: does not work with differential reward ?
+            norm_reward = [kwargs["reward"] / max(kwargs["new_state"].text[:, 1:].squeeze().cpu().numpy().size,
+                                                  len(kwargs["closest_question"].split()))]
             self.measure["norm_reward"] = norm_reward
-            self.measure["len_dialog"] = [kwargs["new_state"].text[:,1:].squeeze().cpu().numpy().size]
+            self.measure["len_dialog"] = [kwargs["new_state"].text[:, 1:].squeeze().cpu().numpy().size]
 
     def compute_(self, **kwargs):
         if not self.train_test + '_' + self.key in self.dict_metric:
@@ -307,12 +341,13 @@ class RewardMetric(Metric):
                 logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
                 self.dict_metric[key][k].append(np.mean(v))
                 self.dict_metric[key][k].append(np.std(v))
-        write_to_csv(self.out_csv_file +'.csv', self.dict_metric)
+        write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
         '''Overwrite write function to avoid logging on tensorboard.'''
         pass
+
 
 class BleuMetric(Metric):
     def __init__(self, agent, train_test):
@@ -342,12 +377,14 @@ class BleuMetric(Metric):
         '''Overwrite write function to avoid logging on tensorboard.'''
         pass
 
+
 # ------------------------ DIVERSITY METRICS -------------------------------------------------------------------------------------------------------------------
 
 class RefQuestionsMetric(Metric):
     '''
     Compute the ratio of Unique closest questions on all the set of questions generated for the same image.
     '''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -376,10 +413,12 @@ class RefQuestionsMetric(Metric):
     def write(self):
         pass
 
+
 class TTRQuestionMetric(Metric):
     '''
     Compute the token-to-token ratio for each question (useful to measure language drift).
     '''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -404,6 +443,7 @@ class TTRQuestionMetric(Metric):
 
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -434,6 +474,7 @@ class UniqueWordsMetric(Metric):
     def write(self):
         pass
 
+
 # --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
 
 class LMMetric(Metric):
@@ -457,6 +498,8 @@ class LMMetric(Metric):
         pass
 
 
-metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric, "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric, "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric, "ratio_closest_questions": RefQuestionsMetric}
-
+metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": Reward2Metric,
+           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric,
+           "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric,
+           "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric,
+           "ratio_closest_questions": RefQuestionsMetric}

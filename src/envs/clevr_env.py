@@ -52,7 +52,9 @@ class ClevrEnv(gym.Env):
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
-        question = self.clevr_dataset.idx2word(self.state.text[:,:-1].numpy()[0]) if action.item() == self.special_tokens.EOS_idx else self.clevr_dataset.idx2word(self.state.text.numpy()[0]) #remove the EOS token if needed.
+        question_tokens_padded, question_tokens = np.zeros((self.max_len + 1)), self.state.text.numpy().ravel()
+        #question_tokens_padded[:question_tokens.shape[0]] = question_tokens  # if needed
+        question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
 
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded,
@@ -64,8 +66,8 @@ class ClevrEnv(gym.Env):
 
     def reset(self, seed=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
-                                                                                                      self.clevr_dataset.all_feats.shape[
-                                                                                                          0]]
+                                                                                                    self.clevr_dataset.all_feats.shape[
+                                                                                                        0]]
         if seed is not None:
             np.random.seed(seed)
         self.img_idx = np.random.randint(range_images[0], range_images[1])
@@ -83,8 +85,9 @@ class ClevrEnv(gym.Env):
         self.dialog = None
         # check the correctness of the reward function.
         if self.reward_type == "levenshtein_" and not self.diff_reward:
-            reward_true_question, _ = self.reward_func.get(question=self.ref_questions_decoded[0], ep_questions_decoded=self.ref_questions_decoded,
-                                                        step_idx=self.step_idx, done=True)
+            reward_true_question, _ = self.reward_func.get(question=self.ref_questions_decoded[0],
+                                                           ep_questions_decoded=self.ref_questions_decoded,
+                                                           step_idx=self.step_idx, done=True)
             assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
 
         return self.state
@@ -141,5 +144,3 @@ if __name__ == '__main__':
     make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
     # env = VectorEnv(make_env_fn, n=4)
     # env = DummyVecEnv([make_env_fn])
-
-

@@ -87,7 +87,7 @@ class Agent:
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
                              ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words', 'ratio_closest_questions']}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog"]}
+                              ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "reward"]}
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
