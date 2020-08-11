@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torchcontrib import nn as contrib_nn
 
 from RL_toolbox.RL_functions import masked_softmax
 
@@ -155,9 +156,10 @@ class PolicyLSTMWordBatch(nn.Module):
         probs_truncated = masked_softmax(logits.clone().detach(), mask)
         # check that the truncation is right.
         sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
-        assert torch.all(sum_probs_va - torch.ones(sum_probs_va.size()).to(self.device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
-        #if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
-            #print(sum_probs_va)
+        assert torch.all(
+            sum_probs_va - torch.ones(sum_probs_va.size()).to(self.device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
+        # if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
+        # print(sum_probs_va)
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 
@@ -174,26 +176,39 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space"):
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat"):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
+        self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
         self.rl = rl
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
-        self.action_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
-                                     num_tokens)
+
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
-        self.value_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size, 1)
+        if self.fusion == "film":
+            self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)
+            self.film = contrib_nn.FiLM()
+            self.fusion_dim = self.num_filters * h_out ** 2
+        else:
+            self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
+
+        self.action_head = nn.Linear(self.fusion_dim, num_tokens)
+        self.value_head = nn.Linear(self.fusion_dim, 1)
 
     def forward(self, state_text, state_img, valid_actions=None):
         embed_text = self._get_embed_text(state_text)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
-        img_feat__ = img_feat_.view(img_feat.size(0), -1)
-        embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+        if self.fusion == "film":
+            gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
+            gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
+            embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
+        else:
+            img_feat__ = img_feat_.view(img_feat.size(0), -1)
+            embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         probs = F.softmax(logits, dim=-1)
@@ -283,8 +298,9 @@ if __name__ == '__main__':
 
     # RL mode.
     model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size)
-    policy_dist, policy_dist_truncated, value = model(dummy_text_input_RL, img_feat_RL, valid_actions=[0,4,8,10])
-    model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size, truncate_mode="masked_inf")
+    policy_dist, policy_dist_truncated, value = model(dummy_text_input_RL, img_feat_RL, valid_actions=[0, 4, 8, 10])
+    model = PolicyLSTMBatch(num_tokens=num_tokens, word_emb_size=word_emb_size, hidden_size=hidden_size,
+                            truncate_mode="masked_inf")
     policy_dist, policy_dist_truncated, value = model(dummy_text_input_RL, img_feat_RL, valid_actions=[0, 4, 8, 10])
 
     # SL mode.

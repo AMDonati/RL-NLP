@@ -1,8 +1,10 @@
 import argparse
 import datetime
 import os
+
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
@@ -81,7 +83,8 @@ def run(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
-                                stride=args.stride, num_filters=args.num_filters, rl=True, train_policy=args.train_policy)
+                                stride=args.stride, num_filters=args.num_filters, rl=True,
+                                train_policy=args.train_policy, fusion=args.fusion)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
@@ -112,31 +115,34 @@ def run(args):
 
     agent = agents[args.agent](**kwargs)
 
-    eval_mode = ['sampling', 'greedy'] #TODO: put it as a parser arg.
-    #eval_mode = ['greedy']
+    eval_mode = ['sampling', 'greedy']  # TODO: put it as a parser arg.
+    # eval_mode = ['greedy']
 
     if args.resume_training is not None:
         epoch, loss = agent.load_ckpt()
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
         agent.start_episode = epoch
-    if args.num_episodes_train > 0: # trick to avoid a bug inside the agent.learn function in case of no training.
+    if args.num_episodes_train > 0:  # trick to avoid a bug inside the agent.learn function in case of no training.
         agent.learn(num_episodes=args.num_episodes_train)
         agent.save(out_policy_file)
     else:
         logger.info("skipping training...")
-    logger.info('---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
+    logger.info(
+        '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
     for mode in eval_mode:
-        logger.info("-----------------------------Starting evaluation for {} action selection-------------------------".format(mode))
+        logger.info(
+            "-----------------------------Starting evaluation for {} action selection-------------------------".format(
+                mode))
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
     # write to csv test scalar metrics:
-    logger.info("-------------------------------------test metrics statistics -----------------------------------------")
+    logger.info(
+        "-------------------------------------test metrics statistics -----------------------------------------")
     for key, metric in agent.test_metrics.items():
         logger.info('------------------- {} -------------------'.format(key))
         metric.write_to_csv()
     logger.info(
         '------------------------------------DONE---------------------------------------------------------------')
     return agent
-
 
 
 def get_parser():
@@ -156,11 +162,15 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-eps', type=float, default=1e-08, help='epsilon value for adam optimizer') # was useful to try to debug REINFROCE.
+    parser.add_argument('-eps', type=float, default=1e-08,
+                        help='epsilon value for adam optimizer')  # was useful to try to debug REINFROCE.
     parser.add_argument('-model', type=str, default="lstm_word", help="model")
-    parser.add_argument('-truncate_mode', type=str, help="truncation mode") # arg that says now if are truncating the action space or not.
-    parser.add_argument('-train_policy', type=str, default="all_space", help="train policy over all space or the truncated action space") # arg to choose between trainig the complete policy or the truncated one in case of truncation.
-    parser.add_argument('-p_th', type=float, help="probability threshold for proba threshold truncation mode") # arg used in the proba_thr truncation function.
+    parser.add_argument('-truncate_mode', type=str,
+                        help="truncation mode")  # arg that says now if are truncating the action space or not.
+    parser.add_argument('-train_policy', type=str, default="all_space",
+                        help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
+    parser.add_argument('-p_th', type=float,
+                        help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
@@ -183,7 +193,10 @@ def get_parser():
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
     parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
-    parser.add_argument('-eval_no_trunc', type=int, default=0, help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
+    parser.add_argument('-eval_no_trunc', type=int, default=0,
+                        help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
+    parser.add_argument('-fusion', type=str, default="cat", help="fusion mode")
+
     return parser
 
 
