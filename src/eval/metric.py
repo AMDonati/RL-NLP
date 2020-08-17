@@ -56,7 +56,7 @@ class Metric:
                 #logging.info('{} std: {}'.format(key, np.std(value)))
                 #self.dict_metric[key].append(np.mean(value))
                 #self.dict_metric[key].append(np.std(value))
-            write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
+            #write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
 
