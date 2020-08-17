@@ -1,15 +1,15 @@
 import argparse
 import datetime
 import os
-
 import torch
 from torch.utils.tensorboard import SummaryWriter
-
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
+import numpy as np
+from utils.utils_train import write_to_csv
 
 
 def run(args):
@@ -131,17 +131,26 @@ def run(args):
         '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
     for mode in eval_mode:
         logger.info(
-            "-----------------------------Starting evaluation for {} action selection-------------------------".format(
+            "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
     # write to csv test scalar metrics:
+    all_metrics = {}
     logger.info(
-        "-------------------------------------test metrics statistics -----------------------------------------")
+        "------------------------------------- test metrics statistics -----------------------------------------")
     for key, metric in agent.test_metrics.items():
         logger.info('------------------- {} -------------------'.format(key))
         metric.write_to_csv()
+        # saving the mean of all metrics in a single csv file:
+        if metric.dict_stats:
+            list_stats = list(metric.dict_stats.values())
+            if isinstance(list_stats[0], dict):
+                all_metrics[metric.key] = np.mean([e["norm_reward"][0] for e in list_stats]) # trick for the reward metric case.
+            else:
+                all_metrics[metric.key] = np.mean([e[0] for e in list_stats])
+    write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
     logger.info(
-        '------------------------------------DONE---------------------------------------------------------------')
+        '------------------------------------ DONE ---------------------------------------------------------------')
     return agent
 
 
