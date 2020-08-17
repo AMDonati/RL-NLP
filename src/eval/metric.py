@@ -51,11 +51,11 @@ class Metric:
     def write_to_csv(self):
         if self.dict_metric:
             for key, value in self.dict_metric.items():
-                self.dict_stats[key] = [np.mean(value), np.std(value), len(value)]
-                logging.info('{} mean: {}'.format(key, np.mean(value)))
-                logging.info('{} std: {}'.format(key, np.std(value)))
-                self.dict_metric[key].append(np.mean(value))
-                self.dict_metric[key].append(np.std(value))
+                self.dict_stats[key] = [np.round(np.mean(value), decimals=3), np.round(np.std(value), decimals=3), np.round(len(value))]
+                logging.info('{}: {} +/- {}'.format(key, np.round(np.mean(value), decimals=3), np.round(np.std(value), decimals=3)))
+                #logging.info('{} std: {}'.format(key, np.std(value)))
+                #self.dict_metric[key].append(np.mean(value))
+                #self.dict_metric[key].append(np.std(value))
             write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
