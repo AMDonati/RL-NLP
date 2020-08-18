@@ -35,7 +35,7 @@ def run(args):
     else:
         logger.info("without truncation...")
 
-    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_eps-adam{}_gradclip{}_trunc_{}_diffrew{}".format(
+    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_eps-adam{}_gradclip{}_trunc_{}_diffrew{}_fusion{}".format(
         args.agent,
         args.model,
         args.word_emb_size,
@@ -52,7 +52,8 @@ def run(args):
         args.eps,
         args.grad_clip,
         args.truncate_mode,
-        args.diff_reward)
+        args.diff_reward,
+        args.fusion)
 
     if args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
