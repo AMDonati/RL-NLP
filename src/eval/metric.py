@@ -302,7 +302,6 @@ class RewardMetric(Metric):
     - The normalised reward (the one monitored at test time)
     - The length of each test episode
     """
-
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -313,7 +312,7 @@ class RewardMetric(Metric):
     def fill_(self, **kwargs):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
-            self.measure["reward"] = [kwargs["reward"]]  # TODO: does not work with differential reward ?
+            self.measure["reward"] = [kwargs["reward"]]
             norm_reward = [kwargs["reward"] / max(kwargs["new_state"].text[:, 1:].squeeze().cpu().numpy().size,
                                                   len(kwargs["closest_question"].split()))]
             self.measure["norm_reward"] = norm_reward
@@ -339,9 +338,9 @@ class RewardMetric(Metric):
                 self.dict_stats[key][k] = [np.mean(v), np.std(v), len(v)]
                 logging.info('{} mean: {}'.format(key + '___' + k, np.mean(v)))
                 logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
-                self.dict_metric[key][k].append(np.mean(v))
-                self.dict_metric[key][k].append(np.std(v))
-        write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
+                #self.dict_metric[key][k].append(np.mean(v))
+                #self.dict_metric[key][k].append(np.std(v))
+        #write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):

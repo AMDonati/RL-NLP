@@ -100,7 +100,7 @@ def run(args):
                       "p_th": args.p_th,
                       "out_path": output_path,
                       "log_interval": args.log_interval, "env": envs[0],
-                      "test_envs": envs,
+                      "test_envs": envs[1:],
                       "eval_no_trunc": args.eval_no_trunc}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
@@ -161,8 +161,8 @@ def get_parser():
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
-    parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
+    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
