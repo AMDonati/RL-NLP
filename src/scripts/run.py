@@ -66,9 +66,11 @@ def run(args):
     writer = SummaryWriter(log_dir=os.path.join(output_path,
                                                 out_folder))
 
-    envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                     num_questions=args.num_questions, diff_reward=args.diff_reward) for mode in
-            ["train", "test_images", "test_text"]]
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
+                     num_questions=args.num_questions, diff_reward=args.diff_reward)
+    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                     num_questions=args.num_questions) for mode in
+            ["test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:
@@ -81,7 +83,7 @@ def run(args):
 
     # creating the policy model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy = models[args.model](envs[0].clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
+    policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters, rl=True,
                                 train_policy=args.train_policy, fusion=args.fusion)
@@ -99,8 +101,8 @@ def run(args):
                       "num_truncated": args.num_truncated,
                       "p_th": args.p_th,
                       "out_path": output_path,
-                      "log_interval": args.log_interval, "env": envs[0],
-                      "test_envs": envs[1:],
+                      "log_interval": args.log_interval, "env": env,
+                      "test_envs": test_envs,
                       "eval_no_trunc": args.eval_no_trunc}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
@@ -201,7 +203,7 @@ def get_parser():
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
-    parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
+    parser.add_argument('-diff_reward', type=int, default=1, help="is reward differential")
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-fusion', type=str, default="cat", help="fusion mode")
