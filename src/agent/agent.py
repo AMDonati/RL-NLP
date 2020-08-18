@@ -3,7 +3,6 @@
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
 
 import logging
-import random
 import torch
 import torch.optim as optim
 from eval.metric import metrics
@@ -132,14 +131,16 @@ class Agent:
                 if key != "ppl":
                     metric.fill(state=state, done=done, new_state=new_state,
                                 ref_question=env.ref_questions, reward=reward,
-                                closest_question=closest_question, dist=dist, valid_actions=valid_actions)
+                                closest_question=closest_question, dist=dist, valid_actions=valid_actions,
+                                ref_questions_decoded=env.ref_questions_decoded)
                 else:
                     # computing ppl on ref questions only in one case (otherwise redundant).
                     if not truncation and test_mode == "sampling":
                         metric.fill(state=state, done=done, new_state=new_state,
                                     ref_question=env.ref_questions, reward=reward,
                                     closest_question=closest_question,
-                                    dist=dist, valid_actions=valid_actions)
+                                    dist=dist, valid_actions=valid_actions,
+                                    ref_questions_decoded=env.ref_questions_decoded)
             state = new_state
             if done:
                 break

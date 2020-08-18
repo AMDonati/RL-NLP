@@ -360,7 +360,7 @@ class BleuMetric(Metric):
         if kwargs["done"]:
             question_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=["<SOS>"],
                                                                      stop_at_end=True)
-            ref_questions = [q.split() for q in self.agent.env.ref_questions_decoded]
+            ref_questions = [q.split() for q in kwargs["ref_questions_decoded"]]
             question_tokens = question_decoded.split()
             score = sentence_bleu(ref_questions, question_tokens)
             self.measure.append(score)
