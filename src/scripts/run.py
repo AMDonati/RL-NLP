@@ -203,7 +203,7 @@ def get_parser():
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
-    parser.add_argument('-diff_reward', type=int, default=1, help="is reward differential")
+    parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-fusion', type=str, default="cat", help="fusion mode")
