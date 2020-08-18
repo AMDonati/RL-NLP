@@ -261,8 +261,15 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         self.stride = stride
         self.kernel_size = kernel_size
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
-        self.action_head = nn.Linear(self.num_filters * h_out ** 2 + self.hidden_size,
-                                     num_tokens)
+        if self.fusion == "film":
+            self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)
+            self.film = contrib_nn.FiLM()
+            self.fusion_dim = self.num_filters * h_out ** 2
+        else:
+            self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
+
+        self.action_head = nn.Linear(self.fusion_dim, num_tokens)
+
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
 
@@ -271,9 +278,15 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
-        img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len,
-                                                                              1)  # repeat img along the sequence axis.
-        embedding = torch.cat((img_feat__, embed_text), dim=-1)
+
+        if self.fusion == "film":
+            gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
+            gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
+            embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
+        else:
+            img_feat__ = img_feat_.view(img_feat.size(0), -1)
+            embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
         value = None
