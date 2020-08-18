@@ -194,7 +194,7 @@ class DialogMetric(Metric):
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
                     kwargs["state"].text[:, 1:].squeeze().cpu())
-            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0], ignored=[])
+            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0], ignored=[]) #TODO: investigate the pb of length of dialogue for pretrain here.
             closest_question_decoded = kwargs["closest_question"]
             string = ' img {}:'.format(kwargs[
                                            "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
