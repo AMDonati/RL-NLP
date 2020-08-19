@@ -253,13 +253,13 @@ class PolicyLSTMWordBatch_SL(nn.Module):
 
 
 class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
-
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5):
+                 kernel_size=1, stride=5, fusion="cat"):
         PolicyLSTMWordBatch_SL.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
+        self.fusion = fusion
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         if self.fusion == "film":
             self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)

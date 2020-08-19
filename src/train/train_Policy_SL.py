@@ -39,6 +39,7 @@ if __name__ == '__main__':
     parser.add_argument("-grad_clip", type=float)
     parser.add_argument("-kernel_size", default=1, type=int)
     parser.add_argument("-num_filters", default=3, type=int)
+    parser.add_argument("-fusion", default="cat", type=str)
     parser.add_argument("-stride", default=2, type=int)
     parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-bs", type=int, default=8, help="batch size")
@@ -103,7 +104,8 @@ if __name__ == '__main__':
                                      hidden_size=args.hidden_size,
                                      kernel_size=args.kernel_size,
                                      num_filters=args.num_filters,
-                                     stride=args.stride).to(device)
+                                     stride=args.stride,
+                                    fusion=args.fusion).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
@@ -117,10 +119,10 @@ if __name__ == '__main__':
     # Create logger, output_path and config file.
     ###############################################################################
 
-    out_path = 'SL_LSTM_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}'.format(args.num_layers,
+    out_path = 'SL_LSTM_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}_fusion-{}'.format(args.num_layers,
                                                                                        args.word_emb_size, args.hidden_size,
                                                                                        args.p_drop, args.grad_clip,
-                                                                                       args.bs, learning_rate)
+                                                                                       args.bs, learning_rate, args.fusion)
     out_path = os.path.join(args.out_path, out_path)
     if not os.path.exists(out_path):
         os.makedirs(out_path)
