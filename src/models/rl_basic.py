@@ -279,12 +279,18 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
 
+        #img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1) 
+        # embedding = torch.cat((img_feat__, embed_text), dim=-1)
         if self.fusion == "film":
-            gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
-            gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
-            embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
+            gammabeta = self.gammabeta(embed_text).view(embed_text.size(0), embed_text.size(1), 2, self.num_filters)
+            gamma, beta = gammabeta[:, :, 0, :], gammabeta[:, :, 1, :]
+            img_feat__ = img_feat_.unsqueeze(1).repeat(1, seq_len, 1, 1, 1).view(-1, img_feat_.size(1),
+                                                                                 img_feat_.size(2),
+                                                                                 img_feat_.size(2))
+            embedding = self.film(img_feat__, gamma.view(-1, gamma.size(2)), beta.view(-1, beta.size(2)))
+            embedding = embedding.view(embed_text.size(0), embed_text.size(1), -1)
         else:
-            img_feat__ = img_feat_.view(img_feat.size(0), -1)
+            img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
 
         logits = self.action_head(embedding)  # (B,S,num_tokens)
