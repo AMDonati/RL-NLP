@@ -8,14 +8,12 @@ stopwords = ["a", "an", "is", "it", "the", "does", "do", "are", "you", "that",
              "photo"]
 stopwords = []
 
-
 class WordCloud(AbstractPlotter):
-    def __init__(self, path, dataset, logger, suffix):
+    def __init__(self, path, questions, dataset, suffix, stopwords=[]):
         super(WordCloud, self).__init__(path, self.__class__.__name__, suffix)
 
-        questions = dataset.target_questions.t().numpy()
-        questions_decoded = " ".join(str(dataset.idx2word(x, stop_at_end=True)) for x in questions)
-        questions_decoded = questions_decoded.replace("<EOS>", "")
+        #questions = dataset.target_questions.t().numpy()
+        questions_decoded = " ".join(dataset.idx2word(x, stop_at_end=True, ignored=['<SOS>', '<PAD>']) for x in questions)
 
         # take relative word frequencies into account, lower max_font_size
         wordcloud = wc.WordCloud(background_color="white", max_font_size=40, max_words=80,
