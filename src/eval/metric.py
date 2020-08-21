@@ -89,6 +89,7 @@ class VAMetric(Metric):
     def log(self):
         logging.info('---------------------Valid action space------------------------------')
         logging.info('\n'.join(self.metric))
+        logging.info('---------------------------------------------------------------------')
 
 
 class SizeVAMetric(Metric):
