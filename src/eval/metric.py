@@ -48,6 +48,9 @@ class Metric:
         self.metric_history.extend(self.metric)
         self.metric = []
 
+    def log(self):
+        pass
+
     def write_to_csv(self):
         if self.dict_metric:
             for key, value in self.dict_metric.items():
@@ -83,6 +86,10 @@ class VAMetric(Metric):
         self.metric = self.measure
         pass
 
+    def log(self):
+        logging.info('---------------------Valid action space------------------------------')
+        logging.info('\n'.join(self.metric))
+
 
 class SizeVAMetric(Metric):
     '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
@@ -114,6 +121,7 @@ class SizeVAMetric(Metric):
 
 
 class LMVAMetric(Metric):
+    '''Monitor the mismatch between the valid actions space and the ref questions.'''
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -167,6 +175,57 @@ class LMPolicyProbsRatio(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
+
+class ActionProbs(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "action_probs"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["log_probs"])
+
+    def compute_(self, **kwargs):
+        ep_log_probs = torch.stack(self.measure).clone().detach()
+        self.ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
+        self.metric.append(np.mean(self.ep_probs))
+
+    def log(self):
+        logging.info('episode action probs: {}'.format(self.ep_probs))
+
+class ActionProbsTruncated(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "action_probs_truncated"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["log_probs_truncated"])
+
+    def compute_(self, **kwargs):
+        ep_log_probs_truncated = torch.stack(self.measure).clone().detach()
+        self.ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
+        self.metric.append(np.mean(self.ep_probs_truncated))
+
+    def log(self):
+        logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
+
+class LMActionProbs(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "action_probs_lm"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"]==kwargs["action"]])
+
+    def compute_(self, **kwargs):
+        lm_probs = torch.stack(self.measure).clone().detach()
+        self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
+        self.metric.append(np.mean(self.ep_lm_probs))
+
+    def log(self):
+        logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
@@ -500,4 +559,5 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric,
            "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric,
-           "ratio_closest_questions": RefQuestionsMetric}
+           "ratio_closest_questions": RefQuestionsMetric,
+           "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated, "action_probs_lm": LMActionProbs}
