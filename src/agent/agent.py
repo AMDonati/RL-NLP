@@ -269,7 +269,7 @@ class Agent:
         current_time = time.time()
         timestep = 1
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
-            state = self.env.reset()
+            state, ep_reward = self.env.reset(), 0
             # ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len):
                 # forced = ref_question[t] if self.pretrain else None
@@ -287,6 +287,7 @@ class Agent:
                                 closest_question=closest_question, new_state=new_state, log_probs=log_probs,
                                 log_probs_truncated=log_probs_truncated)
                 state = new_state
+                ep_reward += reward
 
                 # update if its time
                 if self.update_mode == "step" and timestep % self.update_every == 0:
