@@ -228,6 +228,28 @@ class LMActionProbs(Metric):
     def log(self):
         logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
+class RunningReturn(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "running_return"
+        self.running_return = 0
+        self.idx_episode = 1
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_running_return_history.csv')
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["reward"])
+
+    def compute_(self, **kwargs):
+        ep_reward = np.sum(self.measure)
+        self.running_return = 0.05 * ep_reward + (1 - 0.05) * self.running_return
+        self.metric = [self.running_return]
+        self.dict_metric[self.idx_episode] = self.running_return
+        self.idx_episode+= 1
+
+    def write_to_csv(self):
+        write_to_csv(self.out_csv_file, self.dict_metric)
+
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
 
@@ -561,4 +583,5 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric,
            "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric,
            "ratio_closest_questions": RefQuestionsMetric,
-           "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated, "action_probs_lm": LMActionProbs}
+           "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated, "action_probs_lm": LMActionProbs,
+           "running_return": RunningReturn}

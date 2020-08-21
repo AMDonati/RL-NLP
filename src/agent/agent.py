@@ -11,7 +11,6 @@ import time
 import os
 import numpy as np
 from torch.distributions import Categorical
-from utils.utils_train import write_to_csv
 
 
 class Memory:
@@ -86,7 +85,7 @@ class Agent:
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
                              ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words', 'ratio_closest_questions']}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "action_probs"]}
+                              ["running_return","lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "action_probs"]}
         if self.truncate_mode is not None:
             for key in ["action_probs_truncated", "action_probs_lm"]:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
@@ -268,11 +267,9 @@ class Agent:
     def learn(self, num_episodes=100):
         start_time = time.time()
         current_time = time.time()
-        running_reward = 0
         timestep = 1
-        self.dict_running_return = {}
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
-            state, ep_reward = self.env.reset(), 0
+            state = self.env.reset()
             # ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len):
                 # forced = ref_question[t] if self.pretrain else None
@@ -298,7 +295,6 @@ class Agent:
                     self.memory.clear_memory()
                     timestep = 0
 
-                ep_reward += reward
                 if done:
                     for key, metric in self.train_metrics.items():
                         metric.compute(state=state, closest_question=closest_question, img_idx=self.env.img_idx)
@@ -307,17 +303,15 @@ class Agent:
                         logging.info("UPDATING POLICY WEIGHTS...")
                         self.memory.clear_memory()
                     break
-            running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-            self.dict_running_return[i_episode] = running_reward
+
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
                         i_episode, self.env.img_idx))
-                logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, running_reward))
+                logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, self.train_metrics["running_return"].metric[0]))
                 # logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
-                self.writer.add_scalar('train_running_return', running_reward, i_episode + 1)
                 for key, metric in self.train_metrics.items():
                     metric.log()
                     if key != "valid_actions":  # not taking the valid_actions metric. Used only in logging.
@@ -335,13 +329,9 @@ class Agent:
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
-        # writing to csv the history of running return:
-        write_to_csv(os.path.join(self.out_path, "train_running_return_history.csv"),
-                     self.dict_running_return)  # useful to have a metric to monitor the convergence speed.
-        # write to csv other metric:
+        # write to csv train metrics:
         for _, metric in self.train_metrics.items():
             metric.write_to_csv()
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
-        logging.info("running_reward: {}".format(running_reward))
         logging.info(
             "--------------------------------------------END OF TRAINING ----------------------------------------------------")
