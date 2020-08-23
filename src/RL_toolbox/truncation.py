@@ -4,18 +4,19 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 class Truncation:
-    def __init__(self, agent, dist_action="dist_truncated"):
+    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False):
         self.agent = agent
         self.dist_action = dist_action
+        self.lm_bonus = lm_bonus
 
     def get_valid_actions(self, state_text, state_img):
         pass
 
-    def get_policy_distributions(self, state, valid_actions):
+    def get_policy_distributions(self, state, valid_actions,logits_lm):
         if type(self.agent).__name__ == 'PPO': #trick to distinguish between PPO and REINFORCE in select_action.
-            policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions)
+            policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions, logits_lm)
         elif type(self.agent).__name__ == 'REINFORCE':
-            policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions)
+            policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions, logits_lm)
         return policy_dist, policy_dist_truncated, value
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions):
@@ -29,9 +30,20 @@ class Truncation:
                 action = policy_dist.sample()
         return action
 
+    def get_logits_lm(self, state):
+        if self.lm_bonus:
+            with torch.no_grad():
+                seq_len = state.text.size(1)
+                _, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
+                logits = logits.view(len(state.text), seq_len, -1)
+                logits = logits[:, -1, :]
+            return logits
+        else:
+            return None
+
 class NoTruncation(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
-        Truncation.__init__(self, agent, dist_action)
+    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
+        Truncation.__init__(self, agent, dist_action, lm_bonus)
         self.dist_action = "dist_truncated"
 
     def get_valid_actions(self, state):
@@ -39,8 +51,8 @@ class NoTruncation(Truncation):
 
 
 class TopK(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
-        Truncation.__init__(self, agent, dist_action)
+    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
+        Truncation.__init__(self, agent, dist_action, lm_bonus)
         self.num_truncated = kwargs["num_truncated"]
 
     def get_valid_actions(self, state):
@@ -60,8 +72,8 @@ class TopK(Truncation):
 
 class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
-    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
-        Truncation.__init__(self, agent, dist_action)
+    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
+        Truncation.__init__(self, agent, dist_action, lm_bonus)
         self.p_th = kwargs["p_th"]
 
     def get_valid_actions(self, state):
@@ -81,7 +93,7 @@ class ProbaThreshold(Truncation):
         return valid_actions.unsqueeze(0), action_probs
 
 class SampleVA(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", **kwargs):
+    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
         '''See Overleaf for details on this truncation fn.'''
         Truncation.__init__(self, agent, dist_action)
         self.k_max = kwargs["num_truncated"]

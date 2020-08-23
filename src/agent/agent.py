@@ -44,14 +44,14 @@ class Memory:
 
 
 class Agent:
-    def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, eps=1e-08, grad_clip=None,
+    def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0):
+                 num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0, lm_bonus=0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr, eps=eps)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval
@@ -61,6 +61,7 @@ class Agent:
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.lm_sl = lm_sl
+        self.lm_bonus = lm_bonus
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -69,9 +70,9 @@ class Agent:
         self.eval_no_trunc = eval_no_trunc
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
-            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_)  # adding the truncation class.
+            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=lm_bonus)  # adding the truncation class.
         else:
-            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_)
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=lm_bonus)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -86,7 +87,7 @@ class Agent:
                              ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words', 'ratio_closest_questions']}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["running_return","lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "action_probs"]}
-        if self.truncate_mode is not None:
+        if self.truncate_mode is not None or self.lm_bonus:
             for key in ["action_probs_truncated", "action_probs_lm"]:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
@@ -94,7 +95,8 @@ class Agent:
 
     def select_action(self, state):
         valid_actions, action_probs = self.truncation.get_valid_actions(state)
-        policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions)
+        logits_lm = self.truncation.get_logits_lm(state)
+        policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions, logits_lm) #TODO: add logits_lm.
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                                valid_actions=valid_actions)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
@@ -109,7 +111,7 @@ class Agent:
                 valid_actions, action_probs = self.truncation.get_valid_actions(state)
             else:
                 valid_actions, action_probs = None, None
-            policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions)
+            policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions) # no logits bonus in test.
             if test_mode == 'sampling':
                 action = policy_dist_truncated.sample()
             elif test_mode == 'greedy':

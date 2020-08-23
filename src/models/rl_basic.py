@@ -198,7 +198,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
-    def forward(self, state_text, state_img, valid_actions=None):
+    def forward(self, state_text, state_img, valid_actions=None, logits_lm=None, alpha=0.5):
         embed_text = self._get_embed_text(state_text)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
@@ -209,14 +209,19 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
-        logits = self.action_head(embedding)  # (B,S,num_tokens)
+        logits = self.action_head(embedding)  # (B,S,num_tokens) #TODO: add here logits_lm if needed.
         value = self.value_head(embedding)
+        # adding lm logits bonus
+        if logits_lm is not None:
+            logits_exploration = alpha * logits + (1-alpha) * logits_lm
+        else:
+            logits_exploration = logits
         probs = F.softmax(logits, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits)
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration)
         else:
-            policy_dist_truncated = policy_dist
+            policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         if self.train_policy == 'truncated' and valid_actions is not None:
             return policy_dist_truncated, policy_dist_truncated, value
         else:
