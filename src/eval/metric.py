@@ -54,12 +54,14 @@ class Metric:
     def write_to_csv(self):
         if self.dict_metric:
             for key, value in self.dict_metric.items():
-                self.dict_stats[key] = [np.round(np.mean(value), decimals=3), np.round(np.std(value), decimals=3), np.round(len(value))]
-                logging.info('{}: {} +/- {}'.format(key, np.round(np.mean(value), decimals=3), np.round(np.std(value), decimals=3)))
-                #logging.info('{} std: {}'.format(key, np.std(value)))
-                #self.dict_metric[key].append(np.mean(value))
-                #self.dict_metric[key].append(np.std(value))
-            #write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
+                self.dict_stats[key] = [np.round(np.mean(value), decimals=3), np.round(np.std(value), decimals=3),
+                                        np.round(len(value))]
+                logging.info('{}: {} +/- {}'.format(key, np.round(np.mean(value), decimals=3),
+                                                    np.round(np.std(value), decimals=3)))
+                # logging.info('{} std: {}'.format(key, np.std(value)))
+                # self.dict_metric[key].append(np.mean(value))
+                # self.dict_metric[key].append(np.std(value))
+            # write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
 
@@ -123,6 +125,7 @@ class SizeVAMetric(Metric):
 
 class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -177,6 +180,7 @@ class LMPolicyProbsRatio(Metric):
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
 
+
 class ActionProbs(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
@@ -193,6 +197,7 @@ class ActionProbs(Metric):
 
     def log(self):
         logging.info('episode action probs: {}'.format(self.ep_probs))
+
 
 class ActionProbsTruncated(Metric):
     def __init__(self, agent, train_test):
@@ -211,6 +216,7 @@ class ActionProbsTruncated(Metric):
     def log(self):
         logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
 
+
 class LMActionProbs(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
@@ -218,7 +224,7 @@ class LMActionProbs(Metric):
         self.key = "action_probs_lm"
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"]==kwargs["action"]])
+        self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
 
     def compute_(self, **kwargs):
         lm_probs = torch.stack(self.measure).clone().detach()
@@ -227,6 +233,7 @@ class LMActionProbs(Metric):
 
     def log(self):
         logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
+
 
 class RunningReturn(Metric):
     def __init__(self, agent, train_test):
@@ -245,7 +252,7 @@ class RunningReturn(Metric):
         self.running_return = 0.05 * ep_reward + (1 - 0.05) * self.running_return
         self.metric = [self.running_return]
         self.dict_metric[self.idx_episode] = self.running_return
-        self.idx_episode+= 1
+        self.idx_episode += 1
 
     def write_to_csv(self):
         write_to_csv(self.out_csv_file, self.dict_metric)
@@ -275,8 +282,9 @@ class DialogMetric(Metric):
                 self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text[:, 1:].squeeze().cpu()]
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
-                    kwargs["state"].text[:, 1:].squeeze().cpu())
-            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0], ignored=[]) #TODO: investigate the pb of length of dialogue for pretrain here.
+                    kwargs["state"].text[:, 1:].cpu().view(-1))
+            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
+                                                                  ignored=[])  # TODO: investigate the pb of length of dialogue for pretrain here.
             closest_question_decoded = kwargs["closest_question"]
             string = ' img {}:'.format(kwargs[
                                            "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
@@ -384,6 +392,7 @@ class RewardMetric(Metric):
     - The normalised reward (the one monitored at test time)
     - The length of each test episode
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -420,9 +429,9 @@ class RewardMetric(Metric):
                 self.dict_stats[key][k] = [np.mean(v), np.std(v), len(v)]
                 logging.info('{} mean: {}'.format(key + '___' + k, np.mean(v)))
                 logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
-                #self.dict_metric[key][k].append(np.mean(v))
-                #self.dict_metric[key][k].append(np.std(v))
-        #write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
+                # self.dict_metric[key][k].append(np.mean(v))
+                # self.dict_metric[key][k].append(np.std(v))
+        # write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
@@ -555,6 +564,7 @@ class UniqueWordsMetric(Metric):
     def write(self):
         pass
 
+
 # --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
 
 class LMMetric(Metric):
@@ -583,5 +593,6 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric,
            "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric,
            "ratio_closest_questions": RefQuestionsMetric,
-           "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated, "action_probs_lm": LMActionProbs,
+           "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated,
+           "action_probs_lm": LMActionProbs,
            "running_return": RunningReturn}
