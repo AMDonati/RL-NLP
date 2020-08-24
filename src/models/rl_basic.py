@@ -176,7 +176,7 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat"):
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", alpha=0.5):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
         self.fusion = fusion
@@ -197,8 +197,9 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
+        self.alpha = alpha
 
-    def forward(self, state_text, state_img, valid_actions=None, logits_lm=None, alpha=0.5):
+    def forward(self, state_text, state_img, valid_actions=None, logits_lm=None):
         embed_text = self._get_embed_text(state_text)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
@@ -209,11 +210,11 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
-        logits = self.action_head(embedding)  # (B,S,num_tokens) #TODO: add here logits_lm if needed.
+        logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
         if logits_lm is not None:
-            logits_exploration = alpha * logits + (1-alpha) * logits_lm
+            logits_exploration = self.alpha * logits + (1-self.alpha) * logits_lm
         else:
             logits_exploration = logits
         probs = F.softmax(logits, dim=-1)

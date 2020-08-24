@@ -55,6 +55,9 @@ def run(args):
         args.fusion,
         args.lm_bonus)
 
+    if args.lm_bonus:
+        out_folder = out_folder + '_alpha{}'.format(args.alpha_logits)
+
     if args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
 
@@ -87,7 +90,7 @@ def run(args):
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters, rl=True,
-                                train_policy=args.train_policy, fusion=args.fusion)
+                                train_policy=args.train_policy, fusion=args.fusion, alpha=args.alpha_logits)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
@@ -191,6 +194,7 @@ def get_parser():
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
     # This argument is now required.
     parser.add_argument('-lm_bonus', type=int, default=0, help="Language model logits bonus on policy logits")
+    parser.add_argument('-alpha_logits', type=float, default=0.5, help="alpha value for the convex logits mixture")
     parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
