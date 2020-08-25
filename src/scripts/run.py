@@ -95,7 +95,7 @@ def run(args):
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
 
-    generic_kwargs = {"pretrained_lm": pretrained_lm, "lm_sl": args.lm_sl,
+    generic_kwargs = {"pretrained_lm": pretrained_lm,
                       "pretrain": args.pretrain,
                       "update_every": args.update_every,
                       "lr": args.lr,
@@ -139,7 +139,7 @@ def run(args):
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
-        agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
+        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, baselines=args.test_baselines)
     # write to csv test scalar metrics:
     all_metrics = {}
     logger.info(
@@ -167,9 +167,8 @@ def get_parser():
     parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
-    # parser.add_argument("-num_training_steps", type=int, default=1000, help="number of training_steps")
-    parser.add_argument("-num_episodes_train", type=int, default=50, help="number of episodes training")
-    parser.add_argument("-num_episodes_test", type=int, default=100, help="number of episodes test")
+    parser.add_argument("-num_episodes_train", type=int, default=1000, help="number of episodes training")
+    parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
@@ -195,7 +194,6 @@ def get_parser():
     # This argument is now required.
     parser.add_argument('-lm_bonus', type=int, default=0, help="Language model logits bonus on policy logits")
     parser.add_argument('-alpha_logits', type=float, default=0.5, help="alpha value for the convex logits mixture")
-    parser.add_argument('-lm_sl', type=int, default=1, help="the language model is trained with sl")
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
@@ -212,6 +210,7 @@ def get_parser():
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-fusion', type=str, default="cat", help="fusion mode")
+    parser.add_argument('-test_baselines', type=int, default=0, help="add test SL baselines for evaluation")
 
     return parser
 
