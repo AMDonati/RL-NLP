@@ -8,11 +8,9 @@ from RL_toolbox.RL_functions import compute_grad_norm
 
 class REINFORCE(Agent):
     def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, grad_clip=None,
-                 lm_sl=True,
-                 pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, eval_no_trunc=0,lm_bonus=0):
+                 pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, eval_no_trunc=0, lm_bonus=0):
         Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr, grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
-                       lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
                        p_th=p_th,
@@ -29,11 +27,9 @@ class REINFORCE(Agent):
         policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
-
         return log_prob, value, dist_entropy
 
     def update(self):
-
         rewards = []
         discounted_reward = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):

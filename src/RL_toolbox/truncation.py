@@ -11,11 +11,14 @@ class Truncation:
     def get_valid_actions(self, state):
         pass
 
-    def get_policy_distributions(self, state, valid_actions,logits_lm):
-        if type(self.agent).__name__ == 'PPO': #trick to distinguish between PPO and REINFORCE in select_action.
-            policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions, logits_lm)
-        elif type(self.agent).__name__ == 'REINFORCE':
-            policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions, logits_lm)
+    def get_policy_distributions(self, state, valid_actions, logits_lm, baseline=False):
+        if baseline:
+            policy_dist, policy_dist_truncated, value = self.agent.start_policy(state.text, state.img)
+        else:
+            if type(self.agent).__name__ == 'PPO': #trick to distinguish between PPO and REINFORCE in select_action.
+                policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions, logits_lm)
+            elif type(self.agent).__name__ == 'REINFORCE':
+                policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions, logits_lm)
         return policy_dist, policy_dist_truncated, value
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
@@ -41,7 +44,6 @@ class Truncation:
 class NoTruncation(Truncation):
     def __init__(self, agent, lm_bonus=False, **kwargs):
         Truncation.__init__(self, agent, lm_bonus)
-        self.dist_action = "dist_truncated"
 
     def get_valid_actions(self, state):
         return None, None
@@ -54,16 +56,11 @@ class TopK(Truncation):
 
     def get_valid_actions(self, state):
         with torch.no_grad():
-            if self.agent.lm_sl:
-                seq_len = state.text.size(1)
-                log_probas, _ = self.agent.pretrained_lm(state.text.to(self.agent.device))
-                log_probas = log_probas.view(len(state.text), seq_len, -1)
-                log_probas = log_probas[:, -1, :]
-                top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
-            else:
-                dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
-                probs = dist.probs
-                top_k_weights, top_k_indices = torch.topk(probs, self.num_truncated, sorted=True)
+            seq_len = state.text.size(1)
+            log_probas, _ = self.agent.pretrained_lm(state.text.to(self.agent.device))
+            log_probas = log_probas.view(len(state.text), seq_len, -1)
+            log_probas = log_probas[:, -1, :]
+            top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
         return top_k_indices, top_k_weights.exp()
 
 
@@ -75,14 +72,10 @@ class ProbaThreshold(Truncation):
 
     def get_valid_actions(self, state):
         with torch.no_grad():
-            if self.agent.lm_sl:
-                seq_len = state.text.size(1)
-                log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
-                logits = logits.view(len(state.text), seq_len, -1)
-                probas = F.softmax(logits[:,-1,:], dim=-1)
-            else:
-                dist, dist_, value = self.agent.pretrained_lm(state.text, state.img)
-                probas = dist.probs
+            seq_len = state.text.size(1)
+            log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
+            logits = logits.view(len(state.text), seq_len, -1)
+            probas = F.softmax(logits[:,-1,:], dim=-1)
             probas_mask = torch.ge(probas, self.p_th)
             valid_actions = torch.nonzero(probas_mask, as_tuple=False)[:,1] # slice trick to get only the indices.
             action_probs = probas[:,valid_actions]
@@ -94,22 +87,16 @@ class SampleVA(Truncation):
         '''See Overleaf for details on this truncation fn.'''
         Truncation.__init__(self, agent, lm_bonus)
         self.k_max = kwargs["num_truncated"]
-        self.k_min = 1 # does not work with k_min > 1 because sometimes the lm has a proba equal to one.
 
     def get_valid_actions(self, state):
         with torch.no_grad():
-            if self.agent.lm_sl:
-                seq_len = state.text.size(1)
-                log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
-                logits = logits.view(len(state.text), seq_len, -1)
-                probas = F.softmax(logits[:,-1,:], dim=-1)
-                dist = Categorical(probas)
-            else:
-                dist, _, _ = self.agent.pretrained_lm(state.text, state.img)
-            valid_actions = []
-            while len(valid_actions) < self.k_min:
-                actions = dist.sample(sample_shape=[self.k_max])
-                valid_actions = torch.unique(actions)
+            seq_len = state.text.size(1)
+            log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
+            logits = logits.view(len(state.text), seq_len, -1)
+            probas = F.softmax(logits[:,-1,:], dim=-1)
+            dist = Categorical(probas)
+            actions = dist.sample(sample_shape=[self.k_max])
+            valid_actions = torch.unique(actions)
             action_probs = dist.probs[:,valid_actions]
         return valid_actions.unsqueeze(0), action_probs
 

@@ -9,7 +9,6 @@ from agent.agent import Agent
 class PPO(Agent):
     def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None,
                  truncate_mode="top_k",
-                 lm_sl=True,
                  update_every=100, num_truncated=10,
                  p_th=None,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
@@ -18,7 +17,6 @@ class PPO(Agent):
                  lm_bonus=0):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path, gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
-                       lm_sl=lm_sl,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
                        p_th=p_th,
