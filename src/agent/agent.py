@@ -105,7 +105,8 @@ class Agent:
             valid_actions, action_probs = None, None
         logits_lm = None if test else self.truncation.get_logits_lm(state)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
-                                                                                             logits_lm, baseline=baseline)
+                                                                                             logits_lm,
+                                                                                             baseline=baseline)
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                                valid_actions=valid_actions,
                                                mode=mode)
@@ -133,7 +134,9 @@ class Agent:
         for key in ["reward", "ppl_dialog_lm", "bleu"]:
             self.test_metrics[key].reinit_train_test(self.test_metrics[key].train_test + '_' + 'fromLM')
             self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward,
-                                        closest_question=closest_question)
+                                        closest_question=closest_question,
+                                        state=state,
+                                        ref_questions_decoded=env.ref_questions_decoded)
             self.test_metrics[key].compute()
         # reset metrics key value for writing:
         for m in self.test_metrics.values():
@@ -165,8 +168,61 @@ class Agent:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, baselines=baselines)
 
+    def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
+                             test_mode='sampling', baseline=False):
+        state, ep_reward = env.reset(seed), 0
+        metrics = self.train_metrics if train else self.test_metrics
+        for t in range(0, env.max_len):
+            action, log_probs, value, (
+                valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
+                                                                                              test=1 - train,
+                                                                                              mode=test_mode,
+                                                                                              truncation=truncation,
+                                                                                              baseline=baseline)
+            new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+            if train:
+                # Saving reward and is_terminal:
+                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
+            timestep += 1
+            for key, metric in metrics.items():
+                metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
+                            actions_probs=actions_probs,
+                            ref_question=env.ref_questions,
+                            ref_questions_decoded=env.ref_questions_decoded, reward=reward,
+                            closest_question=closest_question, new_state=new_state, log_probs=log_probs,
+                            log_probs_truncated=log_probs_truncated,
+                            test_mode=test_mode)
+            state = new_state
+            ep_reward += reward
+
+            # update if its time
+            if train:
+                if self.update_mode == "step" and timestep % self.update_every == 0:
+                    loss = self.update()
+                    logging.info("UPDATING POLICY WEIGHTS...")
+                    self.memory.clear_memory()
+                    timestep = 0
+                else:
+                    loss = None
+
+            if done:
+                if train:
+                    if self.update_mode == "episode" and i_episode % self.update_every == 0:
+                        loss = self.update()
+                        logging.info("UPDATING POLICY WEIGHTS...")
+                        self.memory.clear_memory()
+                else:
+                    loss = None
+                break
+        for key, metric in metrics.items():
+            metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
+                           ref_question=env.ref_questions, test_mode=test_mode)
+
+        return state, ep_reward, closest_question, valid_actions, timestep, loss
+
     def test_env(self, env, num_episodes=10, test_mode='sampling', baselines=False):
-        env.reset() # init env.
+        env.reset()  # init env.
+        timestep = 1
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.policy.eval()
@@ -181,29 +237,11 @@ class Agent:
                     m.reinit_train_test(m.train_test + '_' + key)
                 for i in range(env.ref_questions.size(
                         0)):  # loop multiple time over the same image to measure langage diversity
-                    state, ep_reward = env.reset(seed=seed), 0
-                    for t in range(0, env.max_len):
-                        action, log_probs, value, (
-                            valid_actions, action_probs, log_prob_truncated), dist = self.select_action(state=state,
-                                                                                                        mode=test_mode,
-                                                                                                        test=True,
-                                                                                                        truncation=trunc)
-                        new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
-                        ep_reward += reward
-                        for _, metric in self.test_metrics.items():
-                            metric.fill(state=state, done=done, new_state=new_state,
-                                        ref_question=env.ref_questions, reward=reward,
-                                        closest_question=closest_question,
-                                        dist=dist, valid_actions=valid_actions,
-                                        ref_questions_decoded=env.ref_questions_decoded,
-                                        test_mode=test_mode)
-                        state = new_state
-                        if done:
-                            break
+                    with torch.no_grad():
+                        state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
+                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False, test_mode=test_mode,
+                            truncation=trunc)
                     for _, metric in self.test_metrics.items():
-                        metric.compute(state=state, closest_question=closest_question,
-                                       reward=reward, img_idx=env.img_idx, ref_question=env.ref_questions,
-                                       test_mode=test_mode)
                         metric.write()
                     dialogs[key].append(
                         'DIALOG {} for img {}: {}: '.format(i, env.img_idx, key) + self.env.clevr_dataset.idx2word(
@@ -216,22 +254,24 @@ class Agent:
                             m.reinit_train_test(env.mode + '_' + test_mode)
             if baselines:
                 # generate one question with the lm as a comparison
-                _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
-                dialogs["from_lm"] = ['DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(
-                                ep_reward)]
-                # # generate one question with the start policy as a comparison
-                # for m in self.test_metrics.values():
-                #     m.reinit_train_test(env.mode + '_' + test_mode + '_' + 'StartPolicy')
-                # state, ep_reward, closest_question, _ = self.generate_one_episode_test(env=env, truncation=trunc,
-                #                                                                        test_mode=test_mode,
-                #                                                                        seed=seed,
-                #                                                                        baseline=True)
-                # dialogs["start_policy"] = ['DIALOG from start policy: {}'.format(self.env.clevr_dataset.idx2word(
-                #     state.text[:, 1:].numpy()[
-                #         0])) + '----- closest question:' + closest_question + '------reward: {}'.format(
-                #     ep_reward)]
-                # for m in self.test_metrics.values():
-                #     m.reinit_train_test(env.mode + '_' + test_mode)
+                _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env,
+                                                                                                   test_mode=test_mode)
+                dialogs["from_lm"] = ['DIALOG from Language Model: {}'.format(
+                    dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(
+                    ep_reward)]
+                # generate one question with the start policy as a comparison
+                for m in self.test_metrics.values():
+                    m.reinit_train_test(env.mode + '_' + test_mode + '_' + 'StartPolicy')
+                with torch.no_grad():
+                    state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
+                        timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False, test_mode=test_mode,
+                        truncation=False, baseline=True)
+                dialogs["start_policy"] = ['DIALOG from start policy: {}'.format(self.env.clevr_dataset.idx2word(
+                    state.text[:, 1:].numpy()[
+                        0])) + '----- closest question:' + closest_question + '------reward: {}'.format(
+                    ep_reward)]
+                for m in self.test_metrics.values():
+                    m.reinit_train_test(env.mode + '_' + test_mode)
             for _, dialog in dialogs.items():
                 logging.info('\n'.join(dialog))
             logging.info(
@@ -242,40 +282,8 @@ class Agent:
         current_time = time.time()
         timestep = 1
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
-            state, ep_reward = self.env.reset(), 0
-            for t in range(0, self.env.max_len):
-                action, log_probs, value, (
-                    valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state)
-                new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
-                # Saving reward and is_terminal:
-                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
-
-                timestep += 1
-                for key, metric in self.train_metrics.items():
-                    metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
-                                actions_probs=actions_probs,
-                                ref_question=self.env.ref_questions_decoded, reward=reward,
-                                closest_question=closest_question, new_state=new_state, log_probs=log_probs,
-                                log_probs_truncated=log_probs_truncated)
-                state = new_state
-                ep_reward += reward
-
-                # update if its time
-                if self.update_mode == "step" and timestep % self.update_every == 0:
-                    loss = self.update()
-                    logging.info("UPDATING POLICY WEIGHTS...")
-                    self.memory.clear_memory()
-                    timestep = 0
-
-                if done:
-                    for key, metric in self.train_metrics.items():
-                        metric.compute(state=state, closest_question=closest_question, img_idx=self.env.img_idx)
-                    if self.update_mode == "episode" and i_episode % self.update_every == 0:
-                        loss = self.update()
-                        logging.info("UPDATING POLICY WEIGHTS...")
-                        self.memory.clear_memory()
-                    break
-
+            state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
+                timestep=timestep, i_episode=i_episode, env=self.env)
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
@@ -289,7 +297,7 @@ class Agent:
                     metric.log(valid_actions=valid_actions)
                     metric.write()
                 logging.info(
-                    "---------------------------------------------------------------------------------------------------------------------------------------")
+"---------------------------------------------------------------------------------------------------------------------------------------")
 
             if i_episode + 1 % 1000 == 0:
                 elapsed = time.time() - current_time
