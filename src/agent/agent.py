@@ -86,7 +86,7 @@ class Agent:
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
                              ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words', 'ratio_closest_questions']}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["running_return","lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "action_probs", "action_probs_truncated"]}
+                              ["running_return","lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "policy", "action_probs", "action_probs_truncated"]}
         if self.truncate_mode is not None:
             for key in ["action_probs_lm"]:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
@@ -227,7 +227,6 @@ class Agent:
         env.reset()
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)
-        self.generated_text = []
         self.policy.eval()
         if self.eval_no_trunc == 1:
             # if using truncation, eval the test dialog with and without truncation
@@ -316,9 +315,8 @@ class Agent:
                 logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
                 for key, metric in self.train_metrics.items():
-                    metric.log()
-                    if key != "valid_actions":  # not taking the valid_actions metric. Used only in logging.
-                        metric.write()
+                    metric.log(valid_actions=valid_actions)
+                    metric.write()
                 logging.info(
                     "---------------------------------------------------------------------------------------------------------------------------------------")
 

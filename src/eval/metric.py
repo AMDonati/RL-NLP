@@ -48,7 +48,7 @@ class Metric:
         self.metric_history.extend(self.metric)
         self.metric = []
 
-    def log(self):
+    def log(self, **kwargs):
         pass
 
     def write_to_csv(self):
@@ -58,9 +58,6 @@ class Metric:
                                         np.round(len(value))]
                 logging.info('{}: {} +/- {}'.format(key, np.round(np.mean(value), decimals=3),
                                                     np.round(np.std(value), decimals=3)))
-                # logging.info('{} std: {}'.format(key, np.std(value)))
-                # self.dict_metric[key].append(np.mean(value))
-                # self.dict_metric[key].append(np.std(value))
             # write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
@@ -88,10 +85,16 @@ class VAMetric(Metric):
         self.metric = self.measure
         pass
 
-    def log(self):
-        logging.info('---------------------Valid action space------------------------------')
-        logging.info('\n'.join(self.metric))
-        logging.info('---------------------------------------------------------------------')
+    def log(self, **kwargs):
+        if kwargs["valid_actions"] is not None:
+            logging.info('---------------------Valid action space------------------------------')
+            logging.info('\n'.join(self.metric))
+            logging.info('---------------------------------------------------------------------')
+        else:
+            pass
+
+    def write(self):
+        pass
 
 
 class SizeVAMetric(Metric):
@@ -195,7 +198,7 @@ class ActionProbs(Metric):
         self.ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
         self.metric.append(np.mean(self.ep_probs))
 
-    def log(self):
+    def log(self, **kwargs):
         logging.info('episode action probs: {}'.format(self.ep_probs))
 
 
@@ -213,7 +216,7 @@ class ActionProbsTruncated(Metric):
         self.ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
         self.metric.append(np.mean(self.ep_probs_truncated))
 
-    def log(self):
+    def log(self, **kwargs):
         logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
 
 
@@ -231,7 +234,7 @@ class LMActionProbs(Metric):
         self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
         self.metric.append(np.mean(self.ep_lm_probs))
 
-    def log(self):
+    def log(self, **kwargs):
         logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
@@ -567,25 +570,44 @@ class UniqueWordsMetric(Metric):
 
 # --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
 
-class LMMetric(Metric):
+class PolicyMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
-        self.key = "lm"
+        self.key = "policy"
 
     def fill_(self, **kwargs):
-        state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0])
-        top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, self.agent.num_truncated, sorted=True)
-        if self.agent.pretrained_lm != None:
-            top_k_indices = torch.gather(kwargs["valid_actions"], 1, top_k_indices)
-        top_words_decoded = self.agent.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
-        weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                         zip(top_words_decoded.split(), top_k_weights[0].cpu().detach().numpy())]
-        self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
+        # compute top_k_words from the Policy:
+        with torch.no_grad():
+            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=[])
+            top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, 5, sorted=True)
+            top_words_decoded = self.agent.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
+            # get top_words from the language model:
+            seq_len = kwargs["state"].text.size(1)
+            log_probas, _ = self.agent.pretrained_lm(kwargs["state"].text.to(self.agent.device))
+            log_probas = log_probas.view(len(kwargs["state"].text), seq_len, -1)
+            _, top_k_indices_lm = torch.topk(log_probas[:, -1, :], 10, sorted=True)
+            top_k_indices, top_k_weights, top_k_indices_lm = top_k_indices.squeeze(), top_k_weights.squeeze(), top_k_indices_lm.squeeze()
+            in_top_k_words_lm = []
+            for i in top_k_indices:
+                if i in top_k_indices_lm:
+                    in_top_k_words_lm.append("Y")
+                else:
+                    in_top_k_words_lm.append("N")
+            weights_words = ["{}/{:.3f}/{}".format(word, weight, top_k_lm, number=3) for word, weight, top_k_lm in
+                         zip(top_words_decoded.split(), top_k_weights.cpu().detach().numpy(), in_top_k_words_lm)]
+            self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
 
     def compute_(self, **kwargs):
-        self.metric = [self.measure[-1]]
+        self.metric = self.measure
+
+    def write(self):
         pass
+
+    def log(self, **kwargs):
+        logging.info('---------------------Policy Top Words------------------------------')
+        logging.info('\n'.join(self.metric))
+        logging.info('--------------------------------------------------------------------')
 
 
 metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
@@ -595,4 +617,5 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "ratio_closest_questions": RefQuestionsMetric,
            "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated,
            "action_probs_lm": LMActionProbs,
-           "running_return": RunningReturn}
+           "running_return": RunningReturn,
+           "policy": PolicyMetric}
