@@ -4,12 +4,11 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 
 class Truncation:
-    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False):
+    def __init__(self, agent, lm_bonus=False):
         self.agent = agent
-        self.dist_action = dist_action
         self.lm_bonus = lm_bonus
 
-    def get_valid_actions(self, state_text, state_img):
+    def get_valid_actions(self, state):
         pass
 
     def get_policy_distributions(self, state, valid_actions,logits_lm):
@@ -19,15 +18,13 @@ class Truncation:
             policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions, logits_lm)
         return policy_dist, policy_dist_truncated, value
 
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions):
-        if self.dist_action == 'dist_truncated':
+    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
+        if mode == 'sampling':
             action = policy_dist_truncated.sample()
-            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-                action = torch.gather(valid_actions, 1, action.view(1, 1))
-        elif self.dist_action == 'dist':
-            action = policy_dist.sample()
-            while action not in valid_actions:
-                action = policy_dist.sample()
+        elif mode == 'greedy':
+            action = torch.argmax(policy_dist_truncated.probs).view(1).detach()
+        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
+            action = torch.gather(valid_actions, 1, action.view(1, 1))
         return action
 
     def get_logits_lm(self, state):
@@ -42,8 +39,8 @@ class Truncation:
             return None
 
 class NoTruncation(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
-        Truncation.__init__(self, agent, dist_action, lm_bonus)
+    def __init__(self, agent, lm_bonus=False, **kwargs):
+        Truncation.__init__(self, agent, lm_bonus)
         self.dist_action = "dist_truncated"
 
     def get_valid_actions(self, state):
@@ -51,8 +48,8 @@ class NoTruncation(Truncation):
 
 
 class TopK(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
-        Truncation.__init__(self, agent, dist_action, lm_bonus)
+    def __init__(self, agent, lm_bonus=False, **kwargs):
+        Truncation.__init__(self, agent, lm_bonus)
         self.num_truncated = kwargs["num_truncated"]
 
     def get_valid_actions(self, state):
@@ -72,8 +69,8 @@ class TopK(Truncation):
 
 class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
-    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
-        Truncation.__init__(self, agent, dist_action, lm_bonus)
+    def __init__(self, agent, lm_bonus=False, **kwargs):
+        Truncation.__init__(self, agent, lm_bonus)
         self.p_th = kwargs["p_th"]
 
     def get_valid_actions(self, state):
@@ -93,9 +90,9 @@ class ProbaThreshold(Truncation):
         return valid_actions.unsqueeze(0), action_probs
 
 class SampleVA(Truncation):
-    def __init__(self, agent, dist_action="dist_truncated", lm_bonus=False, **kwargs):
+    def __init__(self, agent, lm_bonus=False, **kwargs):
         '''See Overleaf for details on this truncation fn.'''
-        Truncation.__init__(self, agent, dist_action)
+        Truncation.__init__(self, agent, lm_bonus)
         self.k_max = kwargs["num_truncated"]
         self.k_min = 1 # does not work with k_min > 1 because sometimes the lm has a proba equal to one.
 

@@ -47,7 +47,8 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  lm_sl=True,
                  pretrain=False, update_every=50,
-                 num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0, lm_bonus=0):
+                 num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
+                 lm_bonus=0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy
         self.policy.to(self.device)
@@ -67,10 +68,14 @@ class Agent:
         self.update_every = update_every
         self.memory = Memory()
         self.num_truncated = num_truncated
-        self.eval_no_trunc = eval_no_trunc
+        if self.truncate_mode is not None:
+            self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
+        else:
+            self.eval_trunc = {"no_trunc": False}
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
-            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=lm_bonus)  # adding the truncation class.
+            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_,
+                                                         lm_bonus=lm_bonus)  # adding the truncation class.
         else:
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=lm_bonus)
         self.writer = writer
@@ -84,82 +89,33 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words', 'ratio_closest_questions']}
+                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words',
+                              'ratio_closest_questions']}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["running_return","lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog", "policy", "action_probs", "action_probs_truncated"]}
+                              ["running_return", "lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog",
+                               "policy", "action_probs", "action_probs_truncated"]}
         if self.truncate_mode is not None:
             for key in ["action_probs_lm"]:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
-    def select_action(self, state):
-        valid_actions, action_probs = self.truncation.get_valid_actions(state)
-        logits_lm = self.truncation.get_logits_lm(state)
-        policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions, logits_lm) #TODO: add logits_lm.
+    def select_action(self, state, mode='sampling', test=False, truncation=True):
+        if truncation:
+            valid_actions, action_probs = self.truncation.get_valid_actions(state)
+        else:
+            valid_actions, action_probs = None, None
+        logits_lm = None if test else self.truncation.get_logits_lm(state)
+        policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
+                                                                                             logits_lm)
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
-                                               valid_actions=valid_actions)
+                                               valid_actions=valid_actions,
+                                               mode=mode)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         if self.policy.train_policy == 'truncated':
             assert torch.all(torch.eq(policy_dist_truncated.probs, policy_dist.probs))
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
-
-    def generate_action_test(self, state, truncation=False, test_mode='sampling'):
-        with torch.no_grad():
-            if truncation:
-                valid_actions, action_probs = self.truncation.get_valid_actions(state)
-            else:
-                valid_actions, action_probs = None, None
-            policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, valid_actions) # no logits bonus in test.
-            if test_mode == 'sampling':
-                action = policy_dist_truncated.sample()
-            elif test_mode == 'greedy':
-                action = torch.argmax(policy_dist_truncated.probs).view(1).detach()  # TODO: remove the detach here?
-            if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-                action = torch.gather(valid_actions, 1, action.view(1, 1))
-            log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
-            log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
-        return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
-
-    def generate_one_episode_test(self, env, truncation, test_mode, seed=None):
-        state, ep_reward = env.reset(seed=seed), 0
-        for t in range(0, env.max_len):
-            action, log_probs, value, (
-            valid_actions, action_probs, log_prob_truncated), dist = self.generate_action_test(state=state,
-                                                                                               truncation=truncation,
-                                                                                               test_mode=test_mode)
-            new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
-            ep_reward += reward
-            for key, metric in self.test_metrics.items():
-                if key != "ppl":
-                    metric.fill(state=state, done=done, new_state=new_state,
-                                ref_question=env.ref_questions, reward=reward,
-                                closest_question=closest_question, dist=dist, valid_actions=valid_actions,
-                                ref_questions_decoded=env.ref_questions_decoded)
-                else:
-                    # computing ppl on ref questions only in one case (otherwise redundant).
-                    if not truncation and test_mode == "sampling":
-                        metric.fill(state=state, done=done, new_state=new_state,
-                                    ref_question=env.ref_questions, reward=reward,
-                                    closest_question=closest_question,
-                                    dist=dist, valid_actions=valid_actions,
-                                    ref_questions_decoded=env.ref_questions_decoded)
-            state = new_state
-            if done:
-                break
-        for key, metric in self.test_metrics.items():
-            if key != "ppl":
-                metric.compute(state=state, closest_question=closest_question,
-                               reward=reward, img_idx=env.img_idx, ref_question=env.ref_questions)
-                metric.write()
-            else:
-                if not truncation and test_mode == "sampling":
-                    metric.compute(state=state, closest_question=closest_question,
-                                   reward=reward, img_idx=env.img_idx, ref_question=env.ref_questions)
-                    metric.write()
-        return state, ep_reward, closest_question, env.img_idx
-
 
     def generate_one_episode_with_lm(self, env, test_mode='sampling'):
         state = env.special_tokens.SOS_idx
@@ -176,7 +132,8 @@ class Agent:
                 if word_idx == env.special_tokens.EOS_idx:
                     break
         new_state = env.State(state, None)  # trick to have a state.text in the metric.
-        state_decoded = self.env.clevr_dataset.idx2word(state.squeeze().cpu().numpy(), stop_at_end=True, ignored=['<SOS>'])
+        state_decoded = self.env.clevr_dataset.idx2word(state.squeeze().cpu().numpy(), stop_at_end=True,
+                                                        ignored=['<SOS>'])
         # compute associated reward with reward function:
         reward, closest_question = env.reward_func.get(question=state_decoded,
                                                        ep_questions_decoded=env.ref_questions_decoded,
@@ -192,11 +149,9 @@ class Agent:
         #     m.reinit_train_test(env.mode + '_' + test_mode)
         return state, state_decoded, reward, closest_question
 
-
     def save(self, out_file):
         with open(out_file, 'wb') as f:
             torch.save(self.policy.state_dict(), f)
-
 
     def save_ckpt(self, EPOCH, loss):
         torch.save({
@@ -206,7 +161,6 @@ class Agent:
             'loss': loss,
         }, os.path.join(self.checkpoints_path, 'model.pt'))
 
-
     def load_ckpt(self):
         checkpoint = torch.load(os.path.join(self.checkpoints_path, 'model.pt'))
         self.policy.load_state_dict(checkpoint['model_state_dict'])
@@ -215,55 +169,68 @@ class Agent:
         loss = checkpoint['loss']
         return epoch, loss
 
-
     def test(self, num_episodes=10, test_mode='sampling'):
         for env in self.test_envs:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode)
 
-
     def test_env(self, env, num_episodes=10, test_mode='sampling'):
-        # init env:
-        env.reset()
+        env.reset() # init env.
         for m in self.test_metrics.values():
             m.reinit_train_test(env.mode + '_' + test_mode)
         self.policy.eval()
-        if self.eval_no_trunc == 1:
-            # if using truncation, eval the test dialog with and without truncation
-            truncation = {"no_trunc": False, "with_trunc": True} if self.truncate_mode is not None else {"no_trunc": False}
-        else:
-            # if using truncation, eval the test dialog only with truncation
-            truncation = {"with_trunc": True} if self.truncate_mode is not None else {
-                "no_trunc": False}
         for i_episode in range(num_episodes):
-            dialogs = {key:[] for key in truncation.keys()}
+            dialogs = {key: [] for key in self.eval_trunc.keys()}
             logging.info(
                 '-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(
                     i_episode))
             seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
-            for key, trunc in truncation.items():
+            for key, trunc in self.eval_trunc.items():
                 for m in self.test_metrics.values():
                     m.reinit_train_test(m.train_test + '_' + key)
-                for i in range(env.ref_questions.size(0)): # loop multiple time over the same image to measure langage diversity
-                    state, ep_reward, closest_question, img_idx = self.generate_one_episode_test(env=env, truncation=trunc,
-                                                                                                      test_mode=test_mode,
-                                                                                                      seed=seed)
-                    dialogs[key].append('DIALOG {} for img {}: {}:'.format(i, img_idx, key) + self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[
-                                                                                                  0]) + '----- closest question:' + closest_question + '------reward: {}'.format(
-                        ep_reward))
+                for i in range(env.ref_questions.size(
+                        0)):  # loop multiple time over the same image to measure langage diversity
+                    state, ep_reward = env.reset(seed=seed), 0
+                    for t in range(0, env.max_len):
+                        action, log_probs, value, (
+                            valid_actions, action_probs, log_prob_truncated), dist = self.select_action(state=state,
+                                                                                                        mode=test_mode,
+                                                                                                        test=True,
+                                                                                                        truncation=trunc)
+                        new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+                        ep_reward += reward
+                        for _, metric in self.test_metrics.items():
+                            metric.fill(state=state, done=done, new_state=new_state,
+                                        ref_question=env.ref_questions, reward=reward,
+                                        closest_question=closest_question,
+                                        dist=dist, valid_actions=valid_actions,
+                                        ref_questions_decoded=env.ref_questions_decoded,
+                                        test_mode=test_mode)
+                        state = new_state
+                        if done:
+                            break
+                    for _, metric in self.test_metrics.items():
+                        metric.compute(state=state, closest_question=closest_question,
+                                       reward=reward, img_idx=env.img_idx, ref_question=env.ref_questions,
+                                       test_mode=test_mode)
+                        metric.write()
+                    dialogs[key].append(
+                        'DIALOG {} for img {}: {}:'.format(i, env.img_idx, key) + self.env.clevr_dataset.idx2word(
+                            state.text[:, 1:].numpy()[
+                                0]) + '----- closest question:' + closest_question + '------reward: {}'.format(
+                            ep_reward))
                     if i == env.ref_questions.size(0) - 1:
                         # reset metrics key value for writing:
                         for m in self.test_metrics.values():
                             m.reinit_train_test(env.mode + '_' + test_mode)
-            # generate one question with the lm as a comparison
-            _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
-            dialogs["from_lm"] = ['DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(
-                            ep_reward)]
+            # # generate one question with the lm as a comparison
+            # _, dialog_from_lm, ep_reward, closest_question = self.generate_one_episode_with_lm(env=env, test_mode=test_mode)
+            # dialogs["from_lm"] = ['DIALOG from Language Model: {}'.format(dialog_from_lm) + '----- closest question:' + closest_question + '------reward: {}'.format(
+            #                 ep_reward)]
             for _, dialog in dialogs.items():
                 logging.info('\n'.join(dialog))
             logging.info(
                 '-------------------------------------------------------------------------------------------------------------------------------------------------------')
-
 
     def learn(self, num_episodes=100):
         start_time = time.time()
@@ -271,9 +238,7 @@ class Agent:
         timestep = 1
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward = self.env.reset(), 0
-            # ref_question = random.choice(self.env.ref_questions)
             for t in range(0, self.env.max_len):
-                # forced = ref_question[t] if self.pretrain else None
                 action, log_probs, value, (
                     valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state)
                 new_state, (reward, closest_question), done, _ = self.env.step(action.cpu().numpy())
@@ -310,7 +275,8 @@ class Agent:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
                         i_episode, self.env.img_idx))
-                logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, self.train_metrics["running_return"].metric[0]))
+                logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, self.train_metrics[
+                    "running_return"].metric[0]))
                 # logging.info('Episode questions: {}'.format(self.env.ref_questions_decoded))
                 logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
                 logging.info('Closest Question: {}'.format(closest_question))
@@ -326,7 +292,7 @@ class Agent:
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
-        if valid_actions is not None:  # to compare the discrepancy between the 'truncated policy' and the 'all space' policy that is being learned. (Plus comparison with the language model).
+        if valid_actions is not None:  # to compare the discrepancy between the 'truncated policy' and the 'all space' policy
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})

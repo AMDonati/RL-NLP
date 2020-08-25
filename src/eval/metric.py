@@ -318,31 +318,34 @@ class PPLMetric(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        with torch.no_grad():
-            if kwargs["done"]:
-                for ref_question in kwargs["ref_question"]:
-                    inp_question = ref_question[:-1]
-                    inp_question = torch.cat(
-                        [torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(
-                        self.agent.device)  # adding SOS token.
-                    target_question = ref_question[1:]
-                    target_question = torch.cat(
-                        [target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(
-                        self.agent.device)  # adding EOS token.
-                    for i in range(len(inp_question)):
-                        inputs = inp_question[:i + 1].unsqueeze(0)
-                        policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
-                                                                                  valid_actions=kwargs["valid_actions"])
-                        log_prob = policy_dist_truncated.log_prob(target_question[i])
-                        self.measure.append(log_prob)
+        if kwargs["test_mode"] == 'sampling':
+            with torch.no_grad():
+                if kwargs["done"]:
+                    for ref_question in kwargs["ref_question"]:
+                        inp_question = ref_question[:-1]
+                        inp_question = torch.cat(
+                            [torch.tensor(self.agent.env.special_tokens.SOS_idx).view(1), inp_question]).to(
+                            self.agent.device)  # adding SOS token.
+                        target_question = ref_question[1:]
+                        target_question = torch.cat(
+                            [target_question, torch.tensor(self.agent.env.special_tokens.EOS_idx).view(1)]).to(
+                            self.agent.device)  # adding EOS token.
+                        for i in range(len(inp_question)):
+                            inputs = inp_question[:i + 1].unsqueeze(0)
+                            policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
+                                                                                      valid_actions=kwargs["valid_actions"])
+                            log_prob = policy_dist_truncated.log_prob(target_question[i])
+                            self.measure.append(log_prob)
+
 
     def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-        self.metric.append(ppl)
-        if not self.train_test + '_' + self.key in self.dict_metric:
-            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
-        else:
-            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+        if kwargs["test_mode"] == 'sampling':
+            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+            self.metric.append(ppl)
+            if not self.train_test + '_' + self.key in self.dict_metric:
+                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+            else:
+                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def write(self):
         pass
@@ -432,9 +435,6 @@ class RewardMetric(Metric):
                 self.dict_stats[key][k] = [np.mean(v), np.std(v), len(v)]
                 logging.info('{} mean: {}'.format(key + '___' + k, np.mean(v)))
                 logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
-                # self.dict_metric[key][k].append(np.mean(v))
-                # self.dict_metric[key][k].append(np.std(v))
-        # write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
