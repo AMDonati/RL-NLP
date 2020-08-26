@@ -199,10 +199,30 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.value_head = nn.Linear(self.fusion_dim, 1)
         self.alpha = alpha
 
-    def forward(self, state_text, state_img, valid_actions=None, logits_lm=None):
+    def forward(self, state_text, state_img, valid_actions=None, logits_lm=0):
         embed_text = self._get_embed_text(state_text)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
+        embedding = self.process_fusion(embed_text, img_feat_, img_feat)
+        logits = self.action_head(embedding)  # (B,S,num_tokens)
+        value = self.value_head(embedding)
+        # adding lm logits bonus
+        logits_exploration = self.alpha * logits + (1 - self.alpha) * logits_lm
+        probs = F.softmax(logits, dim=-1)
+        policy_dist, policy_dist_truncated = self.get_policies(probs, valid_actions, logits_exploration)
+        return policy_dist, policy_dist_truncated, value
+
+    def get_policies(self, probs, valid_actions, logits_exploration):
+        policy_dist = Categorical(probs)
+        if valid_actions is not None:
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration)
+            if self.train_policy == 'truncated':
+                policy_dist = policy_dist_truncated
+        else:
+            policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
+        return policy_dist, policy_dist_truncated
+
+    def process_fusion(self, embed_text, img_feat_, img_feat):
         if self.fusion == "film":
             gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
@@ -210,23 +230,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
-        logits = self.action_head(embedding)  # (B,S,num_tokens)
-        value = self.value_head(embedding)
-        # adding lm logits bonus
-        if logits_lm is not None:
-            logits_exploration = self.alpha * logits + (1-self.alpha) * logits_lm
-        else:
-            logits_exploration = logits
-        probs = F.softmax(logits, dim=-1)
-        policy_dist = Categorical(probs)
-        if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits_exploration)
-        else:
-            policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
-        if self.train_policy == 'truncated' and valid_actions is not None:
-            return policy_dist_truncated, policy_dist_truncated, value
-        else:
-            return policy_dist, policy_dist_truncated, value
+        return embedding
 
 
 class PolicyLSTMWordBatch_SL(nn.Module):
@@ -285,7 +289,7 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
 
-        #img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1) 
+        # img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
         # embedding = torch.cat((img_feat__, embed_text), dim=-1)
         if self.fusion == "film":
             gammabeta = self.gammabeta(embed_text).view(embed_text.size(0), embed_text.size(1), 2, self.num_filters)

@@ -35,7 +35,6 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
-        #valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated) #not needed and actually has a bug for batch of valid actions in LSTM models.
         policy_dist, _, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))

@@ -3,44 +3,17 @@
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
 
 import logging
+import os
+import time
+
+import numpy as np
 import torch
 import torch.optim as optim
-from eval.metric import metrics
-from RL_toolbox.truncation import truncations
-import time
-import os
-import numpy as np
 from torch.distributions import Categorical
 
-
-class Memory:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.states_img = []
-        self.states_text = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-        self.values = []
-        self.arrs = [self.actions, self.states_text, self.states_img, self.logprobs, self.rewards,
-                     self.is_terminals, self.values]
-
-        self.idx_episode = 0
-
-    def clear_memory(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.states_img[:]
-        del self.states_text[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.is_terminals[:]
-        del self.values[:]
-
-    def add_step(self, actions, states_text, states_img, logprobs, rewards, is_terminals, values):
-        for arr, val in zip(self.arrs, [actions, states_text, states_img, logprobs, rewards, is_terminals, values]):
-            arr.append(val)
+from RL_toolbox.truncation import truncations
+from agent.memory import Memory
+from eval.metric import metrics
 
 
 class Agent:
@@ -99,11 +72,11 @@ class Agent:
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
     def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False):
+        valid_actions, action_probs, logits_lm = None, None, 0
         if truncation:
             valid_actions, action_probs = self.truncation.get_valid_actions(state)
-        else:
-            valid_actions, action_probs = None, None
-        logits_lm = None if test else self.truncation.get_logits_lm(state)
+        if not test:
+            logits_lm = self.truncation.get_logits_lm(state)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
                                                                                              logits_lm,
                                                                                              baseline=baseline)
@@ -228,9 +201,7 @@ class Agent:
         self.policy.eval()
         for i_episode in range(num_episodes):
             dialogs = {key: [] for key in self.eval_trunc.keys()}
-            logging.info(
-                '-------------Test Episode: {} --------------------------------------------------------------------------------------'.format(
-                    i_episode))
+            logging.info('-'*20+'Test Episode: {}'.format(i_episode)+'-'*20 )
             seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
             for key, trunc in self.eval_trunc.items():
                 for m in self.test_metrics.values():
@@ -239,7 +210,8 @@ class Agent:
                         0)):  # loop multiple time over the same image to measure langage diversity
                     with torch.no_grad():
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
-                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False, test_mode=test_mode,
+                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
+                            test_mode=test_mode,
                             truncation=trunc)
                     for _, metric in self.test_metrics.items():
                         metric.write()
@@ -297,7 +269,7 @@ class Agent:
                     metric.log(valid_actions=valid_actions)
                     metric.write()
                 logging.info(
-"---------------------------------------------------------------------------------------------------------------------------------------")
+                    "---------------------------------------------------------------------------------------------------------------------------------------")
 
             if i_episode + 1 % 1000 == 0:
                 elapsed = time.time() - current_time
