@@ -410,10 +410,11 @@ class RewardMetric(Metric):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
             self.measure["reward"] = [kwargs["reward"]]
-            norm_reward = [kwargs["reward"] / max(kwargs["new_state"].text[:, 1:].squeeze().cpu().numpy().size,
+            len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(), ignored=[]).split())
+            norm_reward = [kwargs["reward"] / max(len_episode,
                                                   len(kwargs["closest_question"].split()))]
             self.measure["norm_reward"] = norm_reward
-            self.measure["len_dialog"] = [kwargs["new_state"].text[:, 1:].squeeze().cpu().numpy().size]
+            self.measure["len_dialog"] = [len_episode]
 
     def compute_(self, **kwargs):
         if not self.train_test + '_' + self.key in self.dict_metric:
@@ -432,9 +433,9 @@ class RewardMetric(Metric):
         for key, value in self.dict_metric.items():
             self.dict_stats[key] = {}
             for k, v in value.items():
-                self.dict_stats[key][k] = [np.mean(v), np.std(v), len(v)]
-                logging.info('{} mean: {}'.format(key + '___' + k, np.mean(v)))
-                logging.info('{} std: {}'.format(key + '___' + k, np.std(v)))
+                self.dict_stats[key][k] = [np.round(np.mean(v), decimals=3), np.round(np.std(v), decimals=3), len(v)]
+                logging.info('{} mean: {}'.format(key + '___' + k, np.round(np.mean(v), decimals=3)))
+                logging.info('{} std: {}'.format(key + '___' + k, np.round(np.mean(v), decimals=3)))
         write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def write(self):
@@ -485,18 +486,20 @@ class RefQuestionsMetric(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            self.measure.append(kwargs["closest_question"])
+        if "test_images" in self.train_test:
+            if kwargs["done"]:
+                self.measure.append(kwargs["closest_question"])
 
     def compute_(self, **kwargs):
-        if len(self.measure) == kwargs["ref_question"].size(0):
-            unique_ratio = len(list(set(self.measure))) / len(self.measure)
-            self.metric.append(unique_ratio)
-            self.measure = []
-            if not self.train_test + '_' + self.key in self.dict_metric:
-                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
-            else:
-                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+        if "test_images" and "sampling" in self.train_test:
+            if len(self.measure) == kwargs["ref_question"].size(0):
+                unique_ratio = len(list(set(self.measure))) / len(self.measure)
+                self.metric.append(unique_ratio)
+                self.measure = []
+                if not self.train_test + '_' + self.key in self.dict_metric:
+                    self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+                else:
+                    self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def compute(self, **kwargs):
         self.compute_(**kwargs)
@@ -544,20 +547,22 @@ class UniqueWordsMetric(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            self.measure.append(list(kwargs["new_state"].text.numpy()[0]))
+        if "sampling" in self.train_test:
+            if kwargs["done"]:
+                self.measure.append(list(kwargs["new_state"].text.numpy()[0]))
 
     def compute_(self, **kwargs):
-        if len(self.measure) == kwargs["ref_question"].size(0):
-            arr = np.array(self.measure).flatten()
-            unique_tokens = np.unique(arr)
-            diversity_metric = len(unique_tokens) / len(arr)
-            self.metric.append(diversity_metric)
-            self.measure = []
-            if not self.train_test + '_' + self.key in self.dict_metric:
-                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
-            else:
-                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+        if "sampling" in self.train_test:
+            if len(self.measure) == kwargs["ref_question"].size(0):
+                arr = np.array(self.measure).flatten()
+                unique_tokens = np.unique(arr)
+                diversity_metric = len(unique_tokens) / len(arr)
+                self.metric.append(diversity_metric)
+                self.measure = []
+                if not self.train_test + '_' + self.key in self.dict_metric:
+                    self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+                else:
+                    self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def compute(self, **kwargs):
         self.compute_(**kwargs)

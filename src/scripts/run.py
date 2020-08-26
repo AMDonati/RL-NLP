@@ -151,10 +151,10 @@ def run(args):
         if metric.dict_stats:
             list_stats = list(metric.dict_stats.values())
             if isinstance(list_stats[0], dict):
-                all_metrics[metric.key] = np.mean(
-                    [e["norm_reward"][0] for e in list_stats])  # trick for the reward metric case.
+                all_metrics[metric.key] = np.round(np.mean(
+                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
             else:
-                all_metrics[metric.key] = np.mean([e[0] for e in list_stats])
+                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
     write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
     logger.info(
         '------------------------------------ DONE ---------------------------------------------------------------')
@@ -163,54 +163,59 @@ def run(args):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
-    parser.add_argument("-max_len", type=int, default=10, help="max episode length")
-    parser.add_argument("-num_episodes_train", type=int, default=1000, help="number of episodes training")
-    parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-data_path", type=str, required=True,
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-out_path", type=str, required=True, help="out folder")
-    parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
-    parser.add_argument('-gamma', type=float, default=1., help="gamma")
-    parser.add_argument('-log_interval', type=int, default=10, help="gamma")
-    parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
-    parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
-    parser.add_argument('-model', type=str, default="lstm_word", help="model")
-    parser.add_argument('-truncate_mode', type=str,
-                        help="truncation mode")  # arg that says now if are truncating the action space or not.
-    parser.add_argument('-train_policy', type=str, default="all_space",
-                        help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
-    parser.add_argument('-p_th', type=float,
-                        help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
+    # model args
+    parser.add_argument('-model', type=str, default="lstm", help="model")
+    parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
+    parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
+    parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
+    parser.add_argument('-stride', type=int, default=2, help="stride conv")
+    parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
+    parser.add_argument('-fusion', type=str, default="cat", help="fusion mode")
+    # RL algo args.
+    parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
     parser.add_argument('-K_epochs', type=int, default=10, help="# epochs of training each update_timestep")
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
+    parser.add_argument('-lr', type=float, default=0.005, help="learning rate")
     parser.add_argument('-grad_clip', type=float, help="value of gradient norm clipping")
-    parser.add_argument('-lm_path', type=str, required=True,
-                        help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
-    # This argument is now required.
-    parser.add_argument('-lm_bonus', type=int, default=0, help="Language model logits bonus on policy logits")
-    parser.add_argument('-alpha_logits', type=float, default=0.5, help="alpha value for the convex logits mixture")
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
-    parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    # RL task args.
+    parser.add_argument("-max_len", type=int, default=10, help="max episode length")
+    parser.add_argument('-gamma', type=float, default=1., help="gamma")
+    parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
-    parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
-    parser.add_argument('-agent', type=str, default="PPO", help="RL agent")
-    parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
-    parser.add_argument('-stride', type=int, default=2, help="stride conv")
-    parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
-    parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
     parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
+    # truncation args.
+    parser.add_argument('-lm_path', type=str, required=True,
+                        help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
+    parser.add_argument('-truncate_mode', type=str,
+                        help="truncation mode")  # arg that says now if are truncating the action space or not.
+    parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
+    parser.add_argument('-p_th', type=float,
+                        help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
+    parser.add_argument('-lm_bonus', type=int, default=0, help="Language model logits bonus on policy logits")
+    parser.add_argument('-alpha_logits', type=float, default=0.5, help="alpha value for the convex logits mixture")
+    parser.add_argument('-train_policy', type=str, default="all_space",
+                        help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
+    # train / test pipeline:
+    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
+    parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
-    parser.add_argument('-fusion', type=str, default="cat", help="fusion mode")
     parser.add_argument('-test_baselines', type=int, default=0, help="add test SL baselines for evaluation")
+    # misc.
+    parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
+    parser.add_argument('-log_interval', type=int, default=10, help="gamma")
+    parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
 
     return parser
 
