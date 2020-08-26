@@ -267,8 +267,6 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
                 timestep=timestep, i_episode=i_episode, env=self.env)
-            # update alpha_logits_lm if needed:
-            self.decay_alpha_logits_lm(i_episode)
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
@@ -284,7 +282,7 @@ class Agent:
                 logging.info(
 "---------------------------------------------------------------------------------------------------------------------------------------")
 
-            if i_episode % 1000 == 0:
+            if i_episode + 1 % 1000 == 0:
                 elapsed = time.time() - current_time
                 logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
                 current_time = time.time()

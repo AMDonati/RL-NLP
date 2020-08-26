@@ -48,7 +48,7 @@ class NoTruncation(Truncation):
     def __init__(self, agent, lm_bonus=False, **kwargs):
         Truncation.__init__(self, agent, lm_bonus)
 
-    def truncate(self, state):
+    def truncate(self, log_probas, logits):
         return None, None
 
 
@@ -57,7 +57,7 @@ class TopK(Truncation):
         Truncation.__init__(self, agent, lm_bonus)
         self.num_truncated = kwargs["num_truncated"]
 
-    def truncate(self, log_probas):
+    def truncate(self, log_probas, logits):
         top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
         return top_k_indices, top_k_weights.exp()
 
@@ -84,7 +84,7 @@ class SampleVA(Truncation):
         Truncation.__init__(self, agent, lm_bonus)
         self.k_max = kwargs["num_truncated"]
 
-    def truncate(self, log_probas):
+    def truncate(self, log_probas, logits):
         probas = F.softmax(log_probas, dim=-1)
         dist = Categorical(probas)
         actions = dist.sample(sample_shape=[self.k_max])

@@ -203,7 +203,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
-        logits_exploration = self.alpha * logits + (1 - self.alpha) * logits_lm
+        logits_exploration = alpha * logits + (1 - alpha) * logits_lm
         probs = F.softmax(logits, dim=-1)
         policy_dist, policy_dist_truncated = self.get_policies(probs, valid_actions, logits_exploration)
         return policy_dist, policy_dist_truncated, value
