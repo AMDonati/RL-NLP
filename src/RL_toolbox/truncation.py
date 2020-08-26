@@ -11,14 +11,14 @@ class Truncation:
     def get_valid_actions(self, state):
         pass
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm, baseline=False):
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0, baseline=False):
         if baseline:
             policy_dist, policy_dist_truncated, value = self.agent.start_policy(state.text, state.img)
         else:
             if type(self.agent).__name__ == 'PPO': #trick to distinguish between PPO and REINFORCE in select_action.
-                policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions, logits_lm)
+                policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions=valid_actions, logits_lm=logits_lm, alpha=alpha)
             elif type(self.agent).__name__ == 'REINFORCE':
-                policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions, logits_lm)
+                policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions=valid_actions, logits_lm=logits_lm, alpha=alpha)
         return policy_dist, policy_dist_truncated, value
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):

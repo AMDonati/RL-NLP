@@ -8,7 +8,7 @@ from RL_toolbox.RL_functions import compute_grad_norm
 
 class REINFORCE(Agent):
     def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, grad_clip=None,
-                 pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, eval_no_trunc=0, lm_bonus=0):
+                 pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, eval_no_trunc=0, alpha_logits=0):
         Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr, grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
                        pretrain=pretrain, update_every=update_every,
@@ -16,7 +16,7 @@ class REINFORCE(Agent):
                        p_th=p_th,
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs, eval_no_trunc=eval_no_trunc,
-                       lm_bonus=lm_bonus)
+                       alpha_logits=alpha_logits)
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
         self.update_mode = "episode"
