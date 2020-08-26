@@ -30,7 +30,6 @@ class PolicyGRU(nn.Module):
         self.fc = nn.Linear(cat_size, num_tokens)
         self.saved_log_probs = []
         self.rewards = []
-
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
         if pooling:
             self.max_pool = nn.MaxPool2d(kernel_size=2)
@@ -158,8 +157,6 @@ class PolicyLSTMWordBatch(nn.Module):
         sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
         assert torch.all(
             sum_probs_va - torch.ones(sum_probs_va.size()).to(self.device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
-        # if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
-        # print(sum_probs_va)
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 
@@ -176,7 +173,7 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", alpha=1.):
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat"):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
         self.fusion = fusion
@@ -197,9 +194,8 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
-        self.alpha = alpha
 
-    def forward(self, state_text, state_img, valid_actions=None, logits_lm=0):
+    def forward(self, state_text, state_img, valid_actions=None, logits_lm=0, alpha=0):
         embed_text = self._get_embed_text(state_text)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))

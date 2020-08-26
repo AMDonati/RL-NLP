@@ -15,7 +15,7 @@ from utils.utils_train import write_to_csv
 def run(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
     if args.resume_training is not None:
-        output_path = args.resume_training
+        output_path = os.path.join(args.resume_training, "resume_training_{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     else:
         output_path = os.path.join(args.out_path, "experiments", type_folder,
                                    "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
@@ -35,7 +35,7 @@ def run(args):
     else:
         logger.info("without truncation...")
 
-    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}_diffrew{}_fusion{}_lm-bonus{}".format(
+    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}_diffrew{}_fusion{}".format(
         args.agent,
         args.model,
         args.word_emb_size,
@@ -52,11 +52,10 @@ def run(args):
         args.grad_clip,
         args.truncate_mode,
         args.diff_reward,
-        args.fusion,
-        args.lm_bonus)
+        args.fusion)
 
-    if args.lm_bonus:
-        out_folder = out_folder + '_alpha{}'.format(args.alpha_logits)
+    if args.alpha_logits != 0:
+        out_folder = out_folder + '_alpha-logits-{}'.format(args.alpha_logits)
 
     if args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
@@ -90,7 +89,7 @@ def run(args):
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters, rl=True,
-                                train_policy=args.train_policy, fusion=args.fusion, alpha=args.alpha_logits)
+                                train_policy=args.train_policy, fusion=args.fusion)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
@@ -107,7 +106,7 @@ def run(args):
                       "log_interval": args.log_interval, "env": env,
                       "test_envs": test_envs,
                       "eval_no_trunc": args.eval_no_trunc,
-                      "lm_bonus": args.lm_bonus}
+                      "alpha_logits": args.alpha_logits}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -125,9 +124,9 @@ def run(args):
     # eval_mode = ['greedy']
 
     if args.resume_training is not None:
-        epoch, loss = agent.load_ckpt()
+        epoch, loss = agent.load_ckpt(os.path.join(args.resume_training, "checkpoints"))
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
-        agent.start_episode = epoch
+        agent.start_episode = epoch + 1
     if args.num_episodes_train > 0:  # trick to avoid a bug inside the agent.learn function in case of no training.
         agent.learn(num_episodes=args.num_episodes_train)
         agent.save(out_policy_file)
@@ -201,12 +200,11 @@ def get_parser():
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
-    parser.add_argument('-lm_bonus', type=int, default=0, help="Language model logits bonus on policy logits")
-    parser.add_argument('-alpha_logits', type=float, default=1., help="alpha value for the convex logits mixture")
+    parser.add_argument('-alpha_logits', default=0, help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument('-eval_no_trunc', type=int, default=0,

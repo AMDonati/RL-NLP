@@ -20,7 +20,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
-                 lm_bonus=0):
+                 alpha_logits=0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -33,7 +33,8 @@ class Agent:
         self.truncate_mode = truncate_mode
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
-        self.lm_bonus = lm_bonus
+        self.init_alpha_logits_lm(alpha_logits)
+        self.lm_bonus = 0 if alpha_logits == 0 else 1
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -46,9 +47,9 @@ class Agent:
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_,
-                                                         lm_bonus=lm_bonus)  # adding the truncation class.
+                                                         lm_bonus=self.lm_bonus)  # adding the truncation class.
         else:
-            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=lm_bonus)
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=self.lm_bonus)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -56,7 +57,7 @@ class Agent:
             os.makedirs(self.checkpoints_path)
         self.generated_text = []
         self.init_metrics()
-        self.start_episode = 0
+        self.start_episode = 1
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
@@ -70,6 +71,21 @@ class Agent:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
+
+    def init_alpha_logits_lm(self, alpha, alpha_start=0.5):
+        if alpha != 'decay':
+            self.alpha_logits_lm = float(alpha)
+            self.alpha_decay = False
+        else:
+            self.alpha_decay = True
+            self.alpha_logits_lm = alpha_start
+
+    def decay_alpha_logits_lm(self, i_episode, decay_rate=0.5, alpha_min=0.001, update_every=500):
+        if self.alpha_decay and self.alpha_logits_lm > alpha_min:
+            if i_episode % update_every == 0:
+                self.alpha_logits_lm *= decay_rate
+                logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode, self.alpha_logits_lm))
+
 
     def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
@@ -124,8 +140,8 @@ class Agent:
             'loss': loss,
         }, os.path.join(self.checkpoints_path, 'model.pt'))
 
-    def load_ckpt(self):
-        checkpoint = torch.load(os.path.join(self.checkpoints_path, 'model.pt'))
+    def load_ckpt(self, ckpt_path):
+        checkpoint = torch.load(os.path.join(ckpt_path, 'model.pt'))
         self.policy.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
@@ -206,8 +222,7 @@ class Agent:
                         0)):  # loop multiple time over the same image to measure langage diversity
                     with torch.no_grad():
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
-                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
-                            test_mode=test_mode,
+                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False, test_mode=test_mode,
                             truncation=trunc)
                     for _, metric in self.test_metrics.items():
                         metric.write()
@@ -252,6 +267,8 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
                 timestep=timestep, i_episode=i_episode, env=self.env)
+            # update alpha_logits_lm if needed:
+            self.decay_alpha_logits_lm(i_episode)
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
@@ -265,9 +282,9 @@ class Agent:
                     metric.log(valid_actions=valid_actions)
                     metric.write()
                 logging.info(
-                    "---------------------------------------------------------------------------------------------------------------------------------------")
+"---------------------------------------------------------------------------------------------------------------------------------------")
 
-            if i_episode + 1 % 1000 == 0:
+            if i_episode % 1000 == 0:
                 elapsed = time.time() - current_time
                 logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
                 current_time = time.time()
