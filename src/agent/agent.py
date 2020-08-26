@@ -83,7 +83,7 @@ class Agent:
             os.makedirs(self.checkpoints_path)
         self.generated_text = []
         self.init_metrics()
-        self.start_episode = 0
+        self.start_episode = 1
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
@@ -155,8 +155,8 @@ class Agent:
             'loss': loss,
         }, os.path.join(self.checkpoints_path, 'model.pt'))
 
-    def load_ckpt(self):
-        checkpoint = torch.load(os.path.join(self.checkpoints_path, 'model.pt'))
+    def load_ckpt(self, ckpt_path):
+        checkpoint = torch.load(os.path.join(ckpt_path, 'model.pt'))
         self.policy.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
@@ -299,7 +299,7 @@ class Agent:
                 logging.info(
 "---------------------------------------------------------------------------------------------------------------------------------------")
 
-            if i_episode + 1 % 1000 == 0:
+            if i_episode % 1000 == 0:
                 elapsed = time.time() - current_time
                 logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
                 current_time = time.time()

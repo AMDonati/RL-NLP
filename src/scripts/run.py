@@ -15,7 +15,7 @@ from utils.utils_train import write_to_csv
 def run(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
     if args.resume_training is not None:
-        output_path = args.resume_training
+        output_path = os.path.join(args.resume_training, "resume_training_{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     else:
         output_path = os.path.join(args.out_path, "experiments", type_folder,
                                    "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
@@ -125,9 +125,9 @@ def run(args):
     # eval_mode = ['greedy']
 
     if args.resume_training is not None:
-        epoch, loss = agent.load_ckpt()
+        epoch, loss = agent.load_ckpt(os.path.join(args.resume_training, "checkpoints"))
         logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
-        agent.start_episode = epoch
+        agent.start_episode = epoch + 1
     if args.num_episodes_train > 0:  # trick to avoid a bug inside the agent.learn function in case of no training.
         agent.learn(num_episodes=args.num_episodes_train)
         agent.save(out_policy_file)
@@ -206,7 +206,7 @@ def get_parser():
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument('-eval_no_trunc', type=int, default=0,
