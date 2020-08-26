@@ -101,7 +101,7 @@ class Agent:
 
     def init_alpha_logits_lm(self, alpha, alpha_start=0.5):
         if alpha != 'decay':
-            self.alpha_logits_lm = alpha
+            self.alpha_logits_lm = float(alpha)
             self.alpha_decay = False
         else:
             self.alpha_decay = True

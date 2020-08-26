@@ -30,7 +30,6 @@ class PolicyGRU(nn.Module):
         self.fc = nn.Linear(cat_size, num_tokens)
         self.saved_log_probs = []
         self.rewards = []
-
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
         if pooling:
             self.max_pool = nn.MaxPool2d(kernel_size=2)
@@ -158,8 +157,6 @@ class PolicyLSTMWordBatch(nn.Module):
         sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
         assert torch.all(
             sum_probs_va - torch.ones(sum_probs_va.size()).to(self.device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
-        # if not torch.all(torch.eq(sum_probs_va, torch.ones(sum_probs_va.size()))):
-        # print(sum_probs_va)
         policy_dist_truncated = Categorical(probs_truncated)
         return policy_dist_truncated
 
@@ -221,7 +218,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         if valid_actions is not None:
             policy_dist_truncated = self.truncate(valid_actions, logits_exploration)
         else:
-            policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
+            policy_dist_truncated = Categorical(F.softmax(logits_exploration.clone().detach(), dim=-1))
         if self.train_policy == 'truncated' and valid_actions is not None:
             return policy_dist_truncated, policy_dist_truncated, value
         else:
