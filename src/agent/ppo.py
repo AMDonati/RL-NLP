@@ -7,7 +7,8 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None,
+    def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2,
+                 grad_clip=None,
                  truncate_mode="top_k",
                  update_every=100, num_truncated=10,
                  p_th=None,
@@ -15,7 +16,8 @@ class PPO(Agent):
                  log_interval=1,
                  eval_no_trunc=0,
                  lm_bonus=0):
-        Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path, gamma=gamma, lr=lr,
+        Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
+                       gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
@@ -34,7 +36,7 @@ class PPO(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def evaluate(self, state_text, state_img, action, num_truncated=10):
+    def evaluate(self, state_text, state_img, action):
         policy_dist, _, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
@@ -59,8 +61,7 @@ class PPO(Agent):
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values:
-            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_actions,
-                                                                 self.num_truncated)
+            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
@@ -83,9 +84,9 @@ class PPO(Agent):
             #                                                 vf_loss.mean()))
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
-            #self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
+            # self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
-            #self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
+            # self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
             # take gradient step

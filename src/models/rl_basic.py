@@ -176,7 +176,7 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", alpha=0.5):
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", alpha=1.):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
         self.fusion = fusion

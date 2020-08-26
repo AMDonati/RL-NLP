@@ -72,11 +72,7 @@ class Agent:
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
     def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False):
-        valid_actions, action_probs, logits_lm = None, None, 0
-        if truncation:
-            valid_actions, action_probs = self.truncation.get_valid_actions(state)
-        if not test:
-            logits_lm = self.truncation.get_logits_lm(state)
+        valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
                                                                                              logits_lm,
                                                                                              baseline=baseline)
@@ -201,7 +197,7 @@ class Agent:
         self.policy.eval()
         for i_episode in range(num_episodes):
             dialogs = {key: [] for key in self.eval_trunc.keys()}
-            logging.info('-'*20+'Test Episode: {}'.format(i_episode)+'-'*20 )
+            logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
             for key, trunc in self.eval_trunc.items():
                 for m in self.test_metrics.values():
