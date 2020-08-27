@@ -10,7 +10,7 @@ class Truncation:
 
     def get_valid_actions(self, state, truncation):
         if not truncation:
-            return None, None, None
+            return None, None, 0
         with torch.no_grad():
             seq_len = state.text.size(1)
             log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
