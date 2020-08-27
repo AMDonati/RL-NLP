@@ -4,9 +4,8 @@ from torch.distributions import Categorical
 
 
 class Truncation:
-    def __init__(self, agent, lm_bonus=False):
+    def __init__(self, agent):
         self.agent = agent
-        self.lm_bonus = lm_bonus
 
     def get_valid_actions(self, state, truncation):
         if not truncation:
@@ -21,14 +20,18 @@ class Truncation:
             valid_actions, action_probs = self.truncate(log_probas, logits)
             return valid_actions, action_probs, logits
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0, baseline=False):
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=1., baseline=False):
         if baseline:
             policy_dist, policy_dist_truncated, value = self.agent.start_policy(state.text, state.img)
         else:
-            if type(self.agent).__name__ == 'PPO': #trick to distinguish between PPO and REINFORCE in select_action.
-                policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, valid_actions=valid_actions, logits_lm=logits_lm, alpha=alpha)
+            if type(self.agent).__name__ == 'PPO':  # trick to distinguish between PPO and REINFORCE in select_action.
+                policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img,
+                                                                                  valid_actions=valid_actions,
+                                                                                  logits_lm=logits_lm, alpha=alpha)
             elif type(self.agent).__name__ == 'REINFORCE':
-                policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, valid_actions=valid_actions, logits_lm=logits_lm, alpha=alpha)
+                policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img,
+                                                                              valid_actions=valid_actions,
+                                                                              logits_lm=logits_lm, alpha=alpha)
         return policy_dist, policy_dist_truncated, value
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
@@ -45,16 +48,16 @@ class Truncation:
 
 
 class NoTruncation(Truncation):
-    def __init__(self, agent, lm_bonus=False, **kwargs):
-        Truncation.__init__(self, agent, lm_bonus)
+    def __init__(self, agent, **kwargs):
+        Truncation.__init__(self, agent)
 
     def truncate(self, log_probas, logits):
         return None, None
 
 
 class TopK(Truncation):
-    def __init__(self, agent, lm_bonus=False, **kwargs):
-        Truncation.__init__(self, agent, lm_bonus)
+    def __init__(self, agent, **kwargs):
+        Truncation.__init__(self, agent)
         self.num_truncated = kwargs["num_truncated"]
 
     def truncate(self, log_probas, logits):
@@ -65,8 +68,8 @@ class TopK(Truncation):
 class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
 
-    def __init__(self, agent, lm_bonus=False, **kwargs):
-        Truncation.__init__(self, agent, lm_bonus)
+    def __init__(self, agent, **kwargs):
+        Truncation.__init__(self, agent)
         self.p_th = kwargs["p_th"]
 
     def truncate(self, log_probas, logits):
@@ -79,9 +82,9 @@ class ProbaThreshold(Truncation):
 
 
 class SampleVA(Truncation):
-    def __init__(self, agent, lm_bonus=False, **kwargs):
+    def __init__(self, agent, **kwargs):
         '''See Overleaf for details on this truncation fn.'''
-        Truncation.__init__(self, agent, lm_bonus)
+        Truncation.__init__(self, agent)
         self.k_max = kwargs["num_truncated"]
 
     def truncate(self, log_probas, logits):

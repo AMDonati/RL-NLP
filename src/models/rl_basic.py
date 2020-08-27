@@ -195,7 +195,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
-    def forward(self, state_text, state_img, valid_actions=None, logits_lm=0, alpha=0):
+    def forward(self, state_text, state_img, valid_actions=None, logits_lm=0, alpha=1.):
         embed_text = self._get_embed_text(state_text)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))

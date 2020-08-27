@@ -34,7 +34,6 @@ class Agent:
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.init_alpha_logits_lm(alpha_logits)
-        self.lm_bonus = 0 if alpha_logits == 0 else 1
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -46,10 +45,10 @@ class Agent:
             self.eval_trunc = {"no_trunc": False}
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
-            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated, p_th=p_th_,
-                                                         lm_bonus=self.lm_bonus)  # adding the truncation class.
+            self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
+                                                         p_th=p_th_)  # adding the truncation class.
         else:
-            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, lm_bonus=self.lm_bonus)
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -84,14 +83,15 @@ class Agent:
         if self.alpha_decay and self.alpha_logits_lm > alpha_min:
             if i_episode % update_every == 0:
                 self.alpha_logits_lm *= decay_rate
-                logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode, self.alpha_logits_lm))
-
+                logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
+                                                                                                     self.alpha_logits_lm))
 
     def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
                                                                                              logits_lm,
-                                                                                             baseline=baseline)
+                                                                                             baseline=baseline,
+                                                                                             alpha=self.alpha_logits_lm)
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                                valid_actions=valid_actions,
                                                mode=mode)
@@ -222,7 +222,8 @@ class Agent:
                         0)):  # loop multiple time over the same image to measure langage diversity
                     with torch.no_grad():
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
-                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False, test_mode=test_mode,
+                            timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
+                            test_mode=test_mode,
                             truncation=trunc)
                     for _, metric in self.test_metrics.items():
                         metric.write()
@@ -280,7 +281,7 @@ class Agent:
                     metric.log(valid_actions=valid_actions)
                     metric.write()
                 logging.info(
-"---------------------------------------------------------------------------------------------------------------------------------------")
+                    "---------------------------------------------------------------------------------------------------------------------------------------")
 
             if i_episode + 1 % 1000 == 0:
                 elapsed = time.time() - current_time
