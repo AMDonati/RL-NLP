@@ -6,9 +6,7 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
-
 from RL_toolbox.RL_functions import masked_softmax
-
 
 class PolicyGRU(nn.Module):
     def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0,

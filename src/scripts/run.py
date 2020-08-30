@@ -200,7 +200,7 @@ def get_parser():
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
-    parser.add_argument('-alpha_logits', default=0, help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
+    parser.add_argument('-alpha_logits', default=1., help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
