@@ -1,6 +1,5 @@
 import os
 from collections import namedtuple
-
 import gym
 import numpy as np
 import torch
