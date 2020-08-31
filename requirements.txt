@@ -12,3 +12,7 @@ scikit_learn==0.23.1
 nltk==3.5
 torchcontrib==0.0.2
 git+https://github.com/rizar/CLOSURE.git
+termcolor==1.1.0
+scipy==1.4.1
+pandas==1.0.3
+tqdm==4.43.0
