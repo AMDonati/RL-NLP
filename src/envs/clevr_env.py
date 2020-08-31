@@ -1,5 +1,6 @@
 import os
 from collections import namedtuple
+
 import gym
 import numpy as np
 import torch
@@ -44,7 +45,7 @@ class ClevrEnv(gym.Env):
         self.step_idx = 0
         self.state, self.dialog = None, None
         self.ref_questions, self.ref_questions_decoded = None, None
-        self.img_idx, self.img_feats = None, None
+        self.img_idx, self.img_feats, self.ref_answer = None, None, None
 
     def step(self, action):
         # note that the padding of ref questions and generated dialog has been removed.
@@ -52,12 +53,13 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
         question_tokens_padded, question_tokens = np.zeros((self.max_len + 1)), self.state.text.numpy().ravel()
-        #question_tokens_padded[:question_tokens.shape[0]] = question_tokens  # if needed
+        # question_tokens_padded[:question_tokens.shape[0]] = question_tokens  # if needed
         question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
 
         reward, closest_question = self.reward_func.get(question=question,
                                                         ep_questions_decoded=self.ref_questions_decoded,
-                                                        step_idx=self.step_idx, done=done)
+                                                        step_idx=self.step_idx, done=done, real_answer=self.ref_answer,
+                                                        state=self.state)
         self.step_idx += 1
         if done:
             self.dialog = question
@@ -78,6 +80,8 @@ class ClevrEnv(gym.Env):
             self.ref_questions = self.ref_questions[self.num_questions:, :]
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
+
+        _, _, self.ref_answer = self.clevr_dataset[self.img_idx]
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
         self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
         self.step_idx = 0

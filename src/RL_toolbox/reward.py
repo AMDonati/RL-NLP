@@ -3,11 +3,11 @@ import json
 import nltk
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
-
 # TODO: add the intermediate reward (diff of R(t+1)-R(t))
+from vr.utils import load_execution_engine, load_program_generator
 
 
 class Reward:
@@ -147,8 +147,30 @@ class Differential(Reward):
         return diff_reward, closest_question
 
 
+class VQAAnswer(Reward):
+    def __init__(self, path=None):
+        Reward.__init__(self, path)
+        self.type = "episode"
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.execution_engine, ee_kwargs = load_execution_engine(path)
+        self.execution_engine.to(self.device)
+        self.execution_engine.eval()
+        self.program_generator, pg_kwargs = load_program_generator(path)
+        self.program_generator.to(self.device)
+        self.program_generator.eval()
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+        if not done:
+            return 0, "N/A"
+        programs_pred = self.program_generator(state.text)
+        scores = self.execution_engine(state.img, programs_pred)
+        _, preds = scores.data.cpu().max(1)
+        reward = (preds == real_answer).sum().item()
+        return reward, "N/A"
+
+
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "per_word": PerWord,
-           "correct_vocab": CorrectVocab, "combined": CombinedReward}
+           "correct_vocab": CorrectVocab, "combined": CombinedReward, "vqa": VQAAnswer}
 
 
 def get_dummy_reward(next_state_text, ep_questions, EOS_idx):

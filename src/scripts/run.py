@@ -70,9 +70,9 @@ def run(args):
                                                 out_folder))
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
-                   num_questions=args.num_questions, diff_reward=args.diff_reward)
+                   num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path)
     test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                          num_questions=args.num_questions) for mode in
+                          num_questions=args.num_questions,reward_path=args.reward_path) for mode in
                  ["test_images", "test_text"]]
 
     pretrained_lm = None
@@ -214,6 +214,8 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+
+    parser.add_argument('-reward_path', type=str, help="path for the reward")
 
     return parser
 
