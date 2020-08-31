@@ -6,96 +6,8 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
+
 from RL_toolbox.RL_functions import masked_softmax
-
-class PolicyGRU(nn.Module):
-    def __init__(self, num_tokens, word_emb_size, emb_size, hidden_size, num_filters=None, num_layers=1, p_drop=0,
-                 pooling=True, cat_size=64 + 7 * 7 * 32):
-        super(PolicyGRU, self).__init__()
-        self.num_tokens = num_tokens
-        self.emb_size = emb_size
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.p_drop = p_drop
-        if num_filters is None:
-            self.num_filters = word_emb_size
-        else:
-            self.num_filters = num_filters
-        self.pooling = pooling
-        self.dropout = nn.Dropout(p_drop)
-        self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
-        self.gru = nn.GRU(word_emb_size, self.hidden_size, batch_first=True)
-        self.fc = nn.Linear(cat_size, num_tokens)
-        self.saved_log_probs = []
-        self.rewards = []
-        self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=1)
-        if pooling:
-            self.max_pool = nn.MaxPool2d(kernel_size=2)
-        self.last_policy = []
-
-    def forward(self, text_inputs, img_feat):
-        '''
-        :param text_inputs: shape (S, B)
-        :param img_feat: shape (B, C, H, W)
-        :param hidden: shape (num_layers, B, hidden_size)
-        :return:
-        log_probas: shape (S*B, num_tokens), hidden (num_layers, B, hidden_size)
-        '''
-        embed_text = self._get_embed_text(text_inputs)
-
-        img_feat = F.relu(self.conv(img_feat))
-        if self.pooling:
-            img_feat = self.max_pool(img_feat)
-
-        img_feat = img_feat.view(img_feat.size(0), -1)
-
-        embedding = torch.cat((img_feat, embed_text.view(embed_text.size(0), -1)), dim=1)
-        logits = self.fc(embedding)  # (S,B,num_tokens)
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        probs = F.softmax(logits, dim=1)
-        # sumprobs = probs.sum().detach().numpy()
-        # if math.isnan(sumprobs):
-        policy_dist = Categorical(probs)
-        probs = policy_dist.probs.clone()
-        # self.last_policy.append(probs.detach().numpy()[0])
-        return policy_dist
-
-    def _get_embed_text(self, text):
-        _, hidden = self.gru(self.word_embedding(text))
-        return hidden[-1]
-
-
-class PolicyGRUWord(nn.Module):
-
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1):
-        super(PolicyGRUWord, self).__init__()
-        self.num_tokens = num_tokens
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
-        self.gru = nn.GRU(word_emb_size, self.hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_tokens + 1)
-        self.saved_log_probs = []
-        self.rewards = []
-        self.values = []
-        self.last_policy = []
-        self.optimizer = None
-
-    def forward(self, text_inputs, img_feat, valid_actions):
-        embed_text = self._get_embed_text(text_inputs)
-        out = self.fc(embed_text)  # (S,B,num_tokens)
-        logits, value = out[:, :self.num_tokens], out[:, self.num_tokens]
-        logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        logits = logits[:, valid_actions]
-        probs = F.softmax(logits, dim=1)
-        policy_dist = Categorical(probs)
-        probs_ = policy_dist.probs.clone()
-        # self.last_policy.append(probs_.detach().numpy()[0])
-        return policy_dist, value
-
-    def _get_embed_text(self, text):
-        _, hidden = self.gru(self.word_embedding(text))
-        return hidden[-1]
 
 
 class PolicyLSTMWordBatch(nn.Module):
@@ -119,7 +31,7 @@ class PolicyLSTMWordBatch(nn.Module):
         self.truncate = truncature["masked"]
         self.train_policy = train_policy
 
-    def forward(self, state_text, state_img, valid_actions=None):
+    def forward(self, state_text, state_img, state_answer=None, valid_actions=None):
         embedding = self._get_embed_text(state_text)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
@@ -134,8 +46,10 @@ class PolicyLSTMWordBatch(nn.Module):
         else:
             return policy_dist, policy_dist_truncated, value
 
-    def _get_embed_text(self, text):
+    def _get_embed_text(self, text, answer):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
+        if self.condition_answer and answer is not None:
+            text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
@@ -171,9 +85,12 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat"):
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", num_tokens_answer=31,
+                 condition_answer=True):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
+
+        self.word_embedding = nn.Embedding(num_tokens + num_tokens_answer + 1, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
@@ -192,9 +109,10 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
+        self.condition_answer = condition_answer
 
-    def forward(self, state_text, state_img, valid_actions=None, logits_lm=0, alpha=1.):
-        embed_text = self._get_embed_text(state_text)
+    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=1.):
+        embed_text = self._get_embed_text(state_text, state_answer)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text, img_feat_, img_feat)

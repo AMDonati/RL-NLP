@@ -14,7 +14,8 @@ class ClevrEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="levenshtein_",
-                 reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False):
+                 reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False,
+                 condition_answer=True):
         super(ClevrEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
@@ -34,7 +35,7 @@ class ClevrEnv(gym.Env):
 
         Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx'))
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
-        self.State = namedtuple('State', ('text', 'img'))
+        self.State = namedtuple('State', ('text', 'img', "answer"))
         self.max_len = max_len
 
         self.reward_type = reward_type
@@ -46,11 +47,12 @@ class ClevrEnv(gym.Env):
         self.state, self.dialog = None, None
         self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
+        self.condition_answer = condition_answer
 
     def step(self, action):
         # note that the padding of ref questions and generated dialog has been removed.
         action = torch.tensor(action).view(1, 1)
-        self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img)
+        self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
         done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
         question_tokens_padded, question_tokens = np.zeros((self.max_len + 1)), self.state.text.numpy().ravel()
         # question_tokens_padded[:question_tokens.shape[0]] = question_tokens  # if needed
@@ -83,7 +85,12 @@ class ClevrEnv(gym.Env):
 
         _, _, self.ref_answer = self.clevr_dataset[self.img_idx]
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
-        self.state = self.State(torch.LongTensor([self.special_tokens.SOS_idx]).view(1, 1), self.img_feats.unsqueeze(0))
+
+        state_question = [self.special_tokens.SOS_idx]
+        # if self.condition_answer:
+        # state_question.insert(0, self.clevr_dataset.len_vocab + self.ref_answer)
+        self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
+                                self.img_feats.unsqueeze(0), self.clevr_dataset.len_vocab + self.ref_answer)
         self.step_idx = 0
         self.dialog = None
         # check the correctness of the reward function.
