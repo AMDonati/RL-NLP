@@ -7,16 +7,19 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2, grad_clip=None,
+    def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2,
+                 grad_clip=None,
                  truncate_mode="top_k",
                  update_every=100, num_truncated=10,
                  p_th=None,
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
                  log_interval=1,
                  eval_no_trunc=0,
-                 alpha_logits=0
+                 alpha_logits=0,
+                 alpha_decay=False
                  ):
-        Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path, gamma=gamma, lr=lr,
+        Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
+                       gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
@@ -24,7 +27,7 @@ class PPO(Agent):
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs,
                        eval_no_trunc=eval_no_trunc,
-                       alpha_logits=alpha_logits)
+                       alpha_logits=alpha_logits, alpha_decay=alpha_decay)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs

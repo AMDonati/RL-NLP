@@ -2,28 +2,30 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 
-from agent.agent import Agent
 from RL_toolbox.RL_functions import compute_grad_norm
+from agent.agent import Agent
 
 
 class REINFORCE(Agent):
     def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, grad_clip=None,
-                 pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, eval_no_trunc=0, alpha_logits=0):
-        Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr, grad_clip=grad_clip,
+                 pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10,
+                 eval_no_trunc=0, alpha_logits=0, alpha_decay=False):
+        Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr,
+                       grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
                        p_th=p_th,
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs, eval_no_trunc=eval_no_trunc,
-                       alpha_logits=alpha_logits)
+                       alpha_logits=alpha_logits, alpha_decay=alpha_decay)
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
         self.update_mode = "episode"
         self.writer_iteration = 0
 
     def evaluate(self, state_text, state_img, action, num_truncated=10):
-        #valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
+        # valid_actions, actions_probs = self.get_top_k_words(state_text, num_truncated)
         policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
@@ -43,16 +45,16 @@ class REINFORCE(Agent):
         values = torch.stack(self.memory.values).to(self.device)
 
         advantages = rewards - values.detach().squeeze() if not self.pretrain else 1
-        reinforce_loss = -logprobs.view(-1)*advantages
+        reinforce_loss = -logprobs.view(-1) * advantages
         vf_loss = 0.5 * self.MSE_loss(values.view(-1), rewards) if not self.pretrain else torch.tensor(
             [0]).float().to(
             self.device)
         loss = reinforce_loss + vf_loss
         loss = loss.sum() / self.update_every
-        #loss = loss.mean()
+        # loss = loss.mean()
         # take gradient step
         self.optimizer.zero_grad()
-        #loss.sum().backward()
+        # loss.sum().backward()
         loss.backward()
         # clip grad norm:
         if self.grad_clip is not None:
@@ -71,5 +73,3 @@ class REINFORCE(Agent):
         self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
         return loss.mean()
-
-
