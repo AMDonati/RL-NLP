@@ -85,12 +85,12 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", num_tokens_answer=31,
+                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", env=None,
                  condition_answer=True):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
-
-        self.word_embedding = nn.Embedding(num_tokens + num_tokens_answer + 1, word_emb_size)
+        embedding_size = num_tokens + env.clevr_dataset.len_vocab_answer + 1 if condition_answer else num_tokens
+        self.word_embedding = nn.Embedding(embedding_size, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride

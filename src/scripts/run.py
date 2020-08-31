@@ -190,7 +190,7 @@ def run(args):
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters, rl=True,
-                                train_policy=args.train_policy, fusion=args.fusion)
+                                train_policy=args.train_policy, fusion=args.fusion,env=env)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)

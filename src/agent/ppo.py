@@ -15,7 +15,7 @@ class PPO(Agent):
                  K_epochs=10, entropy_coeff=0.01, pretrain=False,
                  log_interval=1,
                  eval_no_trunc=0,
-                 alpha_logits=0,
+                 alpha_logits=1.,
                  alpha_decay=False
                  ):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,

@@ -19,6 +19,7 @@ class CLEVR_Dataset(Dataset):
         self.vocab_questions = self.get_vocab('question_token_to_idx')
         self.vocab_answers = self.get_vocab('answer_token_to_idx')
         self.len_vocab = len(self.vocab_questions)
+        self.len_vocab_answer = len(self.vocab_answers)
         self.idx_to_token = self.get_idx_to_token()
         self.max_samples = max_samples
 
