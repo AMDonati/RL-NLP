@@ -33,7 +33,8 @@ class Agent:
         self.truncate_mode = truncate_mode
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
-        self.init_alpha_logits_lm(alpha_logits)
+        self.alpha_logits_lm = alpha_logits
+        self.alpha_decay = bool(alpha_decay)
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -70,14 +71,6 @@ class Agent:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
-
-    def init_alpha_logits_lm(self, alpha, alpha_start=0.5):
-        if alpha != 'decay':
-            self.alpha_logits_lm = float(alpha)
-            self.alpha_decay = False
-        else:
-            self.alpha_decay = True
-            self.alpha_logits_lm = alpha_start
 
     def decay_alpha_logits_lm(self, i_episode, decay_rate=0.5, alpha_min=0.001, update_every=500):
         if self.alpha_decay and self.alpha_logits_lm > alpha_min:
