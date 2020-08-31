@@ -138,6 +138,7 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    parser.add_argument('-condition_answer', type=int, default=0, help="condition on the answer")
 
     parser.add_argument('-reward_path', type=str, help="path for the reward")
 
@@ -190,7 +191,8 @@ def run(args):
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters, rl=True,
-                                train_policy=args.train_policy, fusion=args.fusion,env=env)
+                                train_policy=args.train_policy, fusion=args.fusion, env=env,
+                                condition_answer=bool(args.condition_answer))
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
