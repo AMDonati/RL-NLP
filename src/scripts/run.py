@@ -1,40 +1,20 @@
 import argparse
 import datetime
 import os
+
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
 from utils.utils_train import create_logger
-import numpy as np
 from utils.utils_train import write_to_csv
 
 
-def run(args):
-    type_folder = "train" if args.pretrain == 0 else "pretrain"
-    if args.resume_training is not None:
-        output_path = os.path.join(args.resume_training, "resume_training_{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
-    else:
-        output_path = os.path.join(args.out_path, "experiments", type_folder,
-                                   "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
-    if not os.path.isdir(output_path):
-        os.makedirs(output_path)
-    out_file_log = os.path.join(output_path, 'RL_training_log.log')
-    out_policy_file = os.path.join(output_path, 'model.pth')
-
-    logger = create_logger(out_file_log, level=args.logger_level)
-    truncated = "basic" if args.truncate_mode is None else "truncated"
-    pre_trained = "scratch" if args.policy_path is None else "pretrain"
-    logger.info("RL from {} ...".format(pre_trained))
-    if args.truncate_mode is not None:
-        logger.info("with truncation...")
-        if args.train_policy == 'truncated':
-            logger.info("learning the truncated policy")
-    else:
-        logger.info("without truncation...")
-
+def get_writer(args, pre_trained, truncated, output_path):
     out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}_diffrew{}_fusion{}".format(
         args.agent,
         args.model,
@@ -66,34 +46,11 @@ def run(args):
     if args.train_policy == "truncated":
         out_folder = out_folder + '_truncated_policy'
 
-    writer = SummaryWriter(log_dir=os.path.join(output_path,
-                                                out_folder))
+    writer = SummaryWriter(log_dir=os.path.join(output_path, out_folder))
+    return writer
 
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
-                   num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path)
-    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                          num_questions=args.num_questions,reward_path=args.reward_path) for mode in
-                 ["test_images", "test_text"]]
 
-    pretrained_lm = None
-    if args.lm_path is not None:
-        pretrained_lm = torch.load(args.lm_path, map_location=torch.device('cpu'))
-        pretrained_lm.eval()
-
-    models = {
-        "lstm": PolicyLSTMBatch,
-        "lstm_word": PolicyLSTMWordBatch}
-
-    # creating the policy model.
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
-                                kernel_size=args.conv_kernel,
-                                stride=args.stride, num_filters=args.num_filters, rl=True,
-                                train_policy=args.train_policy, fusion=args.fusion)
-    if args.policy_path is not None:
-        policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
-        # self.policy = torch.load(pretrained_policy, map_location=self.device)
-
+def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
                       "pretrain": args.pretrain,
                       "update_every": args.update_every,
@@ -106,7 +63,8 @@ def run(args):
                       "log_interval": args.log_interval, "env": env,
                       "test_envs": test_envs,
                       "eval_no_trunc": args.eval_no_trunc,
-                      "alpha_logits": args.alpha_logits}
+                      "alpha_logits": args.alpha_logits,
+                      "alpha_decay": args.alpha_logits_decay}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -119,44 +77,6 @@ def run(args):
     agents = {"PPO": PPO, "REINFORCE": REINFORCE}
 
     agent = agents[args.agent](**kwargs)
-
-    eval_mode = ['sampling', 'greedy']  # TODO: put it as a parser arg.
-    # eval_mode = ['greedy']
-
-    if args.resume_training is not None:
-        epoch, loss = agent.load_ckpt(os.path.join(args.resume_training, "checkpoints"))
-        logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
-        agent.start_episode = epoch + 1
-    if args.num_episodes_train > 0:  # trick to avoid a bug inside the agent.learn function in case of no training.
-        agent.learn(num_episodes=args.num_episodes_train)
-        agent.save(out_policy_file)
-    else:
-        logger.info("skipping training...")
-    logger.info(
-        '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    for mode in eval_mode:
-        logger.info(
-            "----------------------------- Starting evaluation for {} action selection -------------------------".format(
-                mode))
-        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, baselines=args.test_baselines)
-    # write to csv test scalar metrics:
-    all_metrics = {}
-    logger.info(
-        "------------------------------------- test metrics statistics -----------------------------------------")
-    for key, metric in agent.test_metrics.items():
-        logger.info('------------------- {} -------------------'.format(key))
-        metric.write_to_csv()
-        # saving the mean of all metrics in a single csv file:
-        if metric.dict_stats:
-            list_stats = list(metric.dict_stats.values())
-            if isinstance(list_stats[0], dict):
-                all_metrics[metric.key] = np.round(np.mean(
-                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
-            else:
-                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
-    write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
-    logger.info(
-        '------------------------------------ DONE ---------------------------------------------------------------')
     return agent
 
 
@@ -200,7 +120,11 @@ def get_parser():
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
-    parser.add_argument('-alpha_logits', default=1., help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
+    parser.add_argument('-alpha_logits', default=1.,
+                        help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
+    parser.add_argument('-alpha_logits_decay', default=0,
+                        help="alpha decay for the convex logits mixture. if 0, does not decay the alpha")
+
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
@@ -220,10 +144,100 @@ def get_parser():
     return parser
 
 
+def run(args):
+    type_folder = "train" if args.pretrain == 0 else "pretrain"
+    if args.resume_training is not None:
+        output_path = os.path.join(args.resume_training,
+                                   "resume_training_{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    else:
+        output_path = os.path.join(args.out_path, "experiments", type_folder,
+                                   "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+    if not os.path.isdir(output_path):
+        os.makedirs(output_path)
+    out_file_log = os.path.join(output_path, 'RL_training_log.log')
+    out_policy_file = os.path.join(output_path, 'model.pth')
+
+    logger = create_logger(out_file_log, level=args.logger_level)
+    truncated = "basic" if args.truncate_mode is None else "truncated"
+    pre_trained = "scratch" if args.policy_path is None else "pretrain"
+    logger.info("RL from {} ...".format(pre_trained))
+    if args.truncate_mode is not None:
+        logger.info("with truncation...")
+        if args.train_policy == 'truncated':
+            logger.info("learning the truncated policy")
+    else:
+        logger.info("without truncation...")
+
+    writer = get_writer(args, pre_trained, truncated, output_path)
+
+    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
+                   num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path)
+    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                          num_questions=args.num_questions, reward_path=args.reward_path) for mode in
+                 ["test_images", "test_text"]]
+
+    pretrained_lm = None
+    if args.lm_path is not None:
+        pretrained_lm = torch.load(args.lm_path, map_location=torch.device('cpu'))
+        pretrained_lm.eval()
+
+    models = {
+        "lstm": PolicyLSTMBatch,
+        "lstm_word": PolicyLSTMWordBatch}
+
+    # creating the policy model.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
+                                kernel_size=args.conv_kernel,
+                                stride=args.stride, num_filters=args.num_filters, rl=True,
+                                train_policy=args.train_policy, fusion=args.fusion)
+    if args.policy_path is not None:
+        policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
+        # self.policy = torch.load(pretrained_policy, map_location=self.device)
+
+    agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy)
+
+    eval_mode = ['sampling', 'greedy']  # TODO: put it as a parser arg.
+    # eval_mode = ['greedy']
+
+    if args.resume_training is not None:
+        epoch, loss = agent.load_ckpt(os.path.join(args.resume_training, "checkpoints"))
+        logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
+        agent.start_episode = epoch + 1
+    if args.num_episodes_train > 0:  # trick to avoid a bug inside the agent.learn function in case of no training.
+        agent.learn(num_episodes=args.num_episodes_train)
+        agent.save(out_policy_file)
+    else:
+        logger.info("skipping training...")
+    logger.info(
+        '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
+    for mode in eval_mode:
+        logger.info(
+            "----------------------------- Starting evaluation for {} action selection -------------------------".format(
+                mode))
+        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, baselines=args.test_baselines)
+    # write to csv test scalar metrics:
+    all_metrics = {}
+    logger.info(
+        "------------------------------------- test metrics statistics -----------------------------------------")
+    for key, metric in agent.test_metrics.items():
+        logger.info('------------------- {} -------------------'.format(key))
+        metric.write_to_csv()
+        # saving the mean of all metrics in a single csv file:
+        if metric.dict_stats:
+            list_stats = list(metric.dict_stats.values())
+            if isinstance(list_stats[0], dict):
+                all_metrics[metric.key] = np.round(np.mean(
+                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
+            else:
+                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
+    write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
+    logger.info(
+        '------------------------------------ DONE ---------------------------------------------------------------')
+    return agent
+
+
 if __name__ == '__main__':
-    # -data_path /Users/guillaumequispe/PycharmProjects/RL-NLP/data -out_path /Users/guillaumequispe/PycharmProjects/RL-NLP/output
-    # -max_len 7 -logger_level DEBUG -num_episodes_train 4000 -log_interval 1 -reward "levenshtein_"
-    # -model lstm_word -update_timestep 50 -K_epochs 10 -entropy_coeff 0.01 -eps_clip 0.02
     parser = get_parser()
     args = parser.parse_args()
     run(args)
