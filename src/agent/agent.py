@@ -95,7 +95,7 @@ class Agent:
             assert torch.all(torch.eq(policy_dist_truncated.probs, policy_dist.probs))
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
-    def generate_one_episode_with_lm(self, env, test_mode='sampling'): #TODO: refactor this with alpha = 1.
+    def generate_one_episode_with_lm(self, env, test_mode='sampling'):  # TODO: refactor this with alpha = 1.
         state, ep_reward = env.reset(), 0
         with torch.no_grad():
             for i in range(env.max_len):
@@ -161,7 +161,8 @@ class Agent:
             new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
-                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value)
+                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value,
+                                     state.answer)
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,

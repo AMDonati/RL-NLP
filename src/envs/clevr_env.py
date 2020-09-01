@@ -90,7 +90,7 @@ class ClevrEnv(gym.Env):
         # if self.condition_answer:
         # state_question.insert(0, self.clevr_dataset.len_vocab + self.ref_answer)
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
-                                self.img_feats.unsqueeze(0), self.clevr_dataset.len_vocab + self.ref_answer)
+                                self.img_feats.unsqueeze(0),self.ref_answer)
         self.step_idx = 0
         self.dialog = None
         # check the correctness of the reward function.

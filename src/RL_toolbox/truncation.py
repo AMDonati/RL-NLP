@@ -2,6 +2,38 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
+from RL_toolbox.RL_functions import masked_softmax
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def gather_truncature(valid_actions, logits, num_tokens=87):
+    logits = torch.gather(logits.clone().detach(), -1, valid_actions)
+    probs = F.softmax(logits, dim=-1)
+    return Categorical(probs)
+
+
+def mask_truncature(valid_actions, logits, num_tokens=87):
+    mask = torch.zeros(logits.size(0), num_tokens).to()
+    mask[:, valid_actions] = 1
+    probs_truncated = masked_softmax(logits.clone().detach(), mask)
+    # check that the truncation is right.
+    sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
+    assert torch.all(
+        sum_probs_va - torch.ones(sum_probs_va.size()).to() < 1e-6), "ERROR IN TRUNCATION FUNCTION"
+    policy_dist_truncated = Categorical(probs_truncated)
+    return policy_dist_truncated
+
+
+def mask_inf_truncature(valid_actions, logits, num_tokens=87):
+    mask = torch.ones(logits.size(0), num_tokens) * -1e32
+    mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
+    probs_truncated = F.softmax(mask, dim=-1)
+    # check that the truncation is right.
+    assert probs_truncated[:, valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
+    policy_dist_truncated = Categorical(probs_truncated)
+    return policy_dist_truncated
+
 
 class Truncation:
     def __init__(self, agent):
@@ -64,7 +96,6 @@ class NoTruncation(Truncation):
         else:
             logits = 0
         return None, None, logits
-
 
 
 class TopK(Truncation):

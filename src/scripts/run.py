@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
-from models.rl_basic import PolicyLSTMWordBatch, PolicyLSTMBatch
+from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
 from utils.utils_train import write_to_csv
 
@@ -138,7 +138,8 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
-    parser.add_argument('-condition_answer', type=int, default=0, help="condition on the answer")
+    parser.add_argument('-condition_answer', type=str, default="none",
+                        help="type of answer condition , default to none")
 
     parser.add_argument('-reward_path', type=str, help="path for the reward")
 
@@ -182,9 +183,7 @@ def run(args):
         pretrained_lm = torch.load(args.lm_path, map_location=torch.device('cpu'))
         pretrained_lm.eval()
 
-    models = {
-        "lstm": PolicyLSTMBatch,
-        "lstm_word": PolicyLSTMWordBatch}
+    models = {"lstm": PolicyLSTMBatch}
 
     # creating the policy model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -192,7 +191,7 @@ def run(args):
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters,
                                 train_policy=args.train_policy, fusion=args.fusion, env=env,
-                                condition_answer=bool(args.condition_answer))
+                                condition_answer=args.condition_answer)
     if args.policy_path is not None:
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)

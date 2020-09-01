@@ -7,89 +7,28 @@ from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
 
-from RL_toolbox.RL_functions import masked_softmax
+from RL_toolbox.truncation import gather_truncature, mask_truncature, mask_inf_truncature
 
 
-class PolicyLSTMWordBatch(nn.Module):
+class PolicyLSTMBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1,
-                 train_policy="all_space", **kwargs):
-        super(PolicyLSTMWordBatch, self).__init__()
+    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
+                 kernel_size=1, stride=5, train_policy="all_space", fusion="cat", env=None,
+                 condition_answer="none"):
+        super(PolicyLSTMBatch, self).__init__()
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.condition_answer = condition_answer
         self.num_tokens = num_tokens
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
-        self.action_head = nn.Linear(self.hidden_size,
-                                     num_tokens)
-        self.value_head = nn.Linear(self.hidden_size, 1)
-
-        truncature = {"masked": self.mask_truncature, "gather": self.gather_truncature,
-                      "masked_inf": self.mask_inf_truncature}
+        truncature = {"masked": mask_truncature, "gather": gather_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked"]
         self.train_policy = train_policy
-
-    def forward(self, state_text, state_img, state_answer=None, valid_actions=None):
-        embedding = self._get_embed_text(state_text)
-        logits = self.action_head(embedding)  # (B,S,num_tokens)
-        value = self.value_head(embedding)
-        probs = F.softmax(logits, dim=-1)
-        policy_dist = Categorical(probs)
-        if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits)
-        else:
-            policy_dist_truncated = policy_dist
-        if self.train_policy == 'truncated' and valid_actions is not None:
-            return policy_dist_truncated, policy_dist_truncated, value
-        else:
-            return policy_dist, policy_dist_truncated, value
-
-    def _get_embed_text(self, text, answer):
-        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
-        if self.condition_answer and answer is not None:
-            text = torch.cat([answer.view(text.size(0), 1), text], dim=1) #TODO: change this to have a concatenation of the answer and the dialog differently.
-        lens = (text != 0).sum(dim=1)
-        pad_embed = self.word_embedding(text.to(self.device))
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
-        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        return ht[-1]
-
-    def gather_truncature(self, valid_actions, logits):
-        logits = torch.gather(logits.clone().detach(), -1, valid_actions)
-        probs = F.softmax(logits, dim=-1)
-        return Categorical(probs)
-
-    def mask_truncature(self, valid_actions, logits):
-        mask = torch.zeros(logits.size(0), self.num_tokens).to(self.device)
-        mask[:, valid_actions] = 1
-        probs_truncated = masked_softmax(logits.clone().detach(), mask)
-        # check that the truncation is right.
-        sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
-        assert torch.all(
-            sum_probs_va - torch.ones(sum_probs_va.size()).to(self.device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
-        policy_dist_truncated = Categorical(probs_truncated)
-        return policy_dist_truncated
-
-    def mask_inf_truncature(self, valid_actions, logits):
-        mask = torch.ones(logits.size(0), self.num_tokens) * -1e32
-        mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
-        probs_truncated = F.softmax(mask, dim=-1)
-        # check that the truncation is right.
-        assert probs_truncated[:, valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
-        policy_dist_truncated = Categorical(probs_truncated)
-        return policy_dist_truncated
-
-
-class PolicyLSTMBatch(PolicyLSTMWordBatch):
-
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, train_policy="all_space", fusion="cat", env=None,
-                 condition_answer=True):
-        PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
-                                     train_policy=train_policy)
-        embedding_size = num_tokens + env.clevr_dataset.len_vocab_answer + 1 if condition_answer else num_tokens
-        self.word_embedding = nn.Embedding(embedding_size, word_emb_size)
+        self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
+        # self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
@@ -105,19 +44,21 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
 
+        if self.condition_answer == "after_fusion":
+            self.fusion_dim += word_emb_size
+
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
-        self.condition_answer = condition_answer
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
-        embedding = self.process_fusion(embed_text, img_feat_, img_feat)
+        embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
-        logits_exploration = (1-alpha) * logits + alpha * logits_lm
+        logits_exploration = (1 - alpha) * logits + alpha * logits_lm
         probs = F.softmax(logits, dim=-1)
         policy_dist, policy_dist_truncated = self.get_policies(probs, valid_actions, logits_exploration)
         return policy_dist, policy_dist_truncated, value
@@ -125,14 +66,14 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
     def get_policies(self, probs, valid_actions, logits_exploration):
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits_exploration)
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens)
             if self.train_policy == 'truncated':
                 policy_dist = policy_dist_truncated
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         return policy_dist, policy_dist_truncated
 
-    def process_fusion(self, embed_text, img_feat_, img_feat):
+    def process_fusion(self, embed_text, img_feat_, img_feat, answer):
         if self.fusion == "film":
             gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
@@ -140,7 +81,21 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+        if self.condition_answer == "after_fusion" and answer is not None:
+            embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
+
+    def _get_embed_text(self, text, answer):
+        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
+        lens = (text != 0).sum(dim=1)
+        pad_embed = self.word_embedding(text.to(self.device))
+        if self.condition_answer == "before_lstm" and answer is not None:
+            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1))], dim=1)
+            # text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
+
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
+        return ht[-1]
 
 
 class PolicyLSTMWordBatch_SL(nn.Module):

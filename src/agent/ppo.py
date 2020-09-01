@@ -38,8 +38,8 @@ class PPO(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def evaluate(self, state_text, state_img, action):
-        policy_dist, _, value = self.policy(state_text, state_img, valid_actions=None)
+    def evaluate(self, state_text, state_img, states_answer,action):
+        policy_dist, _, value = self.policy(state_text, state_img,states_answer, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy
@@ -57,13 +57,15 @@ class PPO(Agent):
 
         old_states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
         old_states_img = torch.stack(self.memory.states_img)
+        old_states_answer = torch.stack(self.memory.states_answer)
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
         old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values:
-            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_actions)
+            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_states_answer,
+                                                                 old_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
