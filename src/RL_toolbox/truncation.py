@@ -8,8 +8,8 @@ class Truncation:
         self.agent = agent
 
     def get_valid_actions(self, state, truncation):
-        if not truncation:
-            return None, None, 0
+        if not truncation: #TODO: truncation arg is different from logits.
+            return None, None, 0 #TODO: use alpha parameter instead to decide for logits_lm value.
         with torch.no_grad():
             seq_len = state.text.size(1)
             log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))

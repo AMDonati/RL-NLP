@@ -49,7 +49,7 @@ class PolicyLSTMWordBatch(nn.Module):
     def _get_embed_text(self, text, answer):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         if self.condition_answer and answer is not None:
-            text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
+            text = torch.cat([answer.view(text.size(0), 1), text], dim=1) #TODO: change this to have a concatenation of the answer and the dialog differently.
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)

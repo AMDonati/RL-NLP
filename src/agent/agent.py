@@ -43,7 +43,7 @@ class Agent:
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
         else:
-            self.eval_trunc = {"no_trunc": False}
+            self.eval_trunc = {"no_trunc": False} #TODO: to be refactored?
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
@@ -79,12 +79,12 @@ class Agent:
                 logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
 
-    def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False):
+    def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False): #TODO: replace test arg by alpha?
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
                                                                                              logits_lm,
                                                                                              baseline=baseline,
-                                                                                             alpha=self.alpha_logits_lm)
+                                                                                             alpha=self.alpha_logits_lm) #TODO: issue here for test case. alpha should be equal to 0.
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                                valid_actions=valid_actions,
                                                mode=mode)
