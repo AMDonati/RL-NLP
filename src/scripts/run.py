@@ -120,7 +120,7 @@ def get_parser():
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
-    parser.add_argument('-alpha_logits', default=1.,
+    parser.add_argument('-alpha_logits', default=0., type=float,
                         help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-alpha_logits_decay', default=0,
                         help="alpha decay for the convex logits mixture. if 0, does not decay the alpha")
@@ -128,7 +128,7 @@ def get_parser():
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=20, help="number of episodes training")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument('-eval_no_trunc', type=int, default=0,
@@ -190,7 +190,7 @@ def run(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
-                                stride=args.stride, num_filters=args.num_filters, rl=True,
+                                stride=args.stride, num_filters=args.num_filters,
                                 train_policy=args.train_policy, fusion=args.fusion, env=env,
                                 condition_answer=bool(args.condition_answer))
     if args.policy_path is not None:

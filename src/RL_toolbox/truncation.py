@@ -8,8 +8,8 @@ class Truncation:
         self.agent = agent
 
     def get_valid_actions(self, state, truncation):
-        if not truncation: #TODO: truncation arg is different from logits.
-            return None, None, 0 #TODO: use alpha parameter instead to decide for logits_lm value.
+        if not truncation:
+            return None, None, 0
         with torch.no_grad():
             seq_len = state.text.size(1)
             log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
@@ -20,7 +20,7 @@ class Truncation:
             valid_actions, action_probs = self.truncate(log_probas, logits)
             return valid_actions, action_probs, logits
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=1., baseline=False):
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False):
         if baseline:
             policy_dist, policy_dist_truncated, value = self.agent.start_policy(state.text, state.img, state.answer)
         else:
@@ -51,8 +51,20 @@ class NoTruncation(Truncation):
     def __init__(self, agent, **kwargs):
         Truncation.__init__(self, agent)
 
-    def truncate(self, log_probas, logits):
-        return None, None
+    # def truncate(self, log_probas, logits):
+    #     return None, None
+
+    def get_valid_actions(self, state, truncation):
+        if self.agent.alpha_logits_lm > 0:
+            with torch.no_grad():
+                seq_len = state.text.size(1)
+                log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
+                logits = logits.view(len(state.text), seq_len, -1)
+                logits = logits[:, -1, :]
+        else:
+            logits = 0
+        return None, None, logits
+
 
 
 class TopK(Truncation):
