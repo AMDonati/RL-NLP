@@ -13,7 +13,7 @@ from RL_toolbox.RL_functions import masked_softmax
 class PolicyLSTMWordBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1,
-                 rl=True, train_policy="all_space", **kwargs):
+                 train_policy="all_space", **kwargs):
         super(PolicyLSTMWordBatch, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_tokens = num_tokens
@@ -21,7 +21,6 @@ class PolicyLSTMWordBatch(nn.Module):
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
-        self.rl = rl
         self.action_head = nn.Linear(self.hidden_size,
                                      num_tokens)
         self.value_head = nn.Linear(self.hidden_size, 1)
@@ -49,7 +48,7 @@ class PolicyLSTMWordBatch(nn.Module):
     def _get_embed_text(self, text, answer):
         # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         if self.condition_answer and answer is not None:
-            text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
+            text = torch.cat([answer.view(text.size(0), 1), text], dim=1) #TODO: change this to have a concatenation of the answer and the dialog differently.
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
@@ -85,7 +84,7 @@ class PolicyLSTMWordBatch(nn.Module):
 class PolicyLSTMBatch(PolicyLSTMWordBatch):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, rl=True, train_policy="all_space", fusion="cat", env=None,
+                 kernel_size=1, stride=5, train_policy="all_space", fusion="cat", env=None,
                  condition_answer=True):
         PolicyLSTMWordBatch.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers,
                                      train_policy=train_policy)
@@ -95,7 +94,6 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
-        self.rl = rl
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
 
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
@@ -111,7 +109,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         self.value_head = nn.Linear(self.fusion_dim, 1)
         self.condition_answer = condition_answer
 
-    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=1.):
+    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
@@ -119,7 +117,7 @@ class PolicyLSTMBatch(PolicyLSTMWordBatch):
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
-        logits_exploration = alpha * logits + (1 - alpha) * logits_lm
+        logits_exploration = (1-alpha) * logits + alpha * logits_lm
         probs = F.softmax(logits, dim=-1)
         policy_dist, policy_dist_truncated = self.get_policies(probs, valid_actions, logits_exploration)
         return policy_dist, policy_dist_truncated, value

@@ -79,12 +79,13 @@ class Agent:
                 logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
 
-    def select_action(self, state, mode='sampling', test=False, truncation=True, baseline=False):
+    def select_action(self, state, mode='sampling', truncation=True, baseline=False, train=True):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
+        alpha = self.alpha_logits_lm if train else 0
         policy_dist, policy_dist_truncated, value = self.truncation.get_policy_distributions(state, valid_actions,
                                                                                              logits_lm,
                                                                                              baseline=baseline,
-                                                                                             alpha=self.alpha_logits_lm)
+                                                                                             alpha=alpha)
         action = self.truncation.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                                valid_actions=valid_actions,
                                                mode=mode)
@@ -94,7 +95,7 @@ class Agent:
             assert torch.all(torch.eq(policy_dist_truncated.probs, policy_dist.probs))
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
-    def generate_one_episode_with_lm(self, env, test_mode='sampling'):
+    def generate_one_episode_with_lm(self, env, test_mode='sampling'): #TODO: refactor this with alpha = 1.
         state, ep_reward = env.reset(), 0
         with torch.no_grad():
             for i in range(env.max_len):
@@ -153,7 +154,7 @@ class Agent:
         for t in range(0, env.max_len):
             action, log_probs, value, (
                 valid_actions, actions_probs, log_probs_truncated), dist = self.select_action(state=state,
-                                                                                              test=1 - train,
+                                                                                              train=train,
                                                                                               mode=test_mode,
                                                                                               truncation=truncation,
                                                                                               baseline=baseline)
