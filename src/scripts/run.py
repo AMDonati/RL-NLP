@@ -36,6 +36,8 @@ def get_writer(args, pre_trained, truncated, output_path):
 
     if args.alpha_logits != 0:
         out_folder = out_folder + '_alpha-logits-{}'.format(args.alpha_logits)
+    if args.alpha_decay_rate > 0:
+        out_folder = out_folder + '_decay{}'.format(args.alpha_decay_rate)
 
     if args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
@@ -64,7 +66,7 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
                       "test_envs": test_envs,
                       "eval_no_trunc": args.eval_no_trunc,
                       "alpha_logits": args.alpha_logits,
-                      "alpha_decay": args.alpha_logits_decay}
+                      "alpha_decay_rate": args.alpha_decay_rate}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -122,13 +124,12 @@ def get_parser():
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-alpha_logits', default=0., type=float,
                         help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
-    parser.add_argument('-alpha_logits_decay', default=0,
-                        help="alpha decay for the convex logits mixture. if 0, does not decay the alpha")
-
+    parser.add_argument('-alpha_decay_rate', default=0., type=float,
+                        help="alpha decay rate for the convex logits mixture. if 0, does not decay the alpha")
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=20, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument('-eval_no_trunc', type=int, default=0,

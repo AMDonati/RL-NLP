@@ -34,7 +34,6 @@ class PolicyLSTMBatch(nn.Module):
         self.stride = stride
         self.kernel_size = kernel_size
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
-
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
         if self.fusion == "film":

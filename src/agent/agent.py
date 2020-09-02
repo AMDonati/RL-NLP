@@ -20,7 +20,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
-                 alpha_logits=1., alpha_decay=False):
+                 alpha_logits=1., alpha_decay_rate=0.):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -34,7 +34,7 @@ class Agent:
         if self.pretrained_lm is not None:
             self.pretrained_lm.to(self.device)
         self.alpha_logits_lm = alpha_logits
-        self.alpha_decay = bool(alpha_decay)
+        self.alpha_decay_rate = alpha_decay_rate
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -72,10 +72,10 @@ class Agent:
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
-    def decay_alpha_logits_lm(self, i_episode, decay_rate=0.5, alpha_min=0.001, update_every=500):
-        if self.alpha_decay and self.alpha_logits_lm > alpha_min:
+    def decay_alpha_logits_lm(self, i_episode, alpha_min=0.001, update_every=500):
+        if self.alpha_decay_rate > 0 and self.alpha_logits_lm > alpha_min:
             if i_episode % update_every == 0:
-                self.alpha_logits_lm *= decay_rate
+                self.alpha_logits_lm *= (1-self.alpha_decay_rate)
                 logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
 
@@ -263,6 +263,7 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
                 timestep=timestep, i_episode=i_episode, env=self.env)
+            self.decay_alpha_logits_lm(i_episode=i_episode)
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(
