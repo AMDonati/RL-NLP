@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
+import numpy as np
 
 from RL_toolbox.RL_functions import compute_grad_norm
 from agent.agent import Agent
@@ -31,7 +32,19 @@ class REINFORCE(Agent):
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy
 
-    def update(self):
+    def split_memory_per_episode(self, element):
+        is_terminals = np.array(self.memory.is_terminals)
+        lengths = np.argwhere(is_terminals == True) + 1
+        lengths[1:] = lengths[1:] - lengths[:-1]
+        # indexes_split = np.argwhere(is_terminals == True) + 1
+        # indexes_split = np.array([indexes_split[i][0] for i in
+        #          range(len(indexes_split))])
+        # episode_arrays = np.split(np.array(element), indices_or_sections=indexes_split[:-1])
+        # episode_tensors = [torch.tensor(arr) for arr in episode_arrays]
+        episode_tensors = torch.split(element, tuple(lengths.flatten()))
+        return episode_tensors
+
+    def compute_returns(self):
         rewards = []
         discounted_reward = 0
         for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):
@@ -39,18 +52,44 @@ class REINFORCE(Agent):
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-        rewards = torch.tensor(rewards).to(self.device).float()
+        return rewards
+
+    def update(self):
+        returns = self.compute_returns()
+        returns = torch.tensor(returns).to(self.device).float()
+
+
+        # episode_memories = {}
+        # for key, val in zip(["returns", "values", "log_probs", "log_probs_truncated"], [returns, self.memory.values, self.memory.logprobs, self.memory.logprobs_truncated]):
+        #     episode_memories[key] = self.split_memory_per_episode(val)
+
+        # loss_episodes = []
+        # for i in range(len(episode_memories["returns"])):
+        #     loss_per_episode = -episode_memories["log_probs"][i].view(-1)*(episode_memories["returns"][i] - episode_memories["values"][i].detach().squeeze())
+        #     loss_per_episode = torch.sum(loss_per_episode)
+            #policies_ratios = torch.exp(episode_memories["log_probs"][i].detach() - episode_memories["log_probs_truncated"][i].detach())
+            #loss_per_episode = torch.prod(policies_ratios) * loss_per_episode
+            #loss_episodes.append(loss_per_episode)
 
         logprobs = torch.stack(self.memory.logprobs).to(self.device)
+        logprobs_truncated = torch.stack(self.memory.logprobs_truncated).to(self.device)
         values = torch.stack(self.memory.values).to(self.device)
 
-        advantages = rewards - values.detach().squeeze() if not self.pretrain else 1
-        reinforce_loss = -logprobs.view(-1) * advantages
-        vf_loss = 0.5 * self.MSE_loss(values.view(-1), rewards) if not self.pretrain else torch.tensor(
-            [0]).float().to(
-            self.device)
-        loss = reinforce_loss + vf_loss
-        loss = loss.sum() / self.update_every
+        advantages = returns - values.detach().squeeze()
+        rl_loss_per_timestep = -logprobs.view(-1) * advantages
+        rl_loss_per_timestep = self.split_memory_per_episode(rl_loss_per_timestep)
+        policies_ratios = torch.exp(logprobs.detach()-logprobs_truncated.detach())
+        policies_ratios = self.split_memory_per_episode(policies_ratios)
+        rl_loss_per_episode = torch.stack([torch.sum(l)*torch.prod(p) for l,p in zip(rl_loss_per_timestep, policies_ratios)])
+        reinforce_loss = rl_loss_per_episode.mean()
+
+
+        vf_loss = 0.5 * self.MSE_loss(values.view(-1), returns).mean()
+
+
+
+        loss = reinforce_loss + vf_loss #TODO: add an entropy term here as well.
+        #loss = loss.sum() / self.update_every
         # loss = loss.mean()
         # take gradient step
         self.optimizer.zero_grad()
@@ -69,7 +108,8 @@ class REINFORCE(Agent):
         states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
         policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img))
         new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
-        ratios = torch.exp(torch.log(new_probs) - logprobs)
+        ratios = torch.exp(torch.log(new_probs) - logprobs).detach()
         self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
+        self.writer.add_scalar('rl_loss', reinforce_loss, self.writer_iteration + 1)
 
         return loss.mean()

@@ -5,12 +5,10 @@
 import logging
 import os
 import time
-
 import numpy as np
 import torch
 import torch.optim as optim
 from torch.distributions import Categorical
-
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
@@ -161,7 +159,7 @@ class Agent:
             new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
-                self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value,
+                self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done, value,
                                      state.answer)
             timestep += 1
             for key, metric in metrics.items():

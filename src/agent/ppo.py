@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
-
 from RL_toolbox.RL_functions import compute_grad_norm
 from agent.agent import Agent
 
