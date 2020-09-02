@@ -109,7 +109,7 @@ if __name__ == '__main__':
     num_samples = clevr_dataset.__len__()
     print('length dataset', num_samples)
     index = np.random.randint(0, num_samples)
-    (inp_q, len_q, tar_q), feats, answer = clevr_dataset.__getitem__(0)
+    (inp_q, tar_q), feats, answer = clevr_dataset.__getitem__(0)
     print('inp_q', inp_q.shape)
     print('tar_q', tar_q.shape)
     print('feats', feats.shape)

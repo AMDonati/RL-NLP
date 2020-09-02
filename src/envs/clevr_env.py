@@ -47,7 +47,7 @@ class ClevrEnv(gym.Env):
         self.state, self.dialog = None, None
         self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
-        self.condition_answer = condition_answer
+        self.condition_answer = condition_answer #TODO: where is this used?
 
     def step(self, action):
         # note that the padding of ref questions and generated dialog has been removed.
@@ -73,7 +73,7 @@ class ClevrEnv(gym.Env):
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
-        self.img_idx = np.random.randint(range_images[0], range_images[1])
+        self.img_idx = np.random.randint(range_images[0], range_images[1]) #TODO: here, img_idx should be selected with a self.index between 0 & 700,000.
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
         if self.mode == "train":
@@ -83,7 +83,8 @@ class ClevrEnv(gym.Env):
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
-        _, _, self.ref_answer = self.clevr_dataset[self.img_idx]
+        _, _, self.ref_answer = self.clevr_dataset[self.img_idx] #TODO: this should not be self.img_idx here...
+        #TODO: remove 'YES' / 'NO' ANSWERS...
         self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
 
         state_question = [self.special_tokens.SOS_idx]
