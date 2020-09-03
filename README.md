@@ -10,9 +10,9 @@ The CLEVR Dataset can be downloaded [here](https://cs.stanford.edu/people/jcjohn
 The full dataset (questions + images) or only the questions part can be downloaded. 
 To avoid memory issues on local machines, the first 21 images of the train/val/test datasets are available for download [here](https://drive.google.com/drive/folders/1OEy8Dfq2mO-vAiL9hFO1E_HbqC0wX4WB?usp=sharing).  
 To download the dataset directly via the shell, you can run the following commands: 
-`mkdir data
-wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip -O data/CLEVR_v1.0.zip
-unzip data/CLEVR_v1.0.zip -d data`
+`mkdir data` 
+`wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip -O data/CLEVR_v1.0.zip`  
+`unzip data/CLEVR_v1.0.zip -d data`
 
 ## Requirements 
 * You can create a conda environment called rl-nlp: `conda create -n rl-nlp`
