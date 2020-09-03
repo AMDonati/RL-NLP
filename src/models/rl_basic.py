@@ -81,7 +81,7 @@ class PolicyLSTMBatch(nn.Module):
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         if self.condition_answer == "after_fusion" and answer is not None:
-            embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
+            embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1)).to(self.device)], dim=1)
         return embedding
 
     def _get_embed_text(self, text, answer):
@@ -89,7 +89,7 @@ class PolicyLSTMBatch(nn.Module):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.condition_answer == "before_lstm" and answer is not None:
-            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1))], dim=1)
+            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)], dim=1)
             # text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
 
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
