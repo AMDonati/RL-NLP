@@ -13,6 +13,7 @@ from vr.utils import load_execution_engine, load_program_generator
 class Reward:
     def __init__(self, path):
         self.path = path
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def get(self, question, ep_questions_decoded):
         pass
@@ -101,7 +102,7 @@ class VQAAnswer(Reward):
     def __init__(self, path=None):
         Reward.__init__(self, path)
         self.type = "episode"
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.execution_engine, ee_kwargs = load_execution_engine(path)
         self.execution_engine.to(self.device)
         self.execution_engine.eval()
@@ -113,8 +114,8 @@ class VQAAnswer(Reward):
         if not done:
             return 0, "N/A", None
         with torch.no_grad():
-            programs_pred = self.program_generator(state.text)
-            scores = self.execution_engine(state.img, programs_pred)
+            programs_pred = self.program_generator(state.text.to(self.device))
+            scores = self.execution_engine(state.img.to(self.device), programs_pred)
             _, preds = scores.data.cpu().max(1)
             reward = (preds == real_answer).sum().item()
         return reward, "N/A", preds #TODO: add closest question here?
