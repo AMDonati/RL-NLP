@@ -14,7 +14,7 @@ def gather_truncature(valid_actions, logits, num_tokens=87):
 
 
 def mask_truncature(valid_actions, logits, num_tokens=87):
-    mask = torch.zeros(logits.size(0), num_tokens)
+    mask = torch.zeros(logits.size(0), num_tokens).to(device)
     mask[:, valid_actions] = 1
     probs_truncated = masked_softmax(logits.clone().detach(), mask)
     # check that the truncation is right.
