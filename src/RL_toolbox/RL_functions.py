@@ -6,7 +6,7 @@ import os
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 import Levenshtein as lv
 from models.Policy_network import PolicyLSTM
-from RL_toolbox.reward import Levenshtein, get_dummy_reward
+from RL_toolbox.reward import Levenshtein
 
 State = namedtuple('State', ('text', 'img'))
 Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'closest_question', 'dialog', 'rewards'))

@@ -90,11 +90,11 @@ class Differential(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if step_idx == 0:
             self.last_reward, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True)
-        reward, closest_question = self.reward_function.get(question, ep_questions_decoded, step_idx=step_idx,
+        reward, closest_question, pred_answer = self.reward_function.get(question, ep_questions_decoded, step_idx=step_idx,
                                                             done=True)
         diff_reward = reward - self.last_reward
         self.last_reward = reward
-        return diff_reward, closest_question, None
+        return diff_reward, closest_question, pred_answer
 
 
 class VQAAnswer(Reward):
@@ -111,7 +111,7 @@ class VQAAnswer(Reward):
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if not done:
-            return 0, "N/A"
+            return 0, "N/A", None
         with torch.no_grad():
             programs_pred = self.program_generator(state.text)
             scores = self.execution_engine(state.img, programs_pred)

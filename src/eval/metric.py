@@ -288,12 +288,15 @@ class DialogMetric(Metric):
                     kwargs["state"].text[:, 1:].cpu().view(-1))
             state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
                                                                   ignored=[])
-            if self.agent.env.reward_func == 'levenshtein_':
+            if self.agent.env.reward_type == 'levenshtein_':
                 closest_question_decoded = kwargs["closest_question"]
-                string = ' img {}:'.format(kwargs[
+                string = 'IMG {}:'.format(kwargs[
                                                "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
-            elif self.agent.env.reward_func == 'vqa':
-                pred_answer_decoded = self.agent.clevr_dataset.idx2word
+            elif self.agent.env.reward_type == 'vqa':
+                pred_answer_decoded = self.agent.clevr_dataset.idx2word(kwargs["pred_answer"], decode_answers=True)
+                ref_answer_decoded = self.agent.clevr_dataset.idx2word(self.agent.env.ref_answer, decode_answers=True)
+                string =' IMG {}:'.format(kwargs[
+                                               "img_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded +'\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
@@ -413,8 +416,11 @@ class RewardMetric(Metric):
         if condition:
             self.measure["reward"] = [kwargs["reward"]]
             len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(), ignored=[]).split())
-            norm_reward = [kwargs["reward"] / max(len_episode,
-                                                  len(kwargs["closest_question"].split()))]
+            if self.agent.env.reward_type == 'levenshtein_':
+                norm_reward = [kwargs["reward"] / max(len_episode,
+                                                      len(kwargs["closest_question"].split()))]
+            elif self.agent.env.reward_type == 'vqa':
+                norm_reward = self.measure["reward"]
             self.measure["norm_reward"] = norm_reward
             self.measure["len_dialog"] = [len_episode]
 

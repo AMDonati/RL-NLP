@@ -65,8 +65,8 @@ class CLEVR_Dataset(Dataset):
         idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
         return idx_to_token
 
-    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, ignored=["<SOS>"], decode_anwers=False):
-        if decode_anwers:
+    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, ignored=["<SOS>"], decode_answers=False):
+        if decode_answers:
             idx_to_token = self.get_idx_to_token(questions=False)
         else:
             idx_to_token = self.idx_to_token
@@ -93,7 +93,6 @@ class CLEVR_Dataset(Dataset):
         answer = self.answers[index]
         # loading img feature of img_idx
         feats = self.get_feats_from_img_idx(img_idx)
-
         return (input_question, target_question), feats, answer
 
     def __len__(self):

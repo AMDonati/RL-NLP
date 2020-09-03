@@ -65,7 +65,7 @@ class PolicyLSTMBatch(nn.Module):
     def get_policies(self, probs, valid_actions, logits_exploration):
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens)
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens) #TODO: add a self.device here ?
             if self.train_policy == 'truncated':
                 policy_dist = policy_dist_truncated
         else:

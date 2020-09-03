@@ -110,6 +110,7 @@ def get_parser():
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
+    parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -140,10 +141,7 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-condition_answer', type=str, default="none",
-                        help="type of answer condition , default to none")
-
-    parser.add_argument('-reward_path', type=str, help="path for the reward")
-
+                        help="type of answer condition, default to none")
     return parser
 
 

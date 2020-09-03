@@ -61,8 +61,9 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words',
-                              'ratio_closest_questions']}
+                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words']}
+        if self.env.reward_type == 'levenshtein_':
+            self.test_metrics['ratio_closest_questions'] = metrics["ratio_closest_questions"](self, train_test="test")
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["running_return", "lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog",
                                "policy", "action_probs", "action_probs_truncated"]}
@@ -105,7 +106,7 @@ class Agent:
                     action = Categorical(softmax).sample()
                 elif test_mode == 'greedy':
                     action = log_probas[-1, :].squeeze().argmax()
-                new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+                new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
                 state = new_state
                 ep_reward += reward
                 if done:
@@ -158,7 +159,7 @@ class Agent:
                                                                                               mode=test_mode,
                                                                                               truncation=truncation,
                                                                                               baseline=baseline)
-            new_state, (reward, closest_question), done, _ = env.step(action.cpu().numpy())
+            new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, reward, done, value,
@@ -171,7 +172,8 @@ class Agent:
                             ref_questions_decoded=env.ref_questions_decoded, reward=reward,
                             closest_question=closest_question, new_state=new_state, log_probs=log_probs,
                             log_probs_truncated=log_probs_truncated,
-                            test_mode=test_mode)
+                            test_mode=test_mode,
+                            pred_answer=pred_answer)
             state = new_state
             ep_reward += reward
 
@@ -196,7 +198,7 @@ class Agent:
                 break
         for key, metric in metrics.items():
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
-                           ref_question=env.ref_questions, test_mode=test_mode)
+                           ref_question=env.ref_questions, test_mode=test_mode, pred_answer=pred_answer)
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 

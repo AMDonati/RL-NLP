@@ -65,7 +65,7 @@ class ClevrEnv(gym.Env):
         self.step_idx += 1
         if done:
             self.dialog = question
-        return self.state, (reward, closest_question), done, {}
+        return self.state, (reward, closest_question, pred_answer), done, {}
 
     def reset(self, seed=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
@@ -75,7 +75,7 @@ class ClevrEnv(gym.Env):
             np.random.seed(seed)
         self.data_idx = np.random.randint(range_images[0], range_images[1]*10)
         #self.img_idx = np.random.randint(range_images[0], range_images[1])
-        self.img_idx = self.clevr_dataset.img_idxs[self.data_idx]
+        self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
         if self.mode == "train":
@@ -85,8 +85,8 @@ class ClevrEnv(gym.Env):
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
-        _, _, self.ref_answer = self.clevr_dataset[self.data_idx]
-        self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
+        _, self.img_feats, self.ref_answer = self.clevr_dataset[self.data_idx]
+        #self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
 
         state_question = [self.special_tokens.SOS_idx]
         # if self.condition_answer:
@@ -97,7 +97,7 @@ class ClevrEnv(gym.Env):
         self.dialog = None
         # check the correctness of the reward function.
         if self.reward_type == "levenshtein_" and not self.diff_reward:
-            reward_true_question, _ = self.reward_func.get(question=self.ref_questions_decoded[0],
+            reward_true_question, _, _ = self.reward_func.get(question=self.ref_questions_decoded[0],
                                                            ep_questions_decoded=self.ref_questions_decoded,
                                                            step_idx=self.step_idx, done=True)
             assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
