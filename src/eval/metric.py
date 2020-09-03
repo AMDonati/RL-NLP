@@ -338,7 +338,7 @@ class PPLMetric(Metric):
                         for i in range(len(inp_question)):
                             inputs = inp_question[:i + 1].unsqueeze(0)
                             policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
-                                                                                      valid_actions=kwargs["valid_actions"])
+                                                                                      valid_actions=kwargs["valid_actions"]) #TODO: bug here with vqa task.
                             log_prob = policy_dist_truncated.log_prob(target_question[i])
                             self.measure.append(log_prob)
 

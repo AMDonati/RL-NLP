@@ -14,13 +14,13 @@ def gather_truncature(valid_actions, logits, num_tokens=87):
 
 
 def mask_truncature(valid_actions, logits, num_tokens=87):
-    mask = torch.zeros(logits.size(0), num_tokens)
+    mask = torch.zeros(logits.size(0), num_tokens).to(device)
     mask[:, valid_actions] = 1
     probs_truncated = masked_softmax(logits.clone().detach(), mask)
     # check that the truncation is right.
     sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
     assert torch.all(
-        sum_probs_va - torch.ones(sum_probs_va.size()).to() < 1e-6), "ERROR IN TRUNCATION FUNCTION"
+        sum_probs_va - torch.ones(sum_probs_va.size()).to(device) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
 

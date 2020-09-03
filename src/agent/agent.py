@@ -61,9 +61,10 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             ["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm", "ttr_question", 'unique_words']}
+                             ["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", 'unique_words']}
         if self.env.reward_type == 'levenshtein_':
-            self.test_metrics['ratio_closest_questions'] = metrics["ratio_closest_questions"](self, train_test="test")
+            for key in ["ppl", "ratio_closest_questions"]:
+                self.test_metrics[key] = metrics[key](self, train_test="test")
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["running_return", "lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog",
                                "policy", "action_probs", "action_probs_truncated"]}
