@@ -65,13 +65,20 @@ class CLEVR_Dataset(Dataset):
         idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
         return idx_to_token
 
-    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, ignored=["<SOS>"]):
-        tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim,
+    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, ignored=["<SOS>"], decode_anwers=False):
+        if decode_anwers:
+            idx_to_token = self.get_idx_to_token(questions=False)
+        else:
+            idx_to_token = self.idx_to_token
+        tokens = decode(seq_idx=seq_idx, idx_to_token=idx_to_token, stop_at_end=stop_at_end, delim=delim,
                         ignored=ignored)
         return tokens
 
-    def word2idx(self, seq_tokens, allow_unk=True):
-        idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_questions, allow_unk=allow_unk)
+    def word2idx(self, seq_tokens, allow_unk=True, encode_answers=False):
+        if encode_answers:
+            idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_answers, allow_unk=allow_unk)
+        else:
+            idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_questions, allow_unk=allow_unk)
         return idx
 
     def get_questions_length(self):

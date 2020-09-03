@@ -287,10 +287,13 @@ class DialogMetric(Metric):
                 self.generated_dialog[self.train_test + '_' + self.key].append(
                     kwargs["state"].text[:, 1:].cpu().view(-1))
             state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
-                                                                  ignored=[])  # TODO: investigate the pb of length of dialogue for pretrain here.
-            closest_question_decoded = kwargs["closest_question"]
-            string = ' img {}:'.format(kwargs[
-                                           "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+                                                                  ignored=[])
+            if self.agent.env.reward_func == 'levenshtein_':
+                closest_question_decoded = kwargs["closest_question"]
+                string = ' img {}:'.format(kwargs[
+                                               "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+            elif self.agent.env.reward_func == 'vqa':
+                pred_answer_decoded = self.agent.clevr_dataset.idx2word
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
@@ -310,7 +313,6 @@ class PPLMetric(Metric):
     """
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
-
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"

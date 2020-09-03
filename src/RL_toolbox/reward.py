@@ -66,56 +66,6 @@ class Levenshtein(Reward):
         return len(intersect) / len(vocab_ref_question)
 
 
-class CorrectVocab(Reward):
-    def __init__(self, path):
-        Reward.__init__(self, path=None)
-
-    def get(self, question, ep_questions_decoded):
-        if question is None or len(question.split()) == 0:
-            return 0.
-        else:
-            vocab_ref_questions, len_questions = self.get_vocab(ep_questions_decoded)
-            vocab_question, _ = self.get_vocab([question])
-            intersect = list(set(vocab_ref_questions).intersection(vocab_question))
-            return len(intersect) / max(len_questions)
-
-    @staticmethod
-    def get_vocab(questions):
-        vocab = [q.split() for q in questions]
-        len_questions = [len(q) for q in vocab]
-        vocab = [i for l in vocab for i in l]
-        vocab = list(set(vocab))
-        return vocab, len_questions
-
-
-class CombinedReward(Reward):
-    def __init__(self, reward_func_1, reward_func_2, alpha, path):
-        self.reward_func_1 = rewards[reward_func_1]()
-        self.reward_func_2 = rewards[reward_func_2]()
-        self.alpha = alpha
-        Reward.__init__(self, path)
-
-    def get(self, question, ep_questions_decoded):
-        rew = (1 - self.alpha) * self.reward_func_1.get(question=question, ep_questions_decoded=ep_questions_decoded)[0] \
-              + self.alpha * self.reward_func_2.get(question=question, ep_questions_decoded=ep_questions_decoded)
-        return rew
-
-
-class PerWord(Reward):
-    def __init__(self, path=None):
-        Reward.__init__(self, path)
-
-    def get(self, question, ep_questions_decoded):
-        similarities = np.asarray(
-            [self.compare(question.split(), true_question.split()) for true_question in ep_questions_decoded])
-        return max(similarities), ep_questions_decoded[similarities.argmax()]
-
-    @staticmethod
-    def compare(question, true_question):
-        return sum([question[i + 1] == true_question[i] for i in range(len(true_question)) if
-                    i < len(question) - 1])
-
-
 class Levenshtein_(Reward):
     def __init__(self, path=None):
         Reward.__init__(self, path)
@@ -127,7 +77,7 @@ class Levenshtein_(Reward):
         distances = np.array([nltk.edit_distance(question.split(), true_question.split()) for true_question in
                               ep_questions_decoded])
         reward = -min(distances) if done else 0
-        return reward, ep_questions_decoded[distances.argmin()]
+        return reward, ep_questions_decoded[distances.argmin()], None
 
 
 class Differential(Reward):
@@ -144,7 +94,7 @@ class Differential(Reward):
                                                             done=True)
         diff_reward = reward - self.last_reward
         self.last_reward = reward
-        return diff_reward, closest_question
+        return diff_reward, closest_question, None
 
 
 class VQAAnswer(Reward):
@@ -162,37 +112,15 @@ class VQAAnswer(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A"
-        programs_pred = self.program_generator(state.text)
-        scores = self.execution_engine(state.img, programs_pred)
-        _, preds = scores.data.cpu().max(1)
-        reward = (preds == real_answer).sum().item()
-        return reward, "N/A"
+        with torch.no_grad():
+            programs_pred = self.program_generator(state.text)
+            scores = self.execution_engine(state.img, programs_pred)
+            _, preds = scores.data.cpu().max(1)
+            reward = (preds == real_answer).sum().item()
+        return reward, "N/A", preds #TODO: add closest question here?
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "per_word": PerWord,
-           "correct_vocab": CorrectVocab, "combined": CombinedReward, "vqa": VQAAnswer}
-
-
-def get_dummy_reward(next_state_text, ep_questions, EOS_idx):
-    next_state_text = next_state_text[:, 1:]  # removing sos token.
-    if next_state_text[:, -1] == EOS_idx:  # remove <EOS> token if needed.
-        next_state_text = next_state_text[:, :-1]
-    # trunc state:
-    state_len = next_state_text.size(1)
-    if state_len == 0:
-        # print('no final reward...')
-        return 0.
-    else:
-        # max_len = ep_questions.size(1)
-        # if state_len < max_len:
-        #     next_state_text = torch.cat([next_state_text, next_state_text.new_zeros(1, max_len - state_len)], dim=1)
-        # assert max_len == next_state_text.size(1)
-        ep_questions = ep_questions[:, :state_len]
-        next_state_text = next_state_text.repeat(ep_questions.size(0), 1)
-        mask_same_tokens = next_state_text == ep_questions
-        reward = mask_same_tokens.sum(dim=-1).max().numpy()
-        reward = reward / state_len
-    return reward
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "vqa": VQAAnswer}
 
 
 if __name__ == '__main__':
