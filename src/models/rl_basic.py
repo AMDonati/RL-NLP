@@ -51,6 +51,7 @@ class PolicyLSTMBatch(nn.Module):
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
+        state_answer = state_answer.to(self.device)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
@@ -80,8 +81,9 @@ class PolicyLSTMBatch(nn.Module):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+        #answer = answer.to(self.device)
         if self.condition_answer == "after_fusion" and answer is not None:
-            embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1).to(self.device))], dim=1)
+            embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
 
     def _get_embed_text(self, text, answer):
