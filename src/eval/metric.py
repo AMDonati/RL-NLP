@@ -282,10 +282,10 @@ class DialogMetric(Metric):
     def compute_(self, **kwargs):
         with torch.no_grad():
             if not self.train_test + '_' + self.key in self.generated_dialog.keys():
-                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text[:, 1:].squeeze().cpu()]
+                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text.squeeze().cpu()]
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
-                    kwargs["state"].text[:, 1:].cpu().view(-1))
+                    kwargs["state"].text.cpu().view(-1))
             state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
                                                                   ignored=[])
             if self.agent.env.reward_type == 'levenshtein_':
@@ -293,10 +293,10 @@ class DialogMetric(Metric):
                 string = 'IMG {}:'.format(kwargs[
                                                "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
             elif self.agent.env.reward_type == 'vqa':
-                pred_answer_decoded = self.agent.clevr_dataset.idx2word(kwargs["pred_answer"], decode_answers=True)
-                ref_answer_decoded = self.agent.clevr_dataset.idx2word(self.agent.env.ref_answer, decode_answers=True)
-                string =' IMG {}:'.format(kwargs[
-                                               "img_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded +'\n' + '-' * 40
+                pred_answer_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(), decode_answers=True)
+                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([self.agent.env.ref_answer.numpy().item()], decode_answers=True)
+                string =' IMG {} - question index {}:'.format(kwargs[
+                                               "img_idx"], self.agent.env.data_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded +'\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:

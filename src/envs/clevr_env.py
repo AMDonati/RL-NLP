@@ -73,7 +73,7 @@ class ClevrEnv(gym.Env):
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
-        self.data_idx = np.random.randint(range_images[0], range_images[1]*10)
+        self.data_idx = np.random.randint(range_images[0], range_images[1]) # corresponds to the index of (img, question, answer) tuple.
         #self.img_idx = np.random.randint(range_images[0], range_images[1])
         self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,

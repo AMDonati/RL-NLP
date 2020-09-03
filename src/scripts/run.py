@@ -47,6 +47,8 @@ def get_writer(args, pre_trained, truncated, output_path):
 
     if args.train_policy == "truncated":
         out_folder = out_folder + '_truncated_policy'
+    if args.reward == 'vqa':
+        out_folder = out_folder + '_{}'.format(args.reward) + '_{}'.format(args.condition_answer)
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, out_folder))
     return writer
@@ -115,6 +117,8 @@ def get_parser():
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
     parser.add_argument('-diff_reward', type=int, default=0, help="is reward differential")
+    parser.add_argument('-condition_answer', type=str, default="none",
+                        help="type of answer condition, default to none")
     # truncation args.
     parser.add_argument('-lm_path', type=str, required=True,
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
@@ -130,7 +134,7 @@ def get_parser():
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=3000, help="number of episodes training")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument('-eval_no_trunc', type=int, default=0,
@@ -140,8 +144,7 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
-    parser.add_argument('-condition_answer', type=str, default="none",
-                        help="type of answer condition, default to none")
+
     return parser
 
 
@@ -173,9 +176,14 @@ def run(args):
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                    num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path)
-    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                          num_questions=args.num_questions, reward_path=args.reward_path) for mode in
-                 ["test_images", "test_text"]]
+    if args.reward == 'vqa':
+        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                              num_questions=args.num_questions, reward_path=args.reward_path) for mode in
+                     ["test_images"]]
+    else:
+        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                              num_questions=args.num_questions, reward_path=args.reward_path) for mode in
+                     ["test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:
