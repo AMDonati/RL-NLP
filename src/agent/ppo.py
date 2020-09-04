@@ -16,8 +16,8 @@ class PPO(Agent):
                  log_interval=1,
                  eval_no_trunc=0,
                  alpha_logits=0.,
-                 alpha_decay_rate=0.
-                 ):
+                 alpha_decay_rate=0.,
+                 epsilon_truncated=0.):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
@@ -27,7 +27,8 @@ class PPO(Agent):
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs,
                        eval_no_trunc=eval_no_trunc,
-                       alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate)
+                       alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate, epsilon_truncated=epsilon_truncated
+                       )
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -38,8 +39,8 @@ class PPO(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def evaluate(self, state_text, state_img, states_answer,action):
-        policy_dist, _, value = self.policy(state_text, state_img,states_answer, valid_actions=None)
+    def evaluate(self, state_text, state_img, states_answer, action):
+        policy_dist, _, value = self.policy(state_text, state_img, states_answer, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy
@@ -109,3 +110,10 @@ class PPO(Agent):
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         return loss.mean()
+
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False):
+        policy = self.start_policy if baseline else self.policy_old
+        policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
+                                                           valid_actions=valid_actions,
+                                                           logits_lm=logits_lm, alpha=alpha)
+        return policy_dist, policy_dist_truncated, value

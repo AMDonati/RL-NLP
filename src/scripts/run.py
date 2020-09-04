@@ -68,7 +68,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
                       "test_envs": test_envs,
                       "eval_no_trunc": args.eval_no_trunc,
                       "alpha_logits": args.alpha_logits,
-                      "alpha_decay_rate": args.alpha_decay_rate}
+                      "alpha_decay_rate": args.alpha_decay_rate,
+                      "epsilon_truncated": args.epsilon_truncated}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -144,6 +145,8 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    parser.add_argument('-epsilon_truncated', type=float, default=0.,
+                        help="the agent sample from truncated or total action space")
 
     return parser
 
