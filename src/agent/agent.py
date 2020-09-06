@@ -84,7 +84,7 @@ class Agent:
 
     def act(self, state, mode='sampling', truncation=True, baseline=False, train=True):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
-        alpha = self.alpha_logits_lm if train else 0
+        alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
                                                                                   logits_lm,
                                                                                   baseline=baseline,
@@ -103,6 +103,7 @@ class Agent:
         policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
                                                            valid_actions=valid_actions,
                                                            logits_lm=logits_lm, alpha=alpha)
+        #TODO; add an assert here if valid_actions is None and alpha = 0.
         return policy_dist, policy_dist_truncated, value
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
