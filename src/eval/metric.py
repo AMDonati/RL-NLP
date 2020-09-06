@@ -231,7 +231,7 @@ class LMActionProbs(Metric):
             self.measure.append(torch.tensor([0.]))
 
     def compute_(self, **kwargs):
-        lm_probs = torch.stack(self.measure).clone().detach()
+        lm_probs = torch.stack(self.measure).cpu().clone().detach()
         self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
         self.metric.append(np.mean(self.ep_lm_probs))
 
