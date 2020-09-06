@@ -1,13 +1,11 @@
 import logging
 import os
-
 import h5py
 import numpy as np
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-
-from utils.utils_train import write_to_csv
+from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
 class Metric:
@@ -270,35 +268,37 @@ class EpsilonTruncation(Metric):
         self.type = "scalar"
         self.key = "eps_truncation"
         self.counter = 0
-        #self.metric = {"scalar": [], "text": []}
         self.out_txt_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_metric = dict.fromkeys(["Episode", "Img_idx", "Action", "Policy_prob"])
+        for key in list(self.dict_metric.keys()):
+            self.dict_metric[key] = []
 
     def fill_(self, **kwargs):
         if self.agent.epsilon_truncated > 0:
             if kwargs["action"] not in kwargs["valid_actions"]:
                 self.counter += 1  # TODO: a moving average instead ?
                 action_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["action"].cpu().numpy(), ignored=[])
-                action_probs = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
+                action_prob = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
                 self.measure.append("Episode {} - Img {}/ Action: {}/ Policy prob: {:2.4f}".format(kwargs["i_episode"],
-                                                                                              self.agent.env.img_idx,
+                                                                                              self.agent.env.img_idx.item(),
                                                                                               action_decoded,
-                                                                                              action_probs))
+                                                                                              action_prob))
+                self.dict_metric["Episode"].append(kwargs["i_episode"])
+                self.dict_metric["Img_idx"].append(self.agent.env.img_idx.item())
+                self.dict_metric["Action"].append(action_decoded)
+                self.dict_metric["Policy_prob"].append(np.round(action_prob, decimals=4))
+
+    def write_to_csv(self):
+        #write_to_csv(self.out_csv_file, self.dict_metric)
+        write_to_csv_by_row(self.out_csv_file, self.dict_metric)
 
     def compute_(self, **kwargs):
         if self.agent.epsilon_truncated > 0:
             self.metric = [self.counter]
-            # self.metric["scalar"] = self.counter
-            # self.metric["text"] = self.measure
             string = '\n'.join(self.measure)
             with open(self.out_txt_file, 'a') as f:
                 f.write(string + '\n')
-
-    # def write(self, **kwargs):
-    #     self.agent.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric["scalar"]), self.idx_write)
-    #
-    # def write_to_csv(self):
-    #
-
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
 

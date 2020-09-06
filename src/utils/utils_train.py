@@ -57,3 +57,9 @@ def append_list_as_row(file_name, list_of_elem):
         # Add contents of list as last row in the csv file
         csv_writer.writerow(list_of_elem)
 
+
+def write_to_csv_by_row(output_dir, dic):
+    """Write a python dic to csv. Each Key is a column."""
+    for key, value in dic.items():
+        list_of_elem = [key] + value
+        append_list_as_row(output_dir, list_of_elem)
