@@ -34,16 +34,19 @@ def get_writer(args, pre_trained, truncated, output_path):
         args.diff_reward,
         args.fusion)
 
+    if args.agent == 'PPO':
+        out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
+
+    if args.truncate_mode == 'proba_thr' and args.p_th is not None:
+        out_folder = out_folder + '_pth{}'.format(args.p_th)
+
     if args.alpha_logits != 0:
         out_folder = out_folder + '_alpha-logits-{}'.format(args.alpha_logits)
     if args.alpha_decay_rate > 0:
         out_folder = out_folder + '_decay{}'.format(args.alpha_decay_rate)
 
-    if args.p_th is not None:
-        out_folder = out_folder + '_pth{}'.format(args.p_th)
-
-    if args.agent == 'PPO':
-        out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
+    if args.truncate_mode is not None and args.epsilon_truncated > 0:
+        out_folder = out_folder + '_eps-trunc{}'.format(args.epsilon_truncated)
 
     if args.train_policy == "truncated":
         out_folder = out_folder + '_truncated_policy'
@@ -132,12 +135,14 @@ def get_parser():
                         help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-alpha_decay_rate', default=0., type=float,
                         help="alpha decay rate for the convex logits mixture. if 0, does not decay the alpha")
+    parser.add_argument('-epsilon_truncated', type=float, default=0.,
+                        help="the agent sample from truncated or total action space")
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
-    parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
+    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
+    parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-test_baselines', type=int, default=0, help="add test SL baselines for evaluation")
@@ -145,8 +150,6 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
-    parser.add_argument('-epsilon_truncated', type=float, default=0.,
-                        help="the agent sample from truncated or total action space")
 
     return parser
 

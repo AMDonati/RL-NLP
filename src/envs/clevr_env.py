@@ -73,8 +73,8 @@ class ClevrEnv(gym.Env):
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
-        self.data_idx = np.random.randint(range_images[0], range_images[1]) # corresponds to the index of (img, question, answer) tuple.
-        #self.img_idx = np.random.randint(range_images[0], range_images[1])
+        self.data_idx = np.random.randint(range_images[0], range_images[1]*10)
+        #self.img_idx = np.random.randint(range_images[0], range_images[1]) #TODO: keep this.
         self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
         self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
                              :self.max_len]  # shape (10, 45)
@@ -85,7 +85,7 @@ class ClevrEnv(gym.Env):
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
-        _, self.img_feats, self.ref_answer = self.clevr_dataset[self.data_idx]
+        _, self.img_feats, self.ref_answer = self.clevr_dataset[self.data_idx] #TODO: implementa function that gives all answers from self.img_idx (or a subset) and select one.
         #self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
 
         state_question = [self.special_tokens.SOS_idx]
