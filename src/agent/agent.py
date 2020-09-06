@@ -248,7 +248,7 @@ class Agent:
                     for _, metric in self.test_metrics.items():
                         metric.write()
                     dialogs[key].append(
-                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx, env.data_idx,
+                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx, env.ref_question_idx,
                                                                                  key) + self.env.clevr_dataset.idx2word(
                             state.text[:, 1:].numpy()[
                                 0]) + '----- closest question:' + closest_question + '------ reward: {}'.format(
