@@ -227,11 +227,12 @@ class LMActionProbs(Metric):
         self.key = "action_probs_lm"
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
+        if kwargs["action"] in kwargs["valid_actions"]:
+            self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
 
     def compute_(self, **kwargs):
-        lm_probs = torch.stack(self.measure).clone().detach()
-        self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
+        lm_probs = torch.stack(self.measure).clone().detach().cpu().squeeze().numpy() if self.measure else 0
+        self.ep_lm_probs = np.round(lm_probs, decimals=5)
         self.metric.append(np.mean(self.ep_lm_probs))
 
     def log(self, **kwargs):
@@ -291,12 +292,15 @@ class DialogMetric(Metric):
             if self.agent.env.reward_type == 'levenshtein_':
                 closest_question_decoded = kwargs["closest_question"]
                 string = 'IMG {}:'.format(kwargs[
-                                               "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+                                              "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
             elif self.agent.env.reward_type == 'vqa':
-                pred_answer_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(), decode_answers=True)
-                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([self.agent.env.ref_answer.numpy().item()], decode_answers=True)
-                string =' IMG {} - question index {}:'.format(kwargs[
-                                               "img_idx"], self.agent.env.data_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded +'\n' + '-' * 40
+                pred_answer_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(),
+                                                                            decode_answers=True)
+                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([self.agent.env.ref_answer.numpy().item()],
+                                                                           decode_answers=True)
+                string = ' IMG {} - question index {}:'.format(kwargs[
+                                                                   "img_idx"],
+                                                               self.agent.env.ref_question_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
@@ -316,6 +320,7 @@ class PPLMetric(Metric):
     """
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -338,10 +343,10 @@ class PPLMetric(Metric):
                         for i in range(len(inp_question)):
                             inputs = inp_question[:i + 1].unsqueeze(0)
                             policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
-                                                                                      valid_actions=kwargs["valid_actions"]) #TODO: bug here with vqa task.
+                                                                                      valid_actions=kwargs[
+                                                                                          "valid_actions"])  # TODO: bug here with vqa task.
                             log_prob = policy_dist_truncated.log_prob(target_question[i])
                             self.measure.append(log_prob)
-
 
     def compute_(self, **kwargs):
         if kwargs["test_mode"] == 'sampling':
@@ -415,7 +420,8 @@ class RewardMetric(Metric):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
             self.measure["reward"] = [kwargs["reward"]]
-            len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(), ignored=[]).split())
+            len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(),
+                                                                    ignored=[]).split())
             if self.agent.env.reward_type == 'levenshtein_':
                 norm_reward = [kwargs["reward"] / max(len_episode,
                                                       len(kwargs["closest_question"].split()))]
@@ -608,7 +614,7 @@ class PolicyMetric(Metric):
                 else:
                     in_top_k_words_lm.append("N")
             weights_words = ["{}/{:.3f}/{}".format(word, weight, top_k_lm, number=3) for word, weight, top_k_lm in
-                         zip(top_words_decoded.split(), top_k_weights.cpu().detach().numpy(), in_top_k_words_lm)]
+                             zip(top_words_decoded.split(), top_k_weights.cpu().detach().numpy(), in_top_k_words_lm)]
             self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
 
     def compute_(self, **kwargs):

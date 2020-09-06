@@ -85,11 +85,11 @@ class ClevrEnv(gym.Env):
         # :self.max_len]  # shape (10, 45)
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
-            self.ref_answers = self.ref_answers[0:self.num_questions, :]
+            self.ref_answers = self.ref_answers[0:self.num_questions]
 
         elif self.mode == "test_text":
             self.ref_questions = self.ref_questions[self.num_questions:, :]
-            self.ref_answers = self.ref_answers[self.num_questions:, :]
+            self.ref_answers = self.ref_answers[self.num_questions:]
 
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
