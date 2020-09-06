@@ -1,15 +1,17 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
 # https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-import torch
 import argparse
-import os
-import math
 import json
+import math
+import os
+
 import numpy as np
-from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
-from data_provider.QuestionsDataset import QuestionsDataset
-from train.train_functions import train_one_epoch, evaluate
+import torch
 from torch.utils.data import DataLoader
+
+from data_provider.QuestionsDataset import QuestionsDataset
+from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
+from train.train_functions import train_one_epoch, evaluate
 from utils.utils_train import create_logger, write_to_csv
 
 '''
@@ -44,7 +46,8 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, required=True, default='../../data')
     parser.add_argument("-out_path", type=str, required=True, default='../../output')
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
-
+    parser.add_argument('-range_samples', type=str, default="0,699000",
+                        help="number of samples in the dataset - to train on a subset of the full dataset")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -58,7 +61,8 @@ if __name__ == '__main__':
     test_questions_path = os.path.join(args.data_path, "test_questions.h5")
     vocab_path = os.path.join(args.data_path, "vocab.json")
 
-    train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path)
+    train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path,
+                                     range_samples=args.range_samples)
     val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
     test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
 

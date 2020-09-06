@@ -2,23 +2,25 @@
 Create a questions Dataset to train the language model.
 Inspired from: https://stanford.edu/~shervine/blog/pytorch-how-to-generate-data-parallel
 '''
-import torch
-from torch.utils.data import Dataset, DataLoader
 import json
+import os
+
 import h5py
 import numpy as np
-import os
+import torch
+from torch.utils.data import Dataset, DataLoader
+
 from preprocessing.text_functions import decode
 
 
 # TODO: add a max samples here.
 class QuestionsDataset(Dataset):
-    def __init__(self, h5_questions_path, vocab_path):
+    def __init__(self, h5_questions_path, vocab_path, range_samples=None):
         super(QuestionsDataset, self).__init__()
 
         self.data_path = h5_questions_path
         self.vocab_path = vocab_path
-
+        self.range_samples = range_samples
         self.inp_questions, self.target_questions = self.get_questions()
         self.vocab = self.get_vocab()
         self.idx_to_token = self.get_idx_to_token()
@@ -44,9 +46,15 @@ class QuestionsDataset(Dataset):
         input_questions = hf.get('input_questions')
         input_questions = np.array(input_questions, dtype=np.int32)
         input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
+        range_samples = list(map(int, self.range_samples.split(","))) if self.range_samples is not None else [0,
+                                                                                                              input_questions.size(
+                                                                                                                  0)]
+        input_questions = input_questions[range_samples[0]:range_samples[1]]
+
         target_questions = hf.get('target_questions')
         target_questions = np.array(target_questions, dtype=np.int32)
         target_questions = torch.LongTensor(target_questions)
+        target_questions = target_questions[range_samples[0]:range_samples[1]]
         return input_questions, target_questions  # dim (B,S)
 
     def __len__(self):
