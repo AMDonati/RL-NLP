@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
     print("sample_va...")
     # test sample_va:
-    sample_va = SampleVA(agent=agent, num_truncated=10, k_min=5, dist_action='dist')
+    sample_va = SampleVA(agent=agent, num_truncated=10)
     valid_actions, action_probs = sample_va.get_valid_actions(state)
     print('valid_actions:', valid_actions)
     print('valid_actions shape', valid_actions.size())

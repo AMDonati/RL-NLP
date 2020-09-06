@@ -28,7 +28,6 @@ class PolicyLSTMBatch(nn.Module):
         self.truncate = truncature["masked"]
         self.train_policy = train_policy
         self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
-        # self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
@@ -51,7 +50,7 @@ class PolicyLSTMBatch(nn.Module):
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
-        state_answer = state_answer.to(self.device)
+        state_answer = state_answer if state_answer is None else state_answer.to(self.device)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
@@ -66,7 +65,7 @@ class PolicyLSTMBatch(nn.Module):
     def get_policies(self, probs, valid_actions, logits_exploration):
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens) #TODO: add a self.device here ?
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens)
             if self.train_policy == 'truncated':
                 policy_dist = policy_dist_truncated
         else:
@@ -81,7 +80,6 @@ class PolicyLSTMBatch(nn.Module):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
-        #answer = answer.to(self.device)
         if self.condition_answer == "after_fusion" and answer is not None:
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding

@@ -1,13 +1,11 @@
 import logging
 import os
-
 import h5py
 import numpy as np
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-
-from utils.utils_train import write_to_csv
+from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
 class Metric:
@@ -229,10 +227,12 @@ class LMActionProbs(Metric):
     def fill_(self, **kwargs):
         if kwargs["action"] in kwargs["valid_actions"]:
             self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
+        else:
+            self.measure.append(torch.tensor([0.]).to(self.agent.device))
 
     def compute_(self, **kwargs):
-        lm_probs = torch.stack(self.measure).clone().detach().cpu().squeeze().numpy() if self.measure else 0
-        self.ep_lm_probs = np.round(lm_probs, decimals=5)
+        lm_probs = torch.stack(self.measure).cpu().clone().detach()
+        self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
         self.metric.append(np.mean(self.ep_lm_probs))
 
     def log(self, **kwargs):
@@ -261,6 +261,44 @@ class RunningReturn(Metric):
     def write_to_csv(self):
         write_to_csv(self.out_csv_file, self.dict_metric)
 
+
+class EpsilonTruncation(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "eps_truncation"
+        self.counter = 0
+        self.out_txt_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_metric = dict.fromkeys(["Episode", "Img_idx", "Action", "Policy_prob"])
+        for key in list(self.dict_metric.keys()):
+            self.dict_metric[key] = []
+
+    def fill_(self, **kwargs):
+        if self.agent.epsilon_truncated > 0:
+            if kwargs["action"] not in kwargs["valid_actions"]:
+                self.counter += 1  # TODO: a moving average instead ?
+                action_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["action"].cpu().numpy(), ignored=[])
+                action_prob = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
+                self.measure.append("Episode {} - Img {}/ Action: {}/ Policy prob: {:2.4f}".format(kwargs["i_episode"],
+                                                                                              self.agent.env.img_idx,
+                                                                                              action_decoded,
+                                                                                              action_prob))
+                self.dict_metric["Episode"].append(kwargs["i_episode"])
+                self.dict_metric["Img_idx"].append(self.agent.env.img_idx)
+                self.dict_metric["Action"].append(action_decoded)
+                self.dict_metric["Policy_prob"].append(np.round(action_prob, decimals=4))
+
+    def write_to_csv(self):
+        #write_to_csv(self.out_csv_file, self.dict_metric)
+        write_to_csv_by_row(self.out_csv_file, self.dict_metric)
+
+    def compute_(self, **kwargs):
+        if self.agent.epsilon_truncated > 0:
+            self.metric = [self.counter]
+            string = '\n'.join(self.measure)
+            with open(self.out_txt_file, 'a') as f:
+                f.write(string + '\n')
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
 
@@ -344,7 +382,8 @@ class PPLMetric(Metric):
                             inputs = inp_question[:i + 1].unsqueeze(0)
                             policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
                                                                                       valid_actions=kwargs[
-                                                                                          "valid_actions"])  # TODO: bug here with vqa task.
+                                                                                          "valid_actions"],
+                                                                                      state_answer=self.agent.env.ref_answer)  # TODO: bug here with vqa task.
                             log_prob = policy_dist_truncated.log_prob(target_question[i])
                             self.measure.append(log_prob)
 
@@ -637,4 +676,5 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated,
            "action_probs_lm": LMActionProbs,
            "running_return": RunningReturn,
-           "policy": PolicyMetric}
+           "policy": PolicyMetric,
+           "eps_truncation": EpsilonTruncation}

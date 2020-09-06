@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 from preprocessing.text_functions import decode
 
 
-# TODO: add a max samples here.
+# TODO: add a max samples here: select 350,000 questions.
 class QuestionsDataset(Dataset):
     def __init__(self, h5_questions_path, vocab_path, range_samples=None):
         super(QuestionsDataset, self).__init__()

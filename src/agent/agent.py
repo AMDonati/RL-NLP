@@ -1,7 +1,6 @@
 # TODO: add color logging:
 # https://pypi.org/project/colorlog/
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
-
 import logging
 import os
 import random
@@ -21,7 +20,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
-                 alpha_logits=1., alpha_decay_rate=0., epsilon_truncated=0.):
+                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0.):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -63,13 +62,13 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             ["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", 'unique_words']}
+                             ["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words"]}
         if self.env.reward_type == 'levenshtein_':
             for key in ["ppl", "ratio_closest_questions"]:
                 self.test_metrics[key] = metrics[key](self, train_test="test")
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               ["running_return", "lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog",
-                               "policy", "action_probs", "action_probs_truncated"]}
+                               "policy", "action_probs", "action_probs_truncated", "eps_truncation"]}
         if self.truncate_mode is not None:
             for key in ["action_probs_lm"]:
                 self.train_metrics[key] = metrics[key](self, train_test="train")
@@ -85,7 +84,7 @@ class Agent:
 
     def act(self, state, mode='sampling', truncation=True, baseline=False, train=True):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
-        alpha = self.alpha_logits_lm if train else 0
+        alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
                                                                                   logits_lm,
                                                                                   baseline=baseline,
@@ -104,6 +103,7 @@ class Agent:
         policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
                                                            valid_actions=valid_actions,
                                                            logits_lm=logits_lm, alpha=alpha)
+        #TODO; add an assert here if valid_actions is None and alpha = 0.
         return policy_dist, policy_dist_truncated, value
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
@@ -196,7 +196,8 @@ class Agent:
                             closest_question=closest_question, new_state=new_state, log_probs=log_probs,
                             log_probs_truncated=log_probs_truncated,
                             test_mode=test_mode,
-                            pred_answer=pred_answer)
+                            pred_answer=pred_answer,
+                            i_episode=i_episode)
             state = new_state
             ep_reward += reward
 
