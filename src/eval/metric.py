@@ -228,7 +228,7 @@ class LMActionProbs(Metric):
         if kwargs["action"] in kwargs["valid_actions"]:
             self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
         else:
-            self.measure.append(torch.tensor([0.]))
+            self.measure.append(torch.tensor([0.])).to(self.agent.device)
 
     def compute_(self, **kwargs):
         lm_probs = torch.stack(self.measure).cpu().clone().detach()
