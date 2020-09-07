@@ -3,6 +3,7 @@
 # https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning/blob/master/datasets.py
 import json
 import os
+
 import h5py
 import numpy as np
 import torch
@@ -82,9 +83,18 @@ class CLEVR_Dataset(Dataset):
         return idx
 
     def get_questions_length(self):
-        non_zero_mask = self.input_questions.numpy() != 0 # (B,S).
+        non_zero_mask = self.input_questions.numpy() != 0  # (B,S).
         len = np.sum(non_zero_mask, axis=1)
         return list(len)
+
+    def get_data_from_img_idx(self, img_idx):
+        # caution: this works only for a single img_idx.
+        select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
+        select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
+        feats = self.all_feats[img_idx]
+        feats = torch.FloatTensor(np.array(feats, dtype=np.float32))
+        answers = self.answers[select_idx]
+        return feats, select_questions, answers
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]

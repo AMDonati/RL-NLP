@@ -1,4 +1,5 @@
 import os
+import random
 from collections import namedtuple
 
 import gym
@@ -59,9 +60,10 @@ class ClevrEnv(gym.Env):
         question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
 
         reward, closest_question, pred_answer = self.reward_func.get(question=question,
-                                                        ep_questions_decoded=self.ref_questions_decoded,
-                                                        step_idx=self.step_idx, done=done, real_answer=self.ref_answer,
-                                                        state=self.state)
+                                                                     ep_questions_decoded=self.ref_questions_decoded,
+                                                                     step_idx=self.step_idx, done=done,
+                                                                     real_answer=self.ref_answer,
+                                                                     state=self.state)
         self.step_idx += 1
         if done:
             self.dialog = question
@@ -73,75 +75,50 @@ class ClevrEnv(gym.Env):
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
-        self.data_idx = np.random.randint(range_images[0], range_images[1]*10)
-        #self.img_idx = np.random.randint(range_images[0], range_images[1]) #TODO: keep this.
-        self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
-        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
-                             :self.max_len]  # shape (10, 45)
+        # self.data_idx = np.random.randint(range_images[0], range_images[1]) # corresponds to the index of (img, question, answer) tuple.
+        self.img_idx = np.random.randint(range_images[0], range_images[1])
+        # self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
+
+        self.img_feats, questions, self.ref_answers = self.clevr_dataset.get_data_from_img_idx(self.img_idx)
+        self.ref_questions = questions[:, :self.max_len]
+        # self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
+        # :self.max_len]  # shape (10, 45)
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
+            self.ref_answers = self.ref_answers[0:self.num_questions]
+
         elif self.mode == "test_text":
             self.ref_questions = self.ref_questions[self.num_questions:, :]
+            self.ref_answers = self.ref_answers[self.num_questions:]
+
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
-        _, self.img_feats, self.ref_answer = self.clevr_dataset[self.data_idx] #TODO: implementa function that gives all answers from self.img_idx (or a subset) and select one.
-        #self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
+        self.ref_question_idx = random.sample(range(self.ref_questions.size(0)), 1)
+        self.ref_question = self.ref_questions[self.ref_question_idx]
+        self.ref_answer = self.ref_answers[self.ref_question_idx]
+
+        # _, self.img_feats, self.ref_answer = self.clevr_dataset[self.img_idx]
+        # self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
 
         state_question = [self.special_tokens.SOS_idx]
         # if self.condition_answer:
         # state_question.insert(0, self.clevr_dataset.len_vocab + self.ref_answer)
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
-                                self.img_feats.unsqueeze(0),self.ref_answer)
+                                self.img_feats.unsqueeze(0), self.ref_answer)
         self.step_idx = 0
         self.dialog = None
         # check the correctness of the reward function.
         if self.reward_type == "levenshtein_" and not self.diff_reward:
             reward_true_question, _, _ = self.reward_func.get(question=self.ref_questions_decoded[0],
-                                                           ep_questions_decoded=self.ref_questions_decoded,
-                                                           step_idx=self.step_idx, done=True)
+                                                              ep_questions_decoded=self.ref_questions_decoded,
+                                                              step_idx=self.step_idx, done=True)
             assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
 
         return self.state
 
     def render(self, mode='human', close=False):
         pass
-
-
-class VectorEnv:
-    def __init__(self, make_env_fn, n):
-        self.envs = tuple(make_env_fn() for _ in range(n))
-
-    # Call this only once at the beginning of training (optional):
-    def seed(self, seeds):
-        assert len(self.envs) == len(seeds)
-        return tuple(env.seed(s) for env, s in zip(self.envs, seeds))
-
-    # Call this only once at the beginning of training:
-    def reset(self):
-        return tuple(env.reset() for env in self.envs)
-
-    # Call this on every timestep:
-    def step(self, actions):
-        assert len(self.envs) == len(actions)
-        # return_values = []
-        obs_batch, rew_batch, done_batch, info_batch = [], [], [], []
-        for env, a in zip(self.envs, actions):
-            observation, (reward, _), done, info = env.step(a)
-            if done:
-                observation = env.reset()
-            obs_batch.append(observation)
-            rew_batch.append(reward)
-            done_batch.append(done)
-            info_batch.append(info)
-            # return_values.append((observation, reward, done, info))
-        return obs_batch, rew_batch, done_batch, info_batch
-        # return tuple(return_values)
-
-    # Call this at the end of training:
-    def close(self):
-        for env in self.envs:
-            env.close()
 
 
 if __name__ == '__main__':

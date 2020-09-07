@@ -281,11 +281,11 @@ class EpsilonTruncation(Metric):
                 action_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["action"].cpu().numpy(), ignored=[])
                 action_prob = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
                 self.measure.append("Episode {} - Img {}/ Action: {}/ Policy prob: {:2.4f}".format(kwargs["i_episode"],
-                                                                                              self.agent.env.img_idx.item(),
+                                                                                              self.agent.env.img_idx,
                                                                                               action_decoded,
                                                                                               action_prob))
                 self.dict_metric["Episode"].append(kwargs["i_episode"])
-                self.dict_metric["Img_idx"].append(self.agent.env.img_idx.item())
+                self.dict_metric["Img_idx"].append(self.agent.env.img_idx)
                 self.dict_metric["Action"].append(action_decoded)
                 self.dict_metric["Policy_prob"].append(np.round(action_prob, decimals=4))
 
@@ -338,7 +338,7 @@ class DialogMetric(Metric):
                                                                            decode_answers=True)
                 string = ' IMG {} - question index {}:'.format(kwargs[
                                                                    "img_idx"],
-                                                               self.agent.env.data_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + '-' * 40  # TODO: add the true question.
+                                                               self.agent.env.ref_question_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
