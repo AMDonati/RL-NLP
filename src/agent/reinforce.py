@@ -9,7 +9,7 @@ from agent.agent import Agent
 class REINFORCE(Agent):
     def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10,
-                 eval_no_trunc=0, alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0.):
+                 eval_no_trunc=0, alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0):
         Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
@@ -19,7 +19,8 @@ class REINFORCE(Agent):
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs, eval_no_trunc=eval_no_trunc,
                        alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate,
-                       epsilon_truncated=epsilon_truncated)
+                       epsilon_truncated=epsilon_truncated,
+                       train_seed=train_seed)
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
         self.update_mode = "episode"

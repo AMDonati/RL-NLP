@@ -20,7 +20,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
-                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0.):
+                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -59,6 +59,7 @@ class Agent:
         self.generated_text = []
         self.init_metrics()
         self.start_episode = 1
+        self.train_seed = train_seed
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
@@ -249,7 +250,7 @@ class Agent:
                     for _, metric in self.test_metrics.items():
                         metric.write()
                     dialogs[key].append(
-                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx, env.ref_question_idx,
+                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx, env.ref_question_idx[0],
                                                                                  key) + self.env.clevr_dataset.idx2word(
                             state.text[:, 1:].numpy()[
                                 0]) + '----- closest question:' + closest_question + '------ reward: {}'.format(
@@ -288,8 +289,9 @@ class Agent:
         current_time = time.time()
         timestep = 1
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
+            seed = i_episode if self.train_seed else None
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
-                timestep=timestep, i_episode=i_episode, env=self.env)
+                timestep=timestep, i_episode=i_episode, env=self.env, seed=seed)
             self.decay_alpha_logits_lm(i_episode=i_episode)
             if i_episode % self.log_interval == 0:
                 logging.info(

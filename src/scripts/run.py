@@ -72,7 +72,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
                       "eval_no_trunc": args.eval_no_trunc,
                       "alpha_logits": args.alpha_logits,
                       "alpha_decay_rate": args.alpha_decay_rate,
-                      "epsilon_truncated": args.epsilon_truncated}
+                      "epsilon_truncated": args.epsilon_truncated,
+                      "train_seed": args.train_seed}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -140,8 +141,9 @@ def get_parser():
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=100, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
+    parser.add_argument("-train_seed", type=int, default=0, help="using a seed for the episode generation in training or not...")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
