@@ -83,7 +83,7 @@ class Agent:
                 logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
 
-    def act(self, state, mode='sampling', truncation=True, baseline=False, train=True):
+    def act(self, state, mode='sampling', truncation=True, baseline=False, train=True, timestep=0):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
@@ -92,7 +92,7 @@ class Agent:
                                                                                   alpha=alpha)
         action = self.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                     valid_actions=valid_actions,
-                                    mode=mode)
+                                    mode=mode, timestep=timestep)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         if self.policy.train_policy == 'truncated':
@@ -104,15 +104,17 @@ class Agent:
         policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
                                                            valid_actions=valid_actions,
                                                            logits_lm=logits_lm, alpha=alpha)
-        #TODO; add an assert here if valid_actions is None and alpha = 0.
+        # TODO; add an assert here if valid_actions is None and alpha = 0.
         return policy_dist, policy_dist_truncated, value
 
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
+    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling', timestep=0):
         policy_to_sample_from = policy_dist_truncated
         epsilon_truncated_sample = random.random()
         if epsilon_truncated_sample < self.epsilon_truncated:
             policy_to_sample_from = policy_dist
-        if mode == 'sampling':
+        if self.pretrain:
+            action = self.env.ref_question[:,timestep]
+        elif mode == 'sampling':
             action = policy_to_sample_from.sample()
         elif mode == 'greedy':
             action = torch.argmax(policy_to_sample_from.probs).view(1).detach()
@@ -182,7 +184,7 @@ class Agent:
                                                                                     train=train,
                                                                                     mode=test_mode,
                                                                                     truncation=truncation,
-                                                                                    baseline=baseline)
+                                                                                    baseline=baseline, timestep=t)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
@@ -250,7 +252,8 @@ class Agent:
                     for _, metric in self.test_metrics.items():
                         metric.write()
                     dialogs[key].append(
-                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx, env.ref_question_idx[0],
+                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx,
+                                                                                 env.ref_question_idx[0],
                                                                                  key) + self.env.clevr_dataset.idx2word(
                             state.text[:, 1:].numpy()[
                                 0]) + '----- closest question:' + closest_question + '------ reward: {}'.format(
