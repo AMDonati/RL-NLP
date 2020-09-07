@@ -17,14 +17,12 @@ from preprocessing.text_functions import decode
 class QuestionsDataset(Dataset):
     def __init__(self, h5_questions_path, vocab_path, range_samples=None):
         super(QuestionsDataset, self).__init__()
-
         self.data_path = h5_questions_path
         self.vocab_path = vocab_path
         self.range_samples = range_samples
         self.inp_questions, self.target_questions = self.get_questions()
         self.vocab = self.get_vocab()
         self.idx_to_token = self.get_idx_to_token()
-
         self.vocab_len = len(self.vocab)
         self.seq_len = self.inp_questions.size(1)
 
