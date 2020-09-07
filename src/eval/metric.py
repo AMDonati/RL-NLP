@@ -290,8 +290,9 @@ class EpsilonTruncation(Metric):
                 self.dict_metric["Policy_prob"].append(np.round(action_prob, decimals=4))
 
     def write_to_csv(self):
-        #write_to_csv(self.out_csv_file, self.dict_metric)
-        write_to_csv_by_row(self.out_csv_file, self.dict_metric)
+        if self.agent.epsilon_truncated > 0:
+            #write_to_csv(self.out_csv_file, self.dict_metric)
+            write_to_csv_by_row(self.out_csv_file, self.dict_metric)
 
     def compute_(self, **kwargs):
         if self.agent.epsilon_truncated > 0:
