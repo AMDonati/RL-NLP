@@ -15,7 +15,8 @@ class PPO(Agent):
                  log_interval=1,
                  eval_no_trunc=0,
                  alpha_logits=0.,
-                 alpha_decay_rate=0.
+                 alpha_decay_rate=0.,
+                 train_seed=0
                  ):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
@@ -26,7 +27,8 @@ class PPO(Agent):
                        truncate_mode=truncate_mode,
                        log_interval=log_interval, test_envs=test_envs,
                        eval_no_trunc=eval_no_trunc,
-                       alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate)
+                       alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate,
+                       train_seed=train_seed)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
