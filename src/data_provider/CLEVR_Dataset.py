@@ -89,7 +89,8 @@ class CLEVR_Dataset(Dataset):
 
     def get_data_from_img_idx(self, img_idx):
         # caution: this works only for a single img_idx.
-        select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
+        #select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
+        select_idx = list(np.where(self.img_idxs.data.numpy() == img_idx))
         select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
         feats = self.all_feats[img_idx]
         feats = torch.FloatTensor(np.array(feats, dtype=np.float32))
@@ -125,7 +126,7 @@ if __name__ == '__main__':
     num_samples = clevr_dataset.__len__()
     print('length dataset', num_samples)
     index = np.random.randint(0, num_samples)
-    (inp_q, len_q, tar_q), feats, answer = clevr_dataset.__getitem__(0)
+    (inp_q, tar_q), feats, answer = clevr_dataset.__getitem__(0)
     print('inp_q', inp_q.shape)
     print('tar_q', tar_q.shape)
     print('feats', feats.shape)
@@ -161,3 +162,7 @@ if __name__ == '__main__':
     # ---- test get length -----------------------------------------------------------------------------
     length = clevr_dataset.get_questions_length()
     print(len(length))
+
+    # ---- test get_data_from_img_idx ------------------------------------------------------------------
+    feats, select_questions, ref_answers = clevr_dataset.get_data_from_img_idx(int)
+    print(select_questions)
