@@ -8,6 +8,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 # TODO: add the intermediate reward (diff of R(t+1)-R(t))
 from vr.utils import load_execution_engine, load_program_generator
+import time
 
 
 def get_vocab(key, vocab_path):
@@ -26,7 +27,7 @@ class Reward:
 
 
 class Cosine(Reward):
-    def __init__(self, path, vocab=None):
+    def __init__(self, path, vocab=None, dataset=None):
         Reward.__init__(self, path)
         with open(path) as json_file:
             data = json.load(json_file)
@@ -43,7 +44,7 @@ class Cosine(Reward):
 
 
 class Levenshtein(Reward):
-    def __init__(self, correct_vocab=False, path=None, vocab=None):
+    def __init__(self, correct_vocab=False, path=None, vocab=None, dataset=None):
         Reward.__init__(self, path)
         self.correct_vocab = correct_vocab
 
@@ -74,7 +75,7 @@ class Levenshtein(Reward):
 
 
 class Levenshtein_(Reward):
-    def __init__(self, path=None, vocab=None):
+    def __init__(self, path=None, vocab=None, dataset=None):
         Reward.__init__(self, path)
         self.type = "episode"
 
@@ -88,7 +89,7 @@ class Levenshtein_(Reward):
 
 
 class Differential(Reward):
-    def __init__(self, reward_function, path=None, vocab=None):
+    def __init__(self, reward_function, path=None, vocab=None, dataset=None):
         Reward.__init__(self, path)
         self.type = "step"
         self.reward_function = reward_function
@@ -119,12 +120,12 @@ class VQAAnswer(Reward):
         self.vocab = vocab
         self.dataset = dataset
         self.vocab_questions_vqa = get_vocab('question_token_to_idx', self.vocab)
-        self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
-        # self.idx_to_token = dict(zip(list(self.vocab_questions.values()), list(self.vocab_questions.keys())))
+        # self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
+        self.trad_dict = {value: self.vocab_questions_vqa[key] for key, value in self.dataset.vocab_questions.items() if
+                          key in self.vocab_questions_vqa}
 
     def trad(self, state):
-        tokens = [self.dataset.idx_to_token[token].lower() for token in state.text.squeeze().cpu().numpy()]
-        idx_vqa = [self.vocab_questions_vqa[token] for token in tokens if token in self.vocab_questions_vqa]
+        idx_vqa = [self.trad_dict[idx] for idx in state.text.squeeze().cpu().numpy() if idx in self.trad_dict]
         return torch.tensor(idx_vqa).unsqueeze(dim=0)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
