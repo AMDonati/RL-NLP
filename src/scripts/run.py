@@ -118,6 +118,8 @@ def get_parser():
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein_", help="type of reward function")
     parser.add_argument('-reward_path', type=str, help="path for the reward")
+    parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
+
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -143,7 +145,8 @@ def get_parser():
     # train / test pipeline:
     parser.add_argument("-num_episodes_train", type=int, default=100, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
-    parser.add_argument("-train_seed", type=int, default=0, help="using a seed for the episode generation in training or not...")
+    parser.add_argument("-train_seed", type=int, default=0,
+                        help="using a seed for the episode generation in training or not...")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
     parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
@@ -183,14 +186,17 @@ def run(args):
     writer = get_writer(args, pre_trained, truncated, output_path)
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
-                   num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path)
+                   num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                   reward_vocab=args.reward_vocab)
     if args.reward == 'vqa':
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                              num_questions=args.num_questions, reward_path=args.reward_path) for mode in
+                              num_questions=args.num_questions, reward_path=args.reward_path,
+                              reward_vocab=args.reward_vocab) for mode in
                      ["test_images"]]
     else:
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                              num_questions=args.num_questions, reward_path=args.reward_path) for mode in
+                              num_questions=args.num_questions, reward_path=args.reward_path,
+                              reward_vocab=args.reward_vocab) for mode in
                      ["test_images", "test_text"]]
 
     pretrained_lm = None

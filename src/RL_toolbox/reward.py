@@ -10,6 +10,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 from vr.utils import load_execution_engine, load_program_generator
 
 
+def get_vocab(key, vocab_path):
+    with open(vocab_path, 'r') as f:
+        vocab = json.load(f)[key]
+    return vocab
+
+
 class Reward:
     def __init__(self, path):
         self.path = path
@@ -20,7 +26,7 @@ class Reward:
 
 
 class Cosine(Reward):
-    def __init__(self, path):
+    def __init__(self, path, vocab=None):
         Reward.__init__(self, path)
         with open(path) as json_file:
             data = json.load(json_file)
@@ -37,7 +43,7 @@ class Cosine(Reward):
 
 
 class Levenshtein(Reward):
-    def __init__(self, correct_vocab=False, path=None):
+    def __init__(self, correct_vocab=False, path=None, vocab=None):
         Reward.__init__(self, path)
         self.correct_vocab = correct_vocab
 
@@ -68,7 +74,7 @@ class Levenshtein(Reward):
 
 
 class Levenshtein_(Reward):
-    def __init__(self, path=None):
+    def __init__(self, path=None, vocab=None):
         Reward.__init__(self, path)
         self.type = "episode"
 
@@ -82,7 +88,7 @@ class Levenshtein_(Reward):
 
 
 class Differential(Reward):
-    def __init__(self, reward_function, path=None):
+    def __init__(self, reward_function, path=None, vocab=None):
         Reward.__init__(self, path)
         self.type = "step"
         self.reward_function = reward_function
@@ -91,15 +97,16 @@ class Differential(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if step_idx == 0:
             self.last_reward, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True)
-        reward, closest_question, pred_answer = self.reward_function.get(question, ep_questions_decoded, step_idx=step_idx,
-                                                            done=True)
+        reward, closest_question, pred_answer = self.reward_function.get(question, ep_questions_decoded,
+                                                                         step_idx=step_idx,
+                                                                         done=True)
         diff_reward = reward - self.last_reward
         self.last_reward = reward
         return diff_reward, closest_question, pred_answer
 
 
 class VQAAnswer(Reward):
-    def __init__(self, path=None):
+    def __init__(self, path=None, vocab=None, dataset=None):
         Reward.__init__(self, path)
         self.type = "episode"
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -109,20 +116,30 @@ class VQAAnswer(Reward):
         self.program_generator, pg_kwargs = load_program_generator(path)
         self.program_generator.to(self.device)
         self.program_generator.eval()
+        self.vocab = vocab
+        self.dataset = dataset
+        self.vocab_questions_vqa = get_vocab('question_token_to_idx', self.vocab)
+        self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
+        # self.idx_to_token = dict(zip(list(self.vocab_questions.values()), list(self.vocab_questions.keys())))
+
+    def trad(self, state):
+        tokens = [self.dataset.idx_to_token[token].lower() for token in state.text.squeeze().cpu().numpy()]
+        idx_vqa = [self.vocab_questions_vqa[token] for token in tokens if token in self.vocab_questions_vqa]
+        return torch.tensor(idx_vqa).unsqueeze(dim=0)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
         with torch.no_grad():
-            programs_pred = self.program_generator(state.text.to(self.device))
+            question = self.trad(state)
+            programs_pred = self.program_generator(question)
             scores = self.execution_engine(state.img.to(self.device), programs_pred)
             _, preds = scores.data.cpu().max(1)
             reward = (preds == real_answer).sum().item()
-        return reward, "N/A", preds #TODO: add closest question here?
+        return reward, "N/A", preds  # TODO: add closest question here?
 
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "vqa": VQAAnswer}
-
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
