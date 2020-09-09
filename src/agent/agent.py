@@ -20,7 +20,7 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
-                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0):
+                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -41,6 +41,7 @@ class Agent:
         self.memory = Memory()
         self.num_truncated = num_truncated
         self.epsilon_truncated = epsilon_truncated
+        self.epsilon_truncated_rate = epsilon_truncated_rate
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
         else:
@@ -76,12 +77,15 @@ class Agent:
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
-    def decay_alpha_logits_lm(self, i_episode, alpha_min=0.001, update_every=500):
+    def update_per_episode(self, i_episode, alpha_min=0.001, update_every=500, num_episodes_train=1000):
         if self.alpha_decay_rate > 0 and self.alpha_logits_lm > alpha_min:
             if i_episode % update_every == 0:
                 self.alpha_logits_lm *= (1 - self.alpha_decay_rate)
                 logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
+
+        if i_episode == int(self.epsilon_truncated_rate * num_episodes_train):
+            self.epsilon_truncated = 1
 
     def act(self, state, mode='sampling', truncation=True, baseline=False, train=True, timestep=0):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
@@ -113,7 +117,7 @@ class Agent:
         if epsilon_truncated_sample < self.epsilon_truncated:
             policy_to_sample_from = policy_dist
         if self.pretrain:
-            action = self.env.ref_question[:,timestep]
+            action = self.env.ref_question[:, timestep]
         elif mode == 'sampling':
             action = policy_to_sample_from.sample()
         elif mode == 'greedy':
@@ -295,7 +299,7 @@ class Agent:
             seed = i_episode if self.train_seed else None
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
                 timestep=timestep, i_episode=i_episode, env=self.env, seed=seed)
-            self.decay_alpha_logits_lm(i_episode=i_episode)
+            self.update_per_episode(i_episode=i_episode, num_episodes_train=num_episodes)
             if i_episode % self.log_interval == 0:
                 logging.info(
                     "----------------------------------------- Episode {} - Img  {} -------------------------------------------------------".format(

@@ -18,7 +18,8 @@ class PPO(Agent):
                  alpha_logits=0.,
                  alpha_decay_rate=0.,
                  epsilon_truncated=0.,
-                 train_seed=0):
+                 train_seed=0,
+                 epsilon_truncated_rate=1.):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
@@ -30,7 +31,8 @@ class PPO(Agent):
                        eval_no_trunc=eval_no_trunc,
                        alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate,
                        epsilon_truncated=epsilon_truncated,
-                       train_seed=train_seed
+                       train_seed=train_seed,
+                       epsilon_truncated_rate=epsilon_truncated_rate
                        )
         self.policy_old = policy
         self.policy_old.to(self.device)

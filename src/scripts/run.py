@@ -73,6 +73,7 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
                       "alpha_logits": args.alpha_logits,
                       "alpha_decay_rate": args.alpha_decay_rate,
                       "epsilon_truncated": args.epsilon_truncated,
+                      "epsilon_truncated_rate": args.epsilon_truncated_rate,
                       "train_seed": args.train_seed}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
@@ -140,6 +141,8 @@ def get_parser():
                         help="alpha decay rate for the convex logits mixture. if 0, does not decay the alpha")
     parser.add_argument('-epsilon_truncated', type=float, default=0.,
                         help="the agent sample from truncated or total action space")
+    parser.add_argument('-epsilon_truncated_rate', type=float, default=1,
+                        help="number of training iterations before epsilon truncated set to 1")
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
@@ -155,6 +158,7 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+
 
     return parser
 
