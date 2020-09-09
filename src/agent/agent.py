@@ -86,6 +86,7 @@ class Agent:
 
         if i_episode == int(self.epsilon_truncated_rate * num_episodes_train):
             self.epsilon_truncated = 1
+            logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
     def act(self, state, mode='sampling', truncation=True, baseline=False, train=True, timestep=0):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
