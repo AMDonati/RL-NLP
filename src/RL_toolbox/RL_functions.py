@@ -6,7 +6,7 @@ import os
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 import Levenshtein as lv
 from models.Policy_network import PolicyLSTM
-from RL_toolbox.reward import Levenshtein, get_dummy_reward
+from RL_toolbox.reward import Levenshtein
 
 State = namedtuple('State', ('text', 'img'))
 Episode = namedtuple('Episode', ('img_idx', 'img_feats', 'GD_questions', 'closest_question', 'dialog', 'rewards'))
@@ -86,9 +86,9 @@ def generate_one_episode(env, policy_network, device, select='greedy'):
     rewards, log_probs, values = [], []
     while not done:
         if select == 'sampling':
-            action, log_prob, value = select_action(policy_network, state, device, mode='sampling')
+            action, log_prob, value = act(policy_network, state, device, mode='sampling')
         elif select == 'greedy':
-            action, log_prob, value = select_action(policy_network, state, device, mode='greedy')
+            action, log_prob, value = act(policy_network, state, device, mode='greedy')
         # compute next state, done, reward from the action.
         state, (reward, closest_question), done, _ = env.step(action)
         rewards.append(reward)

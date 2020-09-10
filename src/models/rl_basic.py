@@ -28,7 +28,6 @@ class PolicyLSTMBatch(nn.Module):
         self.truncate = truncature["masked"]
         self.train_policy = train_policy
         self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
-        # self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
@@ -51,6 +50,7 @@ class PolicyLSTMBatch(nn.Module):
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
+        state_answer = state_answer if state_answer is None else state_answer.to(self.device)
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
@@ -89,7 +89,7 @@ class PolicyLSTMBatch(nn.Module):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.condition_answer == "before_lstm" and answer is not None:
-            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1))], dim=1)
+            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)], dim=1)
             # text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
 
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)

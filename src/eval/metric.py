@@ -1,13 +1,11 @@
 import logging
 import os
-
 import h5py
 import numpy as np
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-
-from utils.utils_train import write_to_csv
+from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
 class Metric:
@@ -227,10 +225,13 @@ class LMActionProbs(Metric):
         self.key = "action_probs_lm"
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
+        if kwargs["action"] in kwargs["valid_actions"]:
+            self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
+        else:
+            self.measure.append(torch.tensor([0.]).to(self.agent.device))
 
     def compute_(self, **kwargs):
-        lm_probs = torch.stack(self.measure).clone().detach()
+        lm_probs = torch.stack(self.measure).cpu().clone().detach()
         self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
         self.metric.append(np.mean(self.ep_lm_probs))
 
@@ -261,6 +262,45 @@ class RunningReturn(Metric):
         write_to_csv(self.out_csv_file, self.dict_metric)
 
 
+class EpsilonTruncation(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "eps_truncation"
+        self.counter = 0
+        self.out_txt_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.csv')
+        self.dict_metric = dict.fromkeys(["Episode", "Img_idx", "Action", "Policy_prob"])
+        for key in list(self.dict_metric.keys()):
+            self.dict_metric[key] = []
+
+    def fill_(self, **kwargs):
+        if self.agent.epsilon_truncated > 0:
+            if kwargs["action"] not in kwargs["valid_actions"]:
+                self.counter += 1  # TODO: a moving average instead ?
+                action_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["action"].cpu().numpy(), ignored=[])
+                action_prob = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
+                self.measure.append("Episode {} - Img {}/ Action: {}/ Policy prob: {:2.4f}".format(kwargs["i_episode"],
+                                                                                              self.agent.env.img_idx,
+                                                                                              action_decoded,
+                                                                                              action_prob))
+                self.dict_metric["Episode"].append(kwargs["i_episode"])
+                self.dict_metric["Img_idx"].append(self.agent.env.img_idx)
+                self.dict_metric["Action"].append(action_decoded)
+                self.dict_metric["Policy_prob"].append(np.round(action_prob, decimals=4))
+
+    def write_to_csv(self):
+        if self.agent.epsilon_truncated > 0:
+            #write_to_csv(self.out_csv_file, self.dict_metric)
+            write_to_csv_by_row(self.out_csv_file, self.dict_metric)
+
+    def compute_(self, **kwargs):
+        if self.agent.epsilon_truncated > 0:
+            self.metric = [self.counter]
+            string = '\n'.join(self.measure)
+            with open(self.out_txt_file, 'a') as f:
+                f.write(string + '\n')
+
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
 
 class DialogMetric(Metric):
@@ -282,15 +322,24 @@ class DialogMetric(Metric):
     def compute_(self, **kwargs):
         with torch.no_grad():
             if not self.train_test + '_' + self.key in self.generated_dialog.keys():
-                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text[:, 1:].squeeze().cpu()]
+                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text.squeeze().cpu()]
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
-                    kwargs["state"].text[:, 1:].cpu().view(-1))
+                    kwargs["state"].text.cpu().view(-1))
             state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
-                                                                  ignored=[])  # TODO: investigate the pb of length of dialogue for pretrain here.
-            closest_question_decoded = kwargs["closest_question"]
-            string = ' img {}:'.format(kwargs[
-                                           "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+                                                                  ignored=[])
+            if self.agent.env.reward_type == 'levenshtein_':
+                closest_question_decoded = kwargs["closest_question"]
+                string = 'IMG {}:'.format(kwargs[
+                                              "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+            elif self.agent.env.reward_type == 'vqa':
+                pred_answer_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(),
+                                                                            decode_answers=True)
+                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([self.agent.env.ref_answer.numpy().item()],
+                                                                           decode_answers=True)
+                string = ' IMG {} - question index {}:'.format(kwargs[
+                                                                   "img_idx"],
+                                                               self.agent.env.ref_question_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
@@ -333,10 +382,11 @@ class PPLMetric(Metric):
                         for i in range(len(inp_question)):
                             inputs = inp_question[:i + 1].unsqueeze(0)
                             policy_dist, policy_dist_truncated, _ = self.agent.policy(inputs, kwargs["state"].img,
-                                                                                      valid_actions=kwargs["valid_actions"])
+                                                                                      valid_actions=kwargs[
+                                                                                          "valid_actions"],
+                                                                                      state_answer=self.agent.env.ref_answer)  # TODO: bug here with vqa task.
                             log_prob = policy_dist_truncated.log_prob(target_question[i])
                             self.measure.append(log_prob)
-
 
     def compute_(self, **kwargs):
         if kwargs["test_mode"] == 'sampling':
@@ -410,9 +460,13 @@ class RewardMetric(Metric):
         condition = kwargs["done"] if self.agent.env.reward_func.type == "episode" else True
         if condition:
             self.measure["reward"] = [kwargs["reward"]]
-            len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(), ignored=[]).split())
-            norm_reward = [kwargs["reward"] / max(len_episode,
-                                                  len(kwargs["closest_question"].split()))]
+            len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(),
+                                                                    ignored=[]).split())
+            if self.agent.env.reward_type == 'levenshtein_':
+                norm_reward = [kwargs["reward"] / max(len_episode,
+                                                      len(kwargs["closest_question"].split()))]
+            elif self.agent.env.reward_type == 'vqa':
+                norm_reward = self.measure["reward"]
             self.measure["norm_reward"] = norm_reward
             self.measure["len_dialog"] = [len_episode]
 
@@ -600,7 +654,7 @@ class PolicyMetric(Metric):
                 else:
                     in_top_k_words_lm.append("N")
             weights_words = ["{}/{:.3f}/{}".format(word, weight, top_k_lm, number=3) for word, weight, top_k_lm in
-                         zip(top_words_decoded.split(), top_k_weights.cpu().detach().numpy(), in_top_k_words_lm)]
+                             zip(top_words_decoded.split(), top_k_weights.cpu().detach().numpy(), in_top_k_words_lm)]
             self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
 
     def compute_(self, **kwargs):
@@ -623,4 +677,5 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated,
            "action_probs_lm": LMActionProbs,
            "running_return": RunningReturn,
-           "policy": PolicyMetric}
+           "policy": PolicyMetric,
+           "eps_truncation": EpsilonTruncation}

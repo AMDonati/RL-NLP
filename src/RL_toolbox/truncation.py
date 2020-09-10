@@ -52,29 +52,6 @@ class Truncation:
             valid_actions, action_probs = self.truncate(log_probas, logits)
             return valid_actions, action_probs, logits
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False):
-        if baseline:
-            policy_dist, policy_dist_truncated, value = self.agent.start_policy(state.text, state.img, state.answer)
-        else:
-            if type(self.agent).__name__ == 'PPO':  # trick to distinguish between PPO and REINFORCE in select_action.
-                policy_dist, policy_dist_truncated, value = self.agent.policy_old(state.text, state.img, state.answer,
-                                                                                  valid_actions=valid_actions,
-                                                                                  logits_lm=logits_lm, alpha=alpha)
-            elif type(self.agent).__name__ == 'REINFORCE':
-                policy_dist, policy_dist_truncated, value = self.agent.policy(state.text, state.img, state.answer,
-                                                                              valid_actions=valid_actions,
-                                                                              logits_lm=logits_lm, alpha=alpha)
-        return policy_dist, policy_dist_truncated, value
-
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling'):
-        if mode == 'sampling':
-            action = policy_dist_truncated.sample()
-        elif mode == 'greedy':
-            action = torch.argmax(policy_dist_truncated.probs).view(1).detach()
-        if policy_dist_truncated.probs.size() != policy_dist.probs.size():
-            action = torch.gather(valid_actions, 1, action.view(1, 1))
-        return action
-
     def truncate(self, log_probas, logits):
         return None, None
 
@@ -200,7 +177,7 @@ if __name__ == '__main__':
 
     print("sample_va...")
     # test sample_va:
-    sample_va = SampleVA(agent=agent, num_truncated=10, k_min=5, dist_action='dist')
+    sample_va = SampleVA(agent=agent, num_truncated=10)
     valid_actions, action_probs = sample_va.get_valid_actions(state)
     print('valid_actions:', valid_actions)
     print('valid_actions shape', valid_actions.size())

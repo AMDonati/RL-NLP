@@ -8,7 +8,17 @@
 ## Downloading the dataset
 The CLEVR Dataset can be downloaded [here](https://cs.stanford.edu/people/jcjohns/clevr/).   
 The full dataset (questions + images) or only the questions part can be downloaded. 
-To avoid memory issues on local machines, the first 21 images of the train/val/test datasets are available for download [here](https://drive.google.com/drive/folders/1OEy8Dfq2mO-vAiL9hFO1E_HbqC0wX4WB?usp=sharing).
+To avoid memory issues on local machines, the first 21 images of the train/val/test datasets are available for download [here](https://drive.google.com/drive/folders/1OEy8Dfq2mO-vAiL9hFO1E_HbqC0wX4WB?usp=sharing).  
+To download the dataset directly via the shell, you can run the following commands: 
+`mkdir data` 
+`wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip -O data/CLEVR_v1.0.zip`  
+`unzip data/CLEVR_v1.0.zip -d data`
+
+## Requirements 
+* You can create a conda environment called rl-nlp: `conda create -n rl-nlp`
+* And activate it: `conda activate rl-nlp`
+* The required library can be installed via the file requirements.txt: `pip install -r requirements.txt`
+* The code relies on the CLOSURE github: you need to install it with: `python -m pip install git+https://github.com/gqkc/CLOSURE.git --upgrade`
 
 ## Data preprocessing
 * To run all the scripts from the origin repo (RL-NLP), run first the following command line: `export PYTHONPATH=src:${PYTHONPATH}`
@@ -43,6 +53,7 @@ To extract the image features, run the following command lines (batch size arg m
 #### Link to the pre-trained models 
 * Language Model .pt file [here](https://drive.google.com/drive/folders/1zRT4EF8xNmilzZMYysyhCj73oQKvBLsX?usp=sharing). 
 * Pretrained Policy .pt file (word_emb_size = 32, hidden_size = 64) [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing). 
+* Pretrained VQA model (FiLM version [here](https://drive.google.com/file/d/15HiUyfcXcJyGdZEs-knb9EQEFGfyg4cj/view?usp=sharing)
 ### Training the Language Model on the Dataset of Questions
 `python src/train/train_LM_network.py -model "lstm" -num_layers 1 -emb_size 32  \`
 `-hidden_size 64 -p_drop 0 -data_path "data" \`

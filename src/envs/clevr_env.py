@@ -1,4 +1,5 @@
 import os
+import random
 from collections import namedtuple
 
 import gym
@@ -15,7 +16,7 @@ class ClevrEnv(gym.Env):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein_",
                  reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False,
-                 condition_answer=True):
+                 condition_answer=True, reward_vocab=None):
         super(ClevrEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
@@ -39,7 +40,7 @@ class ClevrEnv(gym.Env):
         self.max_len = max_len
 
         self.reward_type = reward_type
-        self.reward_func = rewards[reward_type](reward_path)
+        self.reward_func = rewards[reward_type](path=reward_path, vocab=reward_vocab, dataset=self.clevr_dataset)
         self.diff_reward = diff_reward
         if diff_reward:
             self.reward_func = Differential(self.reward_func)
@@ -47,7 +48,7 @@ class ClevrEnv(gym.Env):
         self.state, self.dialog = None, None
         self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
-        self.condition_answer = condition_answer #TODO: where is this used?
+        self.condition_answer = condition_answer
 
     def step(self, action):
         # note that the padding of ref questions and generated dialog has been removed.
@@ -58,14 +59,15 @@ class ClevrEnv(gym.Env):
         # question_tokens_padded[:question_tokens.shape[0]] = question_tokens  # if needed
         question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
 
-        reward, closest_question = self.reward_func.get(question=question,
-                                                        ep_questions_decoded=self.ref_questions_decoded,
-                                                        step_idx=self.step_idx, done=done, real_answer=self.ref_answer,
-                                                        state=self.state)
+        reward, closest_question, pred_answer = self.reward_func.get(question=question,
+                                                                     ep_questions_decoded=self.ref_questions_decoded,
+                                                                     step_idx=self.step_idx, done=done,
+                                                                     real_answer=self.ref_answer,
+                                                                     state=self.state)
         self.step_idx += 1
         if done:
             self.dialog = question
-        return self.state, (reward, closest_question), done, {}
+        return self.state, (reward, closest_question, pred_answer), done, {}
 
     def reset(self, seed=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
@@ -73,32 +75,44 @@ class ClevrEnv(gym.Env):
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
-        self.img_idx = np.random.randint(range_images[0], range_images[1]) #TODO: here, img_idx should be selected with a self.index between 0 & 700,000.
-        self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
-                             :self.max_len]  # shape (10, 45)
+        # self.data_idx = np.random.randint(range_images[0], range_images[1]) # corresponds to the index of (img, question, answer) tuple.
+        self.img_idx = np.random.randint(range_images[0], range_images[1])
+        # self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
+
+        self.img_feats, questions, self.ref_answers = self.clevr_dataset.get_data_from_img_idx(self.img_idx)
+        self.ref_questions = questions[:, :self.max_len]
+        # self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
+        # :self.max_len]  # shape (10, 45)
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
+            self.ref_answers = self.ref_answers[0:self.num_questions]
+
         elif self.mode == "test_text":
             self.ref_questions = self.ref_questions[self.num_questions:, :]
+            self.ref_answers = self.ref_answers[self.num_questions:]
+
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
-        _, _, self.ref_answer = self.clevr_dataset[self.img_idx] #TODO: this should not be self.img_idx here...
-        #TODO: remove 'YES' / 'NO' ANSWERS...
-        self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
+        self.ref_question_idx = random.sample(range(self.ref_questions.size(0)), 1)
+        self.ref_question = self.ref_questions[self.ref_question_idx]
+        self.ref_answer = self.ref_answers[self.ref_question_idx]
+
+        # _, self.img_feats, self.ref_answer = self.clevr_dataset[self.img_idx]
+        # self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
 
         state_question = [self.special_tokens.SOS_idx]
         # if self.condition_answer:
         # state_question.insert(0, self.clevr_dataset.len_vocab + self.ref_answer)
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
-                                self.img_feats.unsqueeze(0),self.ref_answer)
+                                self.img_feats.unsqueeze(0), self.ref_answer)
         self.step_idx = 0
         self.dialog = None
         # check the correctness of the reward function.
         if self.reward_type == "levenshtein_" and not self.diff_reward:
-            reward_true_question, _ = self.reward_func.get(question=self.ref_questions_decoded[0],
-                                                           ep_questions_decoded=self.ref_questions_decoded,
-                                                           step_idx=self.step_idx, done=True)
+            reward_true_question, _, _ = self.reward_func.get(question=self.ref_questions_decoded[0],
+                                                              ep_questions_decoded=self.ref_questions_decoded,
+                                                              step_idx=self.step_idx, done=True)
             assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
 
         return self.state
@@ -107,51 +121,15 @@ class ClevrEnv(gym.Env):
         pass
 
 
-class VectorEnv:
-    def __init__(self, make_env_fn, n):
-        self.envs = tuple(make_env_fn() for _ in range(n))
-
-    # Call this only once at the beginning of training (optional):
-    def seed(self, seeds):
-        assert len(self.envs) == len(seeds)
-        return tuple(env.seed(s) for env, s in zip(self.envs, seeds))
-
-    # Call this only once at the beginning of training:
-    def reset(self):
-        return tuple(env.reset() for env in self.envs)
-
-    # Call this on every timestep:
-    def step(self, actions):
-        assert len(self.envs) == len(actions)
-        # return_values = []
-        obs_batch, rew_batch, done_batch, info_batch = [], [], [], []
-        for env, a in zip(self.envs, actions):
-            observation, (reward, _), done, info = env.step(a)
-            if done:
-                observation = env.reset()
-            obs_batch.append(observation)
-            rew_batch.append(reward)
-            done_batch.append(done)
-            info_batch.append(info)
-            # return_values.append((observation, reward, done, info))
-        return obs_batch, rew_batch, done_batch, info_batch
-        # return tuple(return_values)
-
-    # Call this at the end of training:
-    def close(self):
-        for env in self.envs:
-            env.close()
-
-
 if __name__ == '__main__':
     env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,20', mode="test_images")
     seed = 123
     seed = np.random.randint(100000)
     state = env.reset(seed)
     print('Img Idx', env.img_idx)
-    state = env.reset(seed)
-    print('Img Idx', env.img_idx)
+    print('Question Idx', env.ref_question_idx)
+    print('Ref questions', env.ref_questions_decoded)
+    print('Ref Answers', env.ref_answers)
+    print('Ref Answer', env.ref_answer)
+    print('Ref Question', env.ref_question)
 
-    make_env_fn = lambda: ClevrEnv(data_path="../../data", max_len=5, max_samples=20)
-    # env = VectorEnv(make_env_fn, n=4)
-    # env = DummyVecEnv([make_env_fn])

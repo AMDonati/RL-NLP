@@ -3,6 +3,7 @@
 # https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Image-Captioning/blob/master/datasets.py
 import json
 import os
+
 import h5py
 import numpy as np
 import torch
@@ -65,19 +66,36 @@ class CLEVR_Dataset(Dataset):
         idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
         return idx_to_token
 
-    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, ignored=["<SOS>"]):
-        tokens = decode(seq_idx=seq_idx, idx_to_token=self.idx_to_token, stop_at_end=stop_at_end, delim=delim,
+    def idx2word(self, seq_idx, delim=' ', stop_at_end=False, ignored=["<SOS>"], decode_answers=False):
+        if decode_answers:
+            idx_to_token = self.get_idx_to_token(questions=False)
+        else:
+            idx_to_token = self.idx_to_token
+        tokens = decode(seq_idx=seq_idx, idx_to_token=idx_to_token, stop_at_end=stop_at_end, delim=delim,
                         ignored=ignored)
         return tokens
 
-    def word2idx(self, seq_tokens, allow_unk=True):
-        idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_questions, allow_unk=allow_unk)
+    def word2idx(self, seq_tokens, allow_unk=True, encode_answers=False):
+        if encode_answers:
+            idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_answers, allow_unk=allow_unk)
+        else:
+            idx = encode(seq_tokens=seq_tokens, token_to_idx=self.vocab_questions, allow_unk=allow_unk)
         return idx
 
     def get_questions_length(self):
-        non_zero_mask = self.input_questions.numpy() != 0 # (B,S).
+        non_zero_mask = self.input_questions.numpy() != 0  # (B,S).
         len = np.sum(non_zero_mask, axis=1)
         return list(len)
+
+    def get_data_from_img_idx(self, img_idx):
+        # caution: this works only for a single img_idx.
+        #select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
+        select_idx = list(np.where(self.img_idxs.data.numpy() == img_idx))
+        select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
+        feats = self.all_feats[img_idx]
+        feats = torch.FloatTensor(np.array(feats, dtype=np.float32))
+        answers = self.answers[select_idx]
+        return feats, select_questions, answers
 
     def __getitem__(self, index):
         input_question = self.input_questions[index, :]
@@ -86,7 +104,6 @@ class CLEVR_Dataset(Dataset):
         answer = self.answers[index]
         # loading img feature of img_idx
         feats = self.get_feats_from_img_idx(img_idx)
-
         return (input_question, target_question), feats, answer
 
     def __len__(self):
@@ -145,3 +162,7 @@ if __name__ == '__main__':
     # ---- test get length -----------------------------------------------------------------------------
     length = clevr_dataset.get_questions_length()
     print(len(length))
+
+    # ---- test get_data_from_img_idx ------------------------------------------------------------------
+    feats, select_questions, ref_answers = clevr_dataset.get_data_from_img_idx(int)
+    print(select_questions)

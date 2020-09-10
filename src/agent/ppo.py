@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
+
 from RL_toolbox.RL_functions import compute_grad_norm
 from agent.agent import Agent
 
@@ -16,8 +17,9 @@ class PPO(Agent):
                  eval_no_trunc=0,
                  alpha_logits=0.,
                  alpha_decay_rate=0.,
-                 train_seed=0
-                 ):
+                 epsilon_truncated=0.,
+                 train_seed=0,
+                 epsilon_truncated_rate=1.):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
@@ -28,7 +30,10 @@ class PPO(Agent):
                        log_interval=log_interval, test_envs=test_envs,
                        eval_no_trunc=eval_no_trunc,
                        alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate,
-                       train_seed=train_seed)
+                       epsilon_truncated=epsilon_truncated,
+                       train_seed=train_seed,
+                       epsilon_truncated_rate=epsilon_truncated_rate
+                       )
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -39,8 +44,8 @@ class PPO(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def evaluate(self, state_text, state_img, states_answer,action):
-        policy_dist, _, value = self.policy(state_text, state_img,states_answer, valid_actions=None)
+    def evaluate(self, state_text, state_img, states_answer, action):
+        policy_dist, _, value = self.policy(state_text, state_img, states_answer, valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy
@@ -72,16 +77,14 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach().squeeze()
+            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)
             # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy
 
-            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards) if not self.pretrain else torch.tensor(
-                [0]).float().to(
-                self.device)
+            vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards)
             loss = surr + vf_loss - entropy_loss
             # logging.info(
             #     "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
@@ -110,3 +113,10 @@ class PPO(Agent):
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         return loss.mean()
+
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False):
+        policy = self.start_policy if baseline else self.policy_old
+        policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
+                                                           valid_actions=valid_actions,
+                                                           logits_lm=logits_lm, alpha=alpha)
+        return policy_dist, policy_dist_truncated, value
