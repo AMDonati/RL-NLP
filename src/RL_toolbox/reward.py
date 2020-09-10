@@ -8,7 +8,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 # TODO: add the intermediate reward (diff of R(t+1)-R(t))
 from vr.utils import load_execution_engine, load_program_generator
-import time
 
 
 def get_vocab(key, vocab_path):
@@ -120,13 +119,13 @@ class VQAAnswer(Reward):
         self.vocab = vocab
         self.dataset = dataset
         self.vocab_questions_vqa = get_vocab('question_token_to_idx', self.vocab)
-        #self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
+        # self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
         self.trad_dict = {value: self.vocab_questions_vqa[key] for key, value in self.dataset.vocab_questions.items() if
                           key in self.vocab_questions_vqa}
 
     def trad(self, state):
         idx_vqa = [self.trad_dict[idx] for idx in state.text.squeeze().cpu().numpy() if idx in self.trad_dict]
-        idx_vqa.insert(0,1)
+        idx_vqa.insert(0, 1)
         idx_vqa.append(2)
         return torch.tensor(idx_vqa).unsqueeze(dim=0)
 
@@ -134,7 +133,7 @@ class VQAAnswer(Reward):
         if not done:
             return 0, "N/A", None
         with torch.no_grad():
-            question = self.trad(state)
+            question = self.trad(state).to(self.device)
             programs_pred = self.program_generator(question)
             scores = self.execution_engine(state.img.to(self.device), programs_pred)
             _, preds = scores.data.cpu().max(1)
