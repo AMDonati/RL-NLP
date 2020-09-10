@@ -120,12 +120,14 @@ class VQAAnswer(Reward):
         self.vocab = vocab
         self.dataset = dataset
         self.vocab_questions_vqa = get_vocab('question_token_to_idx', self.vocab)
-        # self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
+        #self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
         self.trad_dict = {value: self.vocab_questions_vqa[key] for key, value in self.dataset.vocab_questions.items() if
                           key in self.vocab_questions_vqa}
 
     def trad(self, state):
         idx_vqa = [self.trad_dict[idx] for idx in state.text.squeeze().cpu().numpy() if idx in self.trad_dict]
+        idx_vqa.insert(0,1)
+        idx_vqa.append(2)
         return torch.tensor(idx_vqa).unsqueeze(dim=0)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):

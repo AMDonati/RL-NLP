@@ -57,8 +57,8 @@ class PolicyLSTMBatch(nn.Module):
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
-        logits_exploration = (1 - alpha) * logits + alpha * logits_lm
         probs = F.softmax(logits, dim=-1)
+        logits_exploration = (1 - alpha) * logits + alpha * logits_lm
         policy_dist, policy_dist_truncated = self.get_policies(probs, valid_actions, logits_exploration)
         return policy_dist, policy_dist_truncated, value
 
