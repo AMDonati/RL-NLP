@@ -55,9 +55,9 @@ To extract the image features, run the following command lines (batch size arg m
 * Pretrained Policy .pt file (word_emb_size = 32, hidden_size = 64) [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing). 
 * Pretrained VQA model (FiLM version [here](https://drive.google.com/file/d/15HiUyfcXcJyGdZEs-knb9EQEFGfyg4cj/view?usp=sharing)
 ### Training the Language Model on the Dataset of Questions
-`python src/train/train_LM_network.py -model "lstm" -num_layers 1 -emb_size 32  \`
-`-hidden_size 64 -p_drop 0 -data_path "data" \`
-`-out_path "output" -bs 512 -ep 20 -num_workers 0`
+`python src/train/train_LM_network.py -model "lstm" -num_layers 1 -emb_size 512  \`
+`-hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data" \`
+`-out_path "output" -bs 512 -ep 20 -num_workers 6`
 
 ### Pre-training of the Policy with Supervised Learning 
 `python src/train/train_Policy_SL.py -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 \
