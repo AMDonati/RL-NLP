@@ -37,7 +37,7 @@ def tokenize(s, add_start_token, add_end_token, punct_to_keep, punct_to_remove, 
 
     if punct_to_remove is not None:
         for p in punct_to_remove:
-            s = s.replace(p, '')
+            s = s.replace(p, '') #TODO: remove instead ?
 
     tokens = s.split(delim)
     start_token_upper = tokens[0]
@@ -65,6 +65,10 @@ def build_vocab(sequences, min_token_count, punct_to_keep, punct_to_remove, deli
                 token_to_count[token] = 0
             token_to_count[token] += 1
         start_tokens.append(start_token_upper)
+
+    # remove "" token
+    if "" in list(token_to_count.keys()):
+        del token_to_count[""]
 
     token_to_idx = {}
     for token, idx in SPECIAL_TOKENS.items():
