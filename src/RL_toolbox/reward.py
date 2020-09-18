@@ -125,8 +125,8 @@ class VQAAnswer(Reward):
 
     def trad(self, state):
         idx_vqa = [self.trad_dict[idx] for idx in state.text.squeeze().cpu().numpy() if idx in self.trad_dict]
-        idx_vqa.insert(0, 1)
-        idx_vqa.append(2)
+        idx_vqa.insert(0, 1) # add SOS token.
+        idx_vqa.append(2) # add EOS token.
         return torch.tensor(idx_vqa).unsqueeze(dim=0)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):

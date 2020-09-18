@@ -30,7 +30,7 @@ class ClevrEnv(gym.Env):
                                            h5_feats_path=h5_feats_path,
                                            vocab_path=vocab_path,
                                            max_samples=max_samples)
-        
+
         SOS_idx = self.clevr_dataset.vocab_questions["<SOS>"]
         EOS_idx = self.clevr_dataset.vocab_questions["<EOS>"]
 
