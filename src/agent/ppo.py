@@ -19,7 +19,8 @@ class PPO(Agent):
                  alpha_decay_rate=0.,
                  epsilon_truncated=0.,
                  train_seed=0,
-                 epsilon_truncated_rate=1.):
+                 epsilon_truncated_rate=1.,
+                 is_loss_correction=1):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
@@ -32,8 +33,8 @@ class PPO(Agent):
                        alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate,
                        epsilon_truncated=epsilon_truncated,
                        train_seed=train_seed,
-                       epsilon_truncated_rate=epsilon_truncated_rate
-                       )
+                       epsilon_truncated_rate=epsilon_truncated_rate,
+                       is_loss_correction=is_loss_correction)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -66,6 +67,7 @@ class PPO(Agent):
         old_states_answer = torch.stack(self.memory.states_answer)
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
         old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
+        old_logprobs_truncated = torch.stack(self.memory.logprobs_truncated).to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
@@ -76,25 +78,25 @@ class PPO(Agent):
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
+            # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
+            is_ratios = torch.exp(old_logprobs - old_logprobs_truncated).view(-1)
+
+            # adding the is_ratio:
+            if self.is_loss_correction:
+                ratios *= is_ratios
+
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)
-            # entropy_loss = self.entropy_coeff * torch.tensor(entropy_coeffs) * dist_entropy
             entropy_loss = self.entropy_coeff * dist_entropy
 
             vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards)
             loss = surr + vf_loss - entropy_loss
-            # logging.info(
-            #     "loss {} entropy {} surr {} mse {} ".format(loss.mean(), dist_entropy.mean(),
-            #                                                 surr.mean(),
-            #                                                 vf_loss.mean()))
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
-            # self.writer.add_scalar('entropy', dist_entropy.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
-            # self.writer.add_scalar('surrogate', surr.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
 
             # take gradient step
