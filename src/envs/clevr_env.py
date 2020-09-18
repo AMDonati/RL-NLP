@@ -30,7 +30,7 @@ class ClevrEnv(gym.Env):
                                            h5_feats_path=h5_feats_path,
                                            vocab_path=vocab_path,
                                            max_samples=max_samples)
-
+        
         SOS_idx = self.clevr_dataset.vocab_questions["<SOS>"]
         EOS_idx = self.clevr_dataset.vocab_questions["<EOS>"]
 
@@ -75,18 +75,13 @@ class ClevrEnv(gym.Env):
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
-        # self.data_idx = np.random.randint(range_images[0], range_images[1]) # corresponds to the index of (img, question, answer) tuple.
         self.img_idx = np.random.randint(range_images[0], range_images[1])
-        # self.img_idx = self.clevr_dataset.img_idxs[self.data_idx].numpy()
-
         self.img_feats, questions, self.ref_answers = self.clevr_dataset.get_data_from_img_idx(self.img_idx)
         self.ref_questions = questions[:, :self.max_len]
-        # self.ref_questions = self.clevr_dataset.get_questions_from_img_idx(self.img_idx)[:,
-        # :self.max_len]  # shape (10, 45)
+
         if self.mode == "train":
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
             self.ref_answers = self.ref_answers[0:self.num_questions]
-
         elif self.mode == "test_text":
             self.ref_questions = self.ref_questions[self.num_questions:, :]
             self.ref_answers = self.ref_answers[self.num_questions:]
@@ -97,13 +92,7 @@ class ClevrEnv(gym.Env):
         self.ref_question_idx = random.sample(range(self.ref_questions.size(0)), 1)
         self.ref_question = self.ref_questions[self.ref_question_idx]
         self.ref_answer = self.ref_answers[self.ref_question_idx]
-
-        # _, self.img_feats, self.ref_answer = self.clevr_dataset[self.img_idx]
-        # self.img_feats = self.clevr_dataset.get_feats_from_img_idx(self.img_idx)  # shape (1024, 14, 14)
-
         state_question = [self.special_tokens.SOS_idx]
-        # if self.condition_answer:
-        # state_question.insert(0, self.clevr_dataset.len_vocab + self.ref_answer)
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
                                 self.img_feats.unsqueeze(0), self.ref_answer)
         self.step_idx = 0
