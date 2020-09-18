@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
-
 from RL_toolbox.RL_functions import compute_grad_norm
 from agent.agent import Agent
 
@@ -11,7 +10,8 @@ class REINFORCE(Agent):
     def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50, num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10,
                  eval_no_trunc=0, alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0,
-                 epsilon_truncated_rate=1.):
+                 epsilon_truncated_rate=1.,
+                 is_loss_correction=1):
         Agent.__init__(self, policy=policy, env=env, writer=writer, out_path=out_path, gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
                        pretrained_lm=pretrained_lm,
@@ -22,7 +22,8 @@ class REINFORCE(Agent):
                        log_interval=log_interval, test_envs=test_envs, eval_no_trunc=eval_no_trunc,
                        alpha_logits=alpha_logits, alpha_decay_rate=alpha_decay_rate,
                        epsilon_truncated=epsilon_truncated,
-                       train_seed=train_seed, epsilon_truncated_rate=epsilon_truncated_rate)
+                       train_seed=train_seed, epsilon_truncated_rate=epsilon_truncated_rate,
+                       is_loss_correction=is_loss_correction)
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
         self.update_mode = "episode"
@@ -62,20 +63,21 @@ class REINFORCE(Agent):
         advantages = returns - values.detach().squeeze()
         rl_loss_per_timestep = -logprobs.view(-1) * advantages
         rl_loss_per_timestep = self.split_memory_per_episode(rl_loss_per_timestep)
-        policies_ratios = torch.exp(logprobs.detach()-logprobs_truncated.detach())
-        policies_ratios = self.split_memory_per_episode(policies_ratios)
-        rl_loss_per_episode = torch.stack([torch.sum(l)*torch.prod(p) for l,p in zip(rl_loss_per_timestep, policies_ratios)])
+        is_ratios = torch.exp(logprobs.detach() - logprobs_truncated.detach())
+        is_ratios = self.split_memory_per_episode(is_ratios)
+        if self.is_loss_correction:
+            rl_loss_per_episode = torch.stack(
+                [torch.sum(l) * torch.prod(p) for l, p in zip(rl_loss_per_timestep, is_ratios)])
+        else:
+            rl_loss_per_episode = torch.stack(
+                [torch.sum(l) for l in rl_loss_per_timestep])
         reinforce_loss = rl_loss_per_episode.mean()
-
 
         vf_loss = 0.5 * self.MSE_loss(values.view(-1), returns).mean()
 
-        loss = reinforce_loss + vf_loss #TODO: add an entropy term here as well.
-        #loss = loss.sum() / self.update_every
-        # loss = loss.mean()
+        loss = reinforce_loss + vf_loss  # TODO: add an entropy term here as well.
         # take gradient step
         self.optimizer.zero_grad()
-        # loss.sum().backward()
         loss.backward()
         # clip grad norm:
         if self.grad_clip is not None:

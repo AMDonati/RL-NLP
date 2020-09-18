@@ -11,11 +11,11 @@ from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
-from utils.utils_train import write_to_csv
+from utils.utils_train import write_to_csv, compute_write_all_metrics
 
 
 def get_writer(args, pre_trained, truncated, output_path):
-    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}_diffrew{}_fusion{}".format(
+    out_folder = "runs_{}_{}-{}-{}_{}_{}_len{}_debug{}_q{}_ent{}_k{}_b{}_lr{}_gradclip{}_trunc_{}_diffrew{}_fusion{}_losscorrection{}".format(
         args.agent,
         args.model,
         args.word_emb_size,
@@ -32,7 +32,8 @@ def get_writer(args, pre_trained, truncated, output_path):
         args.grad_clip,
         args.truncate_mode,
         args.diff_reward,
-        args.fusion)
+        args.fusion,
+        args.is_loss_correction)
 
     if args.agent == 'PPO':
         out_folder = out_folder + '_eps{}_Kepochs{}'.format(args.eps_clip, args.K_epochs)
@@ -74,7 +75,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
                       "alpha_decay_rate": args.alpha_decay_rate,
                       "epsilon_truncated": args.epsilon_truncated,
                       "epsilon_truncated_rate": args.epsilon_truncated_rate,
-                      "train_seed": args.train_seed}
+                      "train_seed": args.train_seed,
+                      "is_loss_correction": args.is_loss_correction}
 
     ppo_kwargs = {"policy": policy, "gamma": args.gamma,
                   "K_epochs": args.K_epochs,
@@ -143,22 +145,23 @@ def get_parser():
                         help="the agent sample from truncated or total action space")
     parser.add_argument('-epsilon_truncated_rate', type=float, default=1,
                         help="number of training iterations before epsilon truncated set to 1")
+    parser.add_argument('-is_loss_correction', type=int, default=1,
+                        help="adding the importance sampling ratio correction in the rl loss.")
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=100, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved saved checkpoint')
-    parser.add_argument('-eval_no_trunc', type=int, default=0,
+    parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-test_baselines', type=int, default=0, help="add test SL baselines for evaluation")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
-
 
     return parser
 
@@ -243,21 +246,34 @@ def run(args):
                 mode))
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode, baselines=args.test_baselines)
     # write to csv test scalar metrics:
-    all_metrics = {}
-    logger.info(
-        "------------------------------------- test metrics statistics -----------------------------------------")
-    for key, metric in agent.test_metrics.items():
-        logger.info('------------------- {} -------------------'.format(key))
-        metric.write_to_csv()
-        # saving the mean of all metrics in a single csv file:
-        if metric.dict_stats:
-            list_stats = list(metric.dict_stats.values())
-            if isinstance(list_stats[0], dict):
-                all_metrics[metric.key] = np.round(np.mean(
-                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
-            else:
-                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
-    write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
+    if agent.truncate_mode is not None and args.eval_no_trunc:
+        logger.info("computing all metrics for dialog keeping the truncation mask...")
+        compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="with_trunc")
+        logger.info("computing all metrics for dialog without the truncation mask...")
+        compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="no_trunc")
+    else:
+        compute_write_all_metrics(agent=agent, output_path=output_path,
+                                  logger=logger, keep=None)
+    # all_metrics = {}
+    # logger.info(
+    #     "------------------------------------- test metrics statistics -----------------------------------------")
+    # for key, metric in agent.test_metrics.items():
+    #     logger.info('------------------- {} -------------------'.format(key))
+    #     metric.write_to_csv()
+    #     # saving the mean of all metrics in a single csv file:
+    #     if metric.dict_stats:
+    #         list_stats = list(metric.dict_stats.values()) #TODO: check if key contains no trunc.
+    #         if agent.truncate_mode is not None and args.eval_no_trunc:
+    #             list_stats = []
+    #             for key, value in metric.dict_stats.items():
+    #                 if "no_trunc" not in key:
+    #                     list_stats.append(value)
+    #         if isinstance(list_stats[0], dict):
+    #             all_metrics[metric.key] = np.round(np.mean(
+    #                 [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
+    #         else:
+    #             all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
+    # write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
     logger.info(
         '------------------------------------ DONE ---------------------------------------------------------------')
     return agent

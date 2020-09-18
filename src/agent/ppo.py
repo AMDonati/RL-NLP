@@ -83,7 +83,7 @@ class PPO(Agent):
 
             # adding the is_ratio:
             if self.is_loss_correction:
-                ratios *= is_ratios
+                ratios = ratios * is_ratios
 
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1

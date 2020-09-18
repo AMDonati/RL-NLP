@@ -2,6 +2,9 @@ import argparse
 import csv
 import logging
 from csv import writer
+import numpy as np
+import os
+
 #TODO: add color logging:
 # https://pypi.org/project/colorlog/
 # https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
@@ -63,3 +66,29 @@ def write_to_csv_by_row(output_dir, dic):
     for key, value in dic.items():
         list_of_elem = [key] + value
         append_list_as_row(output_dir, list_of_elem)
+
+def compute_write_all_metrics(agent, output_path, logger, keep=None):
+    # write to csv test scalar metrics:
+    all_metrics = {}
+    csv_file = "all_metrics.csv"
+    logger.info(
+        "------------------------------------- test metrics statistics -----------------------------------------")
+    for key, metric in agent.test_metrics.items():
+        logger.info('------------------- {} -------------------'.format(key))
+        metric.write_to_csv()
+        # saving the mean of all metrics in a single csv file:
+        if metric.dict_stats:
+            list_stats = list(metric.dict_stats.values())  # TODO: check if key contains no trunc.
+            if keep is not None:
+                csv_file = "all_metrics_{}.csv".format(keep)
+                list_stats = []
+                for key, value in metric.dict_stats.items():
+                    if keep in key:
+                        list_stats.append(value)
+            if isinstance(list_stats[0], dict):
+                all_metrics[metric.key] = np.round(np.mean(
+                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
+            else:
+                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
+    write_to_csv(os.path.join(output_path, csv_file), all_metrics)
+

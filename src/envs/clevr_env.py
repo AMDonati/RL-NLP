@@ -1,11 +1,9 @@
 import os
 import random
 from collections import namedtuple
-
 import gym
 import numpy as np
 import torch
-
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 
