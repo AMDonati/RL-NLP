@@ -19,7 +19,6 @@ def mask_truncature(valid_actions, logits, num_tokens=87):
     probs_truncated = masked_softmax(logits.clone().detach(), mask)
     # check that the truncation is right.
     sum_probs_va = probs_truncated[:, valid_actions].sum(dim=-1)
-    print("sum probs va:", sum_probs_va.detach().cpu().numpy())
     assert torch.all(
         torch.abs(sum_probs_va - torch.ones(sum_probs_va.size()).to(device)) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
     policy_dist_truncated = Categorical(probs_truncated)
