@@ -13,7 +13,7 @@ from preprocessing.text_functions import decode, encode
 
 
 class CLEVR_Dataset(Dataset):
-    def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None):
+    def __init__(self, h5_questions_path, h5_feats_path, vocab_path, max_samples=None, mask_answers=False):
         self.questions_path = h5_questions_path
         self.features_path = h5_feats_path
         self.vocab_path = vocab_path
@@ -35,6 +35,7 @@ class CLEVR_Dataset(Dataset):
         self.img_idxs = self.load_data_from_h5(questions_hf.get('img_idxs'))
         self.answers = self.load_data_from_h5(questions_hf.get('answers'))
         self.feats_shape = self.get_feats_from_img_idx(0).shape
+        self.mask_answers = mask_answers
 
     def get_vocab(self, key):
         with open(self.vocab_path, 'r') as f:
@@ -54,7 +55,8 @@ class CLEVR_Dataset(Dataset):
     def get_questions_from_img_idx(self, img_idx):
         # caution: this works only for a single img_idx.
         img_idxs = self.img_idxs
-        select_idx = list(np.where(img_idxs.data.numpy() == img_idx))
+        condition = img_idxs.data.numpy() == img_idx
+        select_idx = list(np.where(condition))
         select_questions = self.input_questions[select_idx, :]
         return select_questions.squeeze(0)[:, 1:]  # removing <sos> token.
 
@@ -89,8 +91,13 @@ class CLEVR_Dataset(Dataset):
 
     def get_data_from_img_idx(self, img_idx):
         # caution: this works only for a single img_idx.
-        #select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
-        select_idx = list(np.where(self.img_idxs.data.numpy() == img_idx))
+        # select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
+        # select_idx = list(np.where(self.img_idxs.data.numpy() == img_idx))
+        select_idx = torch.where(self.img_idxs == img_idx)[0]
+        if self.mask_answers:
+            mask = (self.answers[select_idx] != self.vocab_answers["yes"]) & (
+                    self.answers[select_idx] != self.vocab_answers["no"])
+            select_idx = select_idx[mask]
         select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
         feats = self.all_feats[img_idx]
         feats = torch.FloatTensor(np.array(feats, dtype=np.float32))

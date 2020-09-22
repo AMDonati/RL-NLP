@@ -162,6 +162,7 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="gamma")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
 
     return parser
 
@@ -194,7 +195,7 @@ def run(args):
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                    num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                   reward_vocab=args.reward_vocab)
+                   reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
     if args.reward == 'vqa':
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,

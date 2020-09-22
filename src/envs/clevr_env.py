@@ -14,7 +14,7 @@ class ClevrEnv(gym.Env):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein_",
                  reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False,
-                 condition_answer=True, reward_vocab=None):
+                 condition_answer=True, reward_vocab=None, mask_answers=False):
         super(ClevrEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
@@ -27,7 +27,7 @@ class ClevrEnv(gym.Env):
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
                                            vocab_path=vocab_path,
-                                           max_samples=max_samples)
+                                           max_samples=max_samples, mask_answers=mask_answers)
 
         SOS_idx = self.clevr_dataset.vocab_questions["<SOS>"]
         EOS_idx = self.clevr_dataset.vocab_questions["<EOS>"]
