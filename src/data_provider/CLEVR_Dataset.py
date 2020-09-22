@@ -95,9 +95,12 @@ class CLEVR_Dataset(Dataset):
         # select_idx = list(np.where(self.img_idxs.data.numpy() == img_idx))
         select_idx = torch.where(self.img_idxs == img_idx)[0]
         if self.mask_answers:
-            mask = (self.answers[select_idx] != self.vocab_answers["yes"]) & (
-                    self.answers[select_idx] != self.vocab_answers["no"])
-            select_idx = select_idx[mask]
+            try:
+                mask = (self.answers[select_idx] != self.vocab_answers["yes"]) & (
+                        self.answers[select_idx] != self.vocab_answers["no"])
+                select_idx = select_idx[mask]
+            except IndexError:
+                print("error index from get data from img")
         select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
         feats = self.all_feats[img_idx]
         feats = torch.FloatTensor(np.array(feats, dtype=np.float32))
