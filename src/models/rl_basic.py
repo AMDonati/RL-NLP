@@ -174,7 +174,7 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
 
         if self.condition_answer == "after_fusion" and state_answer is not None:
-            repeated_answer=self.answer_embedding(state_answer).unsqueeze(1).repeat(1, seq_len, 1)
+            repeated_answer = self.answer_embedding(state_answer).unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat([embedding, repeated_answer], dim=2)
 
         logits = self.action_head(embedding)  # (B,S,num_tokens)
