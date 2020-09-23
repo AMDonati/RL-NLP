@@ -52,7 +52,7 @@ def get_writer(args, pre_trained, truncated, output_path):
     if args.train_policy == "truncated":
         out_folder = out_folder + '_truncated_policy'
     if args.reward == 'vqa':
-        out_folder = out_folder + '_{}'.format(args.reward) + '_{}'.format(args.condition_answer)
+        out_folder = out_folder + '_{}'.format(args.reward) + '_{}'.format(args.condition_answer) + '_mask-answers{}'.format(args.mask_answers)
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, out_folder))
     return writer
@@ -255,26 +255,6 @@ def run(args):
     else:
         compute_write_all_metrics(agent=agent, output_path=output_path,
                                   logger=logger, keep=None)
-    # all_metrics = {}
-    # logger.info(
-    #     "------------------------------------- test metrics statistics -----------------------------------------")
-    # for key, metric in agent.test_metrics.items():
-    #     logger.info('------------------- {} -------------------'.format(key))
-    #     metric.write_to_csv()
-    #     # saving the mean of all metrics in a single csv file:
-    #     if metric.dict_stats:
-    #         list_stats = list(metric.dict_stats.values()) #TODO: check if key contains no trunc.
-    #         if agent.truncate_mode is not None and args.eval_no_trunc:
-    #             list_stats = []
-    #             for key, value in metric.dict_stats.items():
-    #                 if "no_trunc" not in key:
-    #                     list_stats.append(value)
-    #         if isinstance(list_stats[0], dict):
-    #             all_metrics[metric.key] = np.round(np.mean(
-    #                 [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
-    #         else:
-    #             all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
-    # write_to_csv(os.path.join(output_path, 'all_metrics.csv'), all_metrics)
     logger.info(
         '------------------------------------ DONE ---------------------------------------------------------------')
     return agent
