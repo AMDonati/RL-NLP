@@ -89,7 +89,8 @@ class PolicyLSTMBatch(nn.Module):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.condition_answer == "before_lstm" and answer is not None:
-            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)], dim=1)
+            pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
+                                  dim=1)
             # text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
 
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
@@ -128,12 +129,14 @@ class PolicyLSTMWordBatch_SL(nn.Module):
 
 class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, fusion="cat"):
+                 kernel_size=1, stride=5, fusion="cat", condition_answer="none", num_tokens_answer=32):
         PolicyLSTMWordBatch_SL.__init__(self, num_tokens, word_emb_size, hidden_size, num_layers=num_layers)
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
         self.kernel_size = kernel_size
         self.fusion = fusion
+        self.answer_embedding = nn.Embedding(num_tokens_answer, word_emb_size)
+        self.condition_answer = condition_answer
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         if self.fusion == "film":
             self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)
@@ -142,12 +145,15 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
 
+        if self.condition_answer == "after_fusion":
+            self.fusion_dim += word_emb_size
+
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
 
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
 
-    def forward(self, state_text, state_img):
+    def forward(self, state_text, state_img, state_answer):
         embed_text = self._get_embed_text(state_text)
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
@@ -166,6 +172,10 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+
+        if self.condition_answer == "after_fusion" and state_answer is not None:
+            repeated_answer = self.answer_embedding(state_answer).unsqueeze(1).repeat(1, seq_len, 1)
+            embedding = torch.cat([embedding, repeated_answer], dim=2)
 
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)

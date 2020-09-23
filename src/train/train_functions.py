@@ -1,6 +1,8 @@
 import time
+
 import torch
 import torch.nn.functional as F
+
 
 def train_one_epoch(model, train_generator, optimizer, criterion, device, args, print_interval=10):
     model.train()  # Turns on train mode which enables dropout.
@@ -28,17 +30,18 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, args, 
 
     return curr_loss, elapsed
 
+
 def train_one_epoch_policy(model, train_generator, optimizer, criterion, device, args, print_interval=10):
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
-    for batch, ((inputs, targets), feats, _) in enumerate(train_generator):
-        inputs, feats = inputs.to(device), feats.to(device)
+    for batch, ((inputs, targets), feats, answers) in enumerate(train_generator):
+        inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
-        logits, _ = model(inputs, feats)  # output (S * B, V)
+        logits, _ = model(inputs, feats, answers)  # output (S * B, V)
         log_probs = F.log_softmax(logits, dim=-1)
-        loss = criterion(log_probs, targets) #TODO: add mse loss for value function.
+        loss = criterion(log_probs, targets)  # TODO: add mse loss for value function.
         loss.backward()
         # clip grad norm:
         if args.grad_clip is not None:
@@ -68,14 +71,15 @@ def evaluate(model, val_generator, criterion, device):
 
     return total_loss / (batch + 1)
 
+
 def evaluate_policy(model, val_generator, criterion, device):
     model.eval()  # turn on evaluation mode which disables dropout.
     total_loss = 0.
     with torch.no_grad():
-        for batch, ((inputs, targets), feats, _) in enumerate(val_generator):
-            inputs, feats = inputs.to(device), feats.to(device)
+        for batch, ((inputs, targets), feats, answers) in enumerate(val_generator):
+            inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             targets = targets.view(targets.size(1) * targets.size(0)).to(device)
-            logits, _ = model(inputs, feats)
+            logits, _ = model(inputs, feats, answers)
             log_probs = F.log_softmax(logits, dim=-1)
             total_loss += criterion(log_probs, targets).item()
 
