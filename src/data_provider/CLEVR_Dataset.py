@@ -101,6 +101,7 @@ class CLEVR_Dataset(Dataset):
                 select_idx = select_idx[mask]
                 select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
             except IndexError:
+                select_idx = torch.where(self.img_idxs == img_idx)[0]
                 select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
                 print("error index from get data from img")
         feats = self.all_feats[img_idx]
