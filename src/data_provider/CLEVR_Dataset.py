@@ -94,6 +94,7 @@ class CLEVR_Dataset(Dataset):
         # select_idx = (self.img_idxs == img_idx).nonzero().squeeze().cpu().numpy()
         # select_idx = list(np.where(self.img_idxs.data.numpy() == img_idx))
         select_idx = torch.where(self.img_idxs == img_idx)[0]
+        select_questions = self.input_questions[select_idx, :].squeeze(0)[:, 1:]
         if self.mask_answers:
             try:
                 mask = (self.answers[select_idx] != self.vocab_answers["yes"]) & (
