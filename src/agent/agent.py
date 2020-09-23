@@ -85,7 +85,7 @@ class Agent:
                 logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
 
-        if i_episode == int(self.epsilon_truncated_rate * num_episodes_train):
+        if i_episode == int(self.epsilon_truncated_rate * num_episodes_train) + 1:
             self.epsilon_truncated = 1
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
