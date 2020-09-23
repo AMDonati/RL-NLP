@@ -20,7 +20,8 @@ class Agent:
     def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
-                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1., is_loss_correction=1):
+                 alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
+                 is_loss_correction=1):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -194,7 +195,8 @@ class Agent:
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
-                self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done, value,
+                self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
+                                     value,
                                      state.answer)
             timestep += 1
             for key, metric in metrics.items():
@@ -231,7 +233,8 @@ class Agent:
                 break
         for key, metric in metrics.items():
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
-                           ref_question=env.ref_questions, test_mode=test_mode, pred_answer=pred_answer)
+                           ref_question=env.ref_questions, ref_questions_decoded=env.ref_questions_decoded,
+                           question_idx=env.ref_question_idx[0], test_mode=test_mode, pred_answer=pred_answer)
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 

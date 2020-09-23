@@ -337,9 +337,10 @@ class DialogMetric(Metric):
                                                                             decode_answers=True)
                 ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([self.agent.env.ref_answer.numpy().item()],
                                                                            decode_answers=True)
+                ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
                 string = ' IMG {} - question index {}:'.format(kwargs[
                                                                    "img_idx"],
-                                                               self.agent.env.ref_question_idx) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + '-' * 40
+                                                               kwargs["question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
