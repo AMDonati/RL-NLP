@@ -1,16 +1,17 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
 # https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-import torch
 import argparse
-import os
-import math
 import json
+import math
+import os
+
 import numpy as np
-from models.Policy_network import PolicyLSTM
-from models.rl_basic import PolicyLSTMBatch_SL
-from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from train.train_functions import train_one_epoch_policy, evaluate_policy
+import torch
 from torch.utils.data import DataLoader
+
+from data_provider.CLEVR_Dataset import CLEVR_Dataset
+from models.rl_basic import PolicyLSTMBatch_SL
+from train.train_functions import train_one_epoch_policy, evaluate_policy
 from utils.utils_train import create_logger, write_to_csv
 
 '''
@@ -30,6 +31,7 @@ if __name__ == '__main__':
         else:
             raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
@@ -47,7 +49,9 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, required=True)
     parser.add_argument("-out_path", type=str, required=True)
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
-    parser.add_argument('-max_samples', type=int, help="number of samples in the dataset - to train on a subset of the full dataset")
+    parser.add_argument('-max_samples', type=int,
+                        help="number of samples in the dataset - to train on a subset of the full dataset")
+    parser.add_argument('-condition_answer', type=str, default="none", help="conditioning on answer")
 
     args = parser.parse_args()
 
@@ -77,8 +81,8 @@ if __name__ == '__main__':
                                       h5_feats_path=train_feats_path,
                                       vocab_path=vocab_path)
         val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
-                                h5_feats_path=val_feats_path,
-                                vocab_path=vocab_path)
+                                    h5_feats_path=val_feats_path,
+                                    vocab_path=vocab_path)
 
     num_tokens = train_dataset.len_vocab
     BATCH_SIZE = args.bs
@@ -100,12 +104,13 @@ if __name__ == '__main__':
     #                                 rl=False).to(device)
 
     policy_network = PolicyLSTMBatch_SL(num_tokens=num_tokens,
-                                     word_emb_size=args.word_emb_size,
-                                     hidden_size=args.hidden_size,
-                                     kernel_size=args.kernel_size,
-                                     num_filters=args.num_filters,
-                                     stride=args.stride,
-                                    fusion=args.fusion).to(device)
+                                        word_emb_size=args.word_emb_size,
+                                        hidden_size=args.hidden_size,
+                                        kernel_size=args.kernel_size,
+                                        num_filters=args.num_filters,
+                                        stride=args.stride,
+                                        fusion=args.fusion,
+                                        condition_answer=args.condition_answer).to(device)
 
     learning_rate = args.lr
     optimizer = torch.optim.Adam(params=policy_network.parameters(), lr=learning_rate)
@@ -113,16 +118,18 @@ if __name__ == '__main__':
     EPOCHS = args.ep
 
     num_batches = int(len(train_dataset) / args.bs)
-    print_interval = 10 if device.type =='cpu' else int(num_batches / 10)
+    print_interval = 10 if device.type == 'cpu' else int(num_batches / 10)
 
     ###############################################################################
     # Create logger, output_path and config file.
     ###############################################################################
 
     out_path = 'SL_LSTM_L_{}_emb_{}_hid_{}_pdrop_{}_gc_{}_bs_{}_lr_{}_fusion-{}'.format(args.num_layers,
-                                                                                       args.word_emb_size, args.hidden_size,
-                                                                                       args.p_drop, args.grad_clip,
-                                                                                       args.bs, learning_rate, args.fusion)
+                                                                                        args.word_emb_size,
+                                                                                        args.hidden_size,
+                                                                                        args.p_drop, args.grad_clip,
+                                                                                        args.bs, learning_rate,
+                                                                                        args.fusion)
     out_path = os.path.join(args.out_path, out_path)
     if not os.path.exists(out_path):
         os.makedirs(out_path)
@@ -164,15 +171,16 @@ if __name__ == '__main__':
     for epoch in range(EPOCHS):
         logger.info('epoch {}/{}'.format(epoch + 1, EPOCHS))
         train_loss, elapsed = train_one_epoch_policy(model=policy_network,
-                                              train_generator=train_generator,
-                                              optimizer=optimizer,
-                                              criterion=criterion,
-                                              device=device,
-                                              args=args,
-                                              print_interval=print_interval)
+                                                     train_generator=train_generator,
+                                                     optimizer=optimizer,
+                                                     criterion=criterion,
+                                                     device=device,
+                                                     args=args,
+                                                     print_interval=print_interval)
         logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
         logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-        val_loss = evaluate_policy(model=policy_network, val_generator=val_generator, criterion=criterion, device=device)
+        val_loss = evaluate_policy(model=policy_network, val_generator=val_generator, criterion=criterion,
+                                   device=device)
         logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
         # saving loss and metrics information.
