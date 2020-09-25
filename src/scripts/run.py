@@ -150,7 +150,7 @@ def get_parser():
     parser.add_argument('-train_policy', type=str, default="all_space",
                         help="train policy over all space or the truncated action space")  # arg to choose between trainig the complete policy or the truncated one in case of truncation.
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=100, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=1, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
@@ -196,16 +196,16 @@ def run(args):
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                    num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
                    reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-    if args.reward == 'vqa':
-        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                              num_questions=args.num_questions, reward_path=args.reward_path,
-                              reward_vocab=args.reward_vocab) for mode in
-                     ["test_images"]]
-    else:
-        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                              num_questions=args.num_questions, reward_path=args.reward_path,
-                              reward_vocab=args.reward_vocab) for mode in
-                     ["test_images", "test_text"]]
+    # if args.reward == 'vqa':
+    #     test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+    #                           num_questions=args.num_questions, reward_path=args.reward_path,
+    #                           reward_vocab=args.reward_vocab) for mode in
+    #                  ["test_images"]]
+    # else:
+    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                                  num_questions=args.num_questions, reward_path=args.reward_path,
+                                  reward_vocab=args.reward_vocab) for mode in
+                         ["test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:

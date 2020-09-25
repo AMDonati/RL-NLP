@@ -335,7 +335,7 @@ class DialogMetric(Metric):
             elif self.agent.env.reward_type == 'vqa':
                 pred_answer_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(),
                                                                             decode_answers=True)
-                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([self.agent.env.ref_answer.numpy().item()],
+                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
                                                                            decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
                 string = ' IMG {} - question index {}:'.format(kwargs[
