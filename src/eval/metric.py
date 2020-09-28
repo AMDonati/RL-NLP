@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-
+import pandas as pd
 from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
@@ -60,6 +60,9 @@ class Metric:
                                                     np.round(np.std(value), decimals=3)))
             # write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
+
+    def post_treatment(self):
+        pass
 
 
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
@@ -434,6 +437,32 @@ class PPLDialogfromLM(Metric):
         pass
 
 
+class Return(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "return"
+        self.idx_episode = 1
+        self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_return_history.csv')
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["reward"])
+
+    def compute_(self, **kwargs):
+        ep_return = np.sum(self.measure)
+        self.metric = [ep_return]
+        self.dict_metric[self.idx_episode] = ep_return
+        self.idx_episode += 1
+
+    def write_to_csv(self):
+        write_to_csv(self.out_csv_file, self.dict_metric)
+
+    def post_treatment(self):
+        csv = os.path.join(self.agent.out_path, self.train_test + '_std_history.csv')
+        serie=pd.Series(list(self.dict_metric.values())).rolling(window=100).std()
+        serie.to_csv(csv)
+
+
 class Reward2Metric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
@@ -688,4 +717,4 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "action_probs_lm": LMActionProbs,
            "running_return": RunningReturn,
            "policy": PolicyMetric,
-           "eps_truncation": EpsilonTruncation}
+           "eps_truncation": EpsilonTruncation, "return": Return}

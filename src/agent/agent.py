@@ -71,7 +71,8 @@ class Agent:
             for key in ["ppl", "ratio_closest_questions"]:
                 self.test_metrics[key] = metrics[key](self, train_test="test")
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["running_return", "lm_valid_actions", "policies_discrepancy", "valid_actions", "dialog",
+                              ["running_return", "return", "lm_valid_actions", "policies_discrepancy", "valid_actions",
+                               "dialog",
                                "policy", "action_probs", "action_probs_truncated", "eps_truncation"]}
         if self.truncate_mode is not None:
             for key in ["action_probs_lm"]:
@@ -335,6 +336,9 @@ class Agent:
         # write to csv train metrics:
         for _, metric in self.train_metrics.items():
             metric.write_to_csv()
+
+        for _, metric in self.train_metrics.items():
+            metric.post_treatment()
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info(
             "--------------------------------------------END OF TRAINING ----------------------------------------------------")
