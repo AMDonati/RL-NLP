@@ -1,10 +1,12 @@
 import logging
 import os
+
 import h5py
 import numpy as np
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
+
 from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
@@ -281,9 +283,9 @@ class EpsilonTruncation(Metric):
                 action_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["action"].cpu().numpy(), ignored=[])
                 action_prob = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
                 self.measure.append("Episode {} - Img {}/ Action: {}/ Policy prob: {:2.4f}".format(kwargs["i_episode"],
-                                                                                              self.agent.env.img_idx,
-                                                                                              action_decoded,
-                                                                                              action_prob))
+                                                                                                   self.agent.env.img_idx,
+                                                                                                   action_decoded,
+                                                                                                   action_prob))
                 self.dict_metric["Episode"].append(kwargs["i_episode"])
                 self.dict_metric["Img_idx"].append(self.agent.env.img_idx)
                 self.dict_metric["Action"].append(action_decoded)
@@ -291,7 +293,7 @@ class EpsilonTruncation(Metric):
 
     def write_to_csv(self):
         if self.agent.epsilon_truncated > 0:
-            #write_to_csv(self.out_csv_file, self.dict_metric)
+            # write_to_csv(self.out_csv_file, self.dict_metric)
             write_to_csv_by_row(self.out_csv_file, self.dict_metric)
 
     def compute_(self, **kwargs):
@@ -300,6 +302,7 @@ class EpsilonTruncation(Metric):
             string = '\n'.join(self.measure)
             with open(self.out_txt_file, 'a') as f:
                 f.write(string + '\n')
+
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
 
@@ -340,7 +343,8 @@ class DialogMetric(Metric):
                 ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
                 string = ' IMG {} - question index {}:'.format(kwargs[
                                                                    "img_idx"],
-                                                               kwargs["question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
+                                                               kwargs[
+                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
             self.metric.append(string)
             # write dialog in a .txt file:
             with open(self.out_dialog_file, 'a') as f:
@@ -505,12 +509,17 @@ class BleuMetric(Metric):
         self.key = "bleu"
         self.train_test = train_test
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
+        self.condition_answer = agent.env.condition_answer
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
             question_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=["<SOS>"],
                                                                      stop_at_end=True)
-            ref_questions = [q.split() for q in kwargs["ref_questions_decoded"]]
+            ref_questions = kwargs["ref_questions_decoded"]
+            if self.condition_answer:
+                question_idx = kwargs["ref_question_idx"][0]
+                ref_questions = ref_questions[question_idx:question_idx + 1]
+            ref_questions = [q.split() for q in ref_questions]
             question_tokens = question_decoded.split()
             score = sentence_bleu(ref_questions, question_tokens)
             self.measure.append(score)

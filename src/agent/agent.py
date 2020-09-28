@@ -149,7 +149,8 @@ class Agent:
             self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward,
                                         closest_question=closest_question,
                                         state=state,
-                                        ref_questions_decoded=env.ref_questions_decoded)
+                                        ref_questions_decoded=env.ref_questions_decoded,
+                                        ref_question_idx=env.ref_question_idx)
             self.test_metrics[key].compute()
         # reset metrics key value for writing:
         for m in self.test_metrics.values():
@@ -208,7 +209,7 @@ class Agent:
                             log_probs_truncated=log_probs_truncated,
                             test_mode=test_mode,
                             pred_answer=pred_answer,
-                            i_episode=i_episode)
+                            i_episode=i_episode, ref_question_idx=env.ref_question_idx)
             state = new_state
             ep_reward += reward
 
@@ -234,7 +235,8 @@ class Agent:
         for key, metric in metrics.items():
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
                            ref_question=env.ref_questions, ref_questions_decoded=env.ref_questions_decoded,
-                           question_idx=env.ref_question_idx[0], test_mode=test_mode, pred_answer=pred_answer, ref_answer=env.ref_answer)
+                           question_idx=env.ref_question_idx[0], test_mode=test_mode, pred_answer=pred_answer,
+                           ref_answer=env.ref_answer)
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
