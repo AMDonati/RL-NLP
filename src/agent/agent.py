@@ -133,7 +133,7 @@ class Agent:
         state, ep_reward = env.reset(), 0
         with torch.no_grad():
             for i in range(env.max_len):
-                log_probas, hidden = self.pretrained_lm(state.text)  # output (1, num_tokens)
+                log_probas, hidden = self.pretrained_lm(state.text.to(self.device))  # output (1, num_tokens)
                 if test_mode == 'sampling':
                     softmax = log_probas[-1, :].squeeze().exp()
                     action = Categorical(softmax).sample()
