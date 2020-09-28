@@ -459,7 +459,7 @@ class Return(Metric):
 
     def post_treatment(self):
         csv = os.path.join(self.agent.out_path, self.train_test + '_std_history.csv')
-        serie=pd.Series(list(self.dict_metric.values())).rolling(window=100).std()
+        serie=pd.Series(self.dict_metric).rolling(window=100).std()
         serie.to_csv(csv)
 
 
