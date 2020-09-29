@@ -545,7 +545,7 @@ class BleuMetric(Metric):
             question_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=["<SOS>"],
                                                                      stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
-            if self.condition_answer:
+            if self.condition_answer != "none":
                 question_idx = kwargs["ref_question_idx"][0]
                 ref_questions = ref_questions[question_idx:question_idx + 1]
             ref_questions = [q.split() for q in ref_questions]
