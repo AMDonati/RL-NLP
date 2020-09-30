@@ -4,6 +4,7 @@ import nltk
 import numpy as np
 import pandas as pd
 import torch
+from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 # TODO: add the intermediate reward (diff of R(t+1)-R(t))
@@ -87,6 +88,18 @@ class Levenshtein_(Reward):
         return reward, ep_questions_decoded[distances.argmin()], None
 
 
+class Bleu(Reward):
+    def __init__(self, path=None, vocab=None, dataset=None):
+        Reward.__init__(self, path)
+        self.type = "episode"
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+        if not done:
+            return 0, "N/A", None
+        reward = sentence_bleu(list(map(str.split, ep_questions_decoded)), question.split())
+        return reward, "N/A", None
+
+
 class Differential(Reward):
     def __init__(self, reward_function, path=None, vocab=None, dataset=None):
         Reward.__init__(self, path)
@@ -125,8 +138,8 @@ class VQAAnswer(Reward):
 
     def trad(self, state):
         idx_vqa = [self.trad_dict[idx] for idx in state.text.squeeze().cpu().numpy() if idx in self.trad_dict]
-        idx_vqa.insert(0, 1) # add SOS token.
-        idx_vqa.append(2) # add EOS token.
+        idx_vqa.insert(0, 1)  # add SOS token.
+        idx_vqa.append(2)  # add EOS token.
         return torch.tensor(idx_vqa).unsqueeze(dim=0)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
@@ -141,7 +154,7 @@ class VQAAnswer(Reward):
         return reward, "N/A", preds  # TODO: add closest question here?
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "vqa": VQAAnswer}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
