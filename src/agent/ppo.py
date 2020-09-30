@@ -78,11 +78,12 @@ class PPO(Agent):
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
-            # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
-            is_ratios = torch.exp(old_logprobs - old_logprobs_truncated).view(-1)
-
             # adding the is_ratio:
             if self.is_loss_correction:
+                sampling_term = old_logprobs_truncated * (
+                            1 - self.epsilon_truncated) + self.epsilon_truncated * old_logprobs
+                # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
+                is_ratios = torch.exp(old_logprobs - sampling_term.to(self.device)).view(-1)
                 ratios = ratios * is_ratios
 
             # Finding Surrogate Loss:
