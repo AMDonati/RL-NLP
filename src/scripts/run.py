@@ -190,7 +190,7 @@ def run(args):
     conf_file = os.path.join(output_path, 'conf.ini')
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     out_policy_file = os.path.join(output_path, 'model.pth')
-    create_config_file(conf_file)
+    create_config_file(conf_file, args)
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.truncate_mode is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
