@@ -1,8 +1,8 @@
 import argparse
 import datetime
 import os
+from configparser import ConfigParser
 
-import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
@@ -10,8 +10,8 @@ from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
 from models.rl_basic import PolicyLSTMBatch
+from utils.utils_train import compute_write_all_metrics
 from utils.utils_train import create_logger
-from utils.utils_train import write_to_csv, compute_write_all_metrics
 
 
 def get_writer(args, pre_trained, truncated, output_path):
@@ -52,7 +52,8 @@ def get_writer(args, pre_trained, truncated, output_path):
     if args.train_policy == "truncated":
         out_folder = out_folder + '_truncated_policy'
     if args.reward == 'vqa':
-        out_folder = out_folder + '_{}'.format(args.reward) + '_{}'.format(args.condition_answer) + '_mask-answers{}'.format(args.mask_answers)
+        out_folder = out_folder + '_{}'.format(args.reward) + '_{}'.format(
+            args.condition_answer) + '_mask-answers{}'.format(args.mask_answers)
 
     writer = SummaryWriter(log_dir=os.path.join(output_path, out_folder))
     return writer
@@ -167,6 +168,15 @@ def get_parser():
     return parser
 
 
+def create_config_file(conf_file, args):
+    config = ConfigParser()
+    config.add_section('main')
+    for key, value in vars(args).items():
+        config.set('main', key, str(value))
+    with open(conf_file, 'w') as fp:
+        config.write(fp)
+
+
 def run(args):
     type_folder = "train" if args.pretrain == 0 else "pretrain"
     if args.resume_training is not None:
@@ -177,9 +187,10 @@ def run(args):
                                    "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
+    conf_file = os.path.join(output_path, 'conf.ini')
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     out_policy_file = os.path.join(output_path, 'model.pth')
-
+    create_config_file(conf_file)
     logger = create_logger(out_file_log, level=args.logger_level)
     truncated = "basic" if args.truncate_mode is None else "truncated"
     pre_trained = "scratch" if args.policy_path is None else "pretrain"
@@ -203,9 +214,9 @@ def run(args):
     #                  ["test_images"]]
     # else:
     test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                                  num_questions=args.num_questions, reward_path=args.reward_path,
-                                  reward_vocab=args.reward_vocab) for mode in
-                         ["test_images", "test_text"]]
+                          num_questions=args.num_questions, reward_path=args.reward_path,
+                          reward_vocab=args.reward_vocab) for mode in
+                 ["test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:
