@@ -215,7 +215,7 @@ def run(args):
     # else:
     test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                           num_questions=args.num_questions, reward_path=args.reward_path,
-                          reward_vocab=args.reward_vocab) for mode in
+                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers) for mode in
                  ["test_images", "test_text"]]
 
     pretrained_lm = None
