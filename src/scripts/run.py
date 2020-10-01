@@ -41,12 +41,12 @@ def get_writer(args, pre_trained, truncated, output_path):
     if args.truncate_mode == 'proba_thr' and args.p_th is not None:
         out_folder = out_folder + '_pth{}'.format(args.p_th)
 
-    if args.alpha_logits != 0:
+    if float(args.alpha_logits) != 0:
         out_folder = out_folder + '_alpha-logits-{}'.format(args.alpha_logits)
-    if args.alpha_decay_rate > 0:
+    if float(args.alpha_decay_rate) > 0:
         out_folder = out_folder + '_decay{}'.format(args.alpha_decay_rate)
 
-    if args.truncate_mode is not None and args.epsilon_truncated > 0:
+    if args.truncate_mode is not None and float(args.epsilon_truncated) > 0:
         out_folder = out_folder + '_eps-trunc{}'.format(args.epsilon_truncated)
 
     if args.train_policy == "truncated":
@@ -59,45 +59,45 @@ def get_writer(args, pre_trained, truncated, output_path):
     return writer
 
 
-def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy):
+def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
-                      "pretrain": args.pretrain,
-                      "update_every": args.update_every,
-                      "lr": args.lr,
-                      "grad_clip": args.grad_clip, "writer": writer,
-                      "truncate_mode": args.truncate_mode,
-                      "num_truncated": args.num_truncated,
-                      "p_th": args.p_th,
+                      "pretrain": args_.pretrain,
+                      "update_every": args_.update_every,
+                      "lr": args_.lr,
+                      "grad_clip": args_.grad_clip, "writer": writer,
+                      "truncate_mode": args_.truncate_mode,
+                      "num_truncated": args_.num_truncated,
+                      "p_th": args_.p_th,
                       "out_path": output_path,
-                      "log_interval": args.log_interval, "env": env,
+                      "log_interval": args_.log_interval, "env": env,
                       "test_envs": test_envs,
-                      "eval_no_trunc": args.eval_no_trunc,
-                      "alpha_logits": args.alpha_logits,
-                      "alpha_decay_rate": args.alpha_decay_rate,
-                      "epsilon_truncated": args.epsilon_truncated,
-                      "epsilon_truncated_rate": args.epsilon_truncated_rate,
-                      "train_seed": args.train_seed,
-                      "is_loss_correction": args.is_loss_correction}
+                      "eval_no_trunc": args_.eval_no_trunc,
+                      "alpha_logits": args_.alpha_logits,
+                      "alpha_decay_rate": args_.alpha_decay_rate,
+                      "epsilon_truncated": args_.epsilon_truncated,
+                      "epsilon_truncated_rate": args_.epsilon_truncated_rate,
+                      "train_seed": args_.train_seed,
+                      "is_loss_correction": args_.is_loss_correction}
 
-    ppo_kwargs = {"policy": policy, "gamma": args.gamma,
-                  "K_epochs": args.K_epochs,
-                  "entropy_coeff": args.entropy_coeff,
-                  "eps_clip": args.eps_clip}
-    reinforce_kwargs = {"policy": policy, "gamma": args.gamma}
+    ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
+                  "K_epochs": args_.K_epochs,
+                  "entropy_coeff": args_.entropy_coeff,
+                  "eps_clip": args_.eps_clip}
+    reinforce_kwargs = {"policy": policy, "gamma": args_.gamma}
     algo_kwargs = {"PPO": ppo_kwargs, "REINFORCE": reinforce_kwargs}
-    kwargs = {**algo_kwargs[args.agent], **generic_kwargs}
+    kwargs = {**algo_kwargs[args_.agent], **generic_kwargs}
 
     agents = {"PPO": PPO, "REINFORCE": REINFORCE}
 
-    agent = agents[args.agent](**kwargs)
+    agent = agents[args_.agent](**kwargs)
     return agent
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-data_path", type=str, required=True,
+    parser.add_argument("-data_path", type=str,
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-out_path", type=str, required=True, help="out folder")
+    parser.add_argument("-out_path", type=str, help="out folder")
     # model args
     parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
@@ -131,7 +131,7 @@ def get_parser():
     parser.add_argument('-condition_answer', type=str, default="none",
                         help="type of answer condition, default to none")
     # truncation args.
-    parser.add_argument('-lm_path', type=str, required=True,
+    parser.add_argument('-lm_path', type=str,
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
     parser.add_argument('-truncate_mode', type=str,
                         help="truncation mode")  # arg that says now if are truncating the action space or not.
@@ -236,7 +236,7 @@ def run(args):
         policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
         # self.policy = torch.load(pretrained_policy, map_location=self.device)
 
-    agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy)
+    agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_=args)
 
     eval_mode = ['sampling', 'greedy']  # TODO: put it as a parser arg.
     # eval_mode = ['greedy']
