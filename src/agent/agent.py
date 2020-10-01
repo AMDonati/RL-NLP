@@ -236,7 +236,7 @@ class Agent:
         for key, metric in metrics.items():
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
                            ref_question=env.ref_questions, ref_questions_decoded=env.ref_questions_decoded,
-                           question_idx=env.ref_question_idx[0], test_mode=test_mode, pred_answer=pred_answer,
+                           question_idx=env.ref_question_idx, test_mode=test_mode, pred_answer=pred_answer,
                            ref_answer=env.ref_answer)
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
@@ -265,7 +265,7 @@ class Agent:
                         metric.write()
                     dialogs[key].append(
                         'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx,
-                                                                                 env.ref_question_idx[0],
+                                                                                 env.ref_question_idx,
                                                                                  key) + self.env.clevr_dataset.idx2word(
                             state.text[:, 1:].numpy()[
                                 0]) + '----- closest question:' + closest_question + '------ reward: {}'.format(

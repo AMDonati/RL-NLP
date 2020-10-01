@@ -87,7 +87,7 @@ class ClevrEnv(gym.Env):
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
-        self.ref_question_idx = random.sample(range(self.ref_questions.size(0)), 1)
+        self.ref_question_idx = random.choice(range(self.ref_questions.size(0)))
         self.ref_question = self.ref_questions[self.ref_question_idx]
         self.ref_answer = self.ref_answers[self.ref_question_idx]
         state_question = [self.special_tokens.SOS_idx]

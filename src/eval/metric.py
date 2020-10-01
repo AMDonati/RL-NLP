@@ -546,7 +546,7 @@ class BleuMetric(Metric):
                                                                      stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
             if self.condition_answer != "none":
-                question_idx = kwargs["ref_question_idx"][0]
+                question_idx = kwargs["ref_question_idx"]
                 ref_questions = ref_questions[question_idx:question_idx + 1]
             ref_questions = [q.split() for q in ref_questions]
             question_tokens = question_decoded.split()
