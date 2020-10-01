@@ -1,9 +1,11 @@
 import os
 import random
 from collections import namedtuple
+
 import gym
 import numpy as np
 import torch
+
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 
@@ -24,6 +26,7 @@ class ClevrEnv(gym.Env):
         vocab_path = os.path.join(data_path, 'vocab.json')
         self.debug = debug.split(",")
         self.num_questions = num_questions
+        self.mask_answers = mask_answers
         self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
                                            h5_feats_path=h5_feats_path,
                                            vocab_path=vocab_path,
@@ -77,17 +80,17 @@ class ClevrEnv(gym.Env):
         self.img_feats, questions, self.ref_answers = self.clevr_dataset.get_data_from_img_idx(self.img_idx)
         self.ref_questions = questions[:, :self.max_len]
 
-        if self.mode == "train":
+        if self.mode == "train" and not self.mask_answers:
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
             self.ref_answers = self.ref_answers[0:self.num_questions]
-        elif self.mode == "test_text":
+        elif self.mode == "test_text" and not self.mask_answers:
             self.ref_questions = self.ref_questions[self.num_questions:, :]
             self.ref_answers = self.ref_answers[self.num_questions:]
 
         self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
-
         self.ref_question_idx = random.choice(range(self.ref_questions.size(0)))
+
         self.ref_question = self.ref_questions[self.ref_question_idx]
         self.ref_answer = self.ref_answers[self.ref_question_idx]
         state_question = [self.special_tokens.SOS_idx]
@@ -119,4 +122,3 @@ if __name__ == '__main__':
     print('Ref Answers', env.ref_answers)
     print('Ref Answer', env.ref_answer)
     print('Ref Question', env.ref_question)
-
