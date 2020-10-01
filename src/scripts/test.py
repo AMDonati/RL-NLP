@@ -28,7 +28,7 @@ def cast_value(value):
 def eval(args):
     dirs = [f.path for f in os.scandir(args.models_path) if f.is_dir()]
     for dir in dirs:
-        if os.path.exists(os.path.join(dir, "conf.ini")):
+        if os.path.exists(os.path.join(dir, "conf.ini")) and os.path.exists(os.path.join(dir, "model.pth")):
             conf_path = os.path.join(dir, "conf.ini")
             config = configparser.ConfigParser()
             config.read(conf_path)
@@ -37,6 +37,8 @@ def eval(args):
             defaults = {key: cast_value(value) for key, value in dict(config.items("main")).items()}
             defaults["num_episodes_train"] = 0
             defaults["K_epochs"] = defaults["k_epochs"]
+            defaults["policy_path"] = os.path.join(dir, "model.pth")
+
             conf_parser = get_run_parser()
             conf_parser.set_defaults(**defaults)
             # args_list=list(np.array(list(defaults.items())).ravel())
