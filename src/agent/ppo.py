@@ -79,7 +79,7 @@ class PPO(Agent):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
             # adding the is_ratio:
-            if self.is_loss_correction:
+            if self.is_loss_correction and self.truncate_mode is not None:
                 sampling_term = old_logprobs_truncated * (
                             1 - self.epsilon_truncated) + self.epsilon_truncated * old_logprobs
                 # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
