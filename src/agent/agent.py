@@ -121,7 +121,7 @@ class Agent:
         if epsilon_truncated_sample < self.epsilon_truncated:
             policy_to_sample_from = policy_dist
         if self.pretrain:
-            action = self.env.ref_question[:, timestep]
+            action = self.env.ref_question[timestep]
         elif mode == 'sampling':
             action = policy_to_sample_from.sample()
         elif mode == 'greedy':
