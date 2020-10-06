@@ -34,9 +34,10 @@ class ClevrEnv(gym.Env):
 
         SOS_idx = self.clevr_dataset.vocab_questions["<SOS>"]
         EOS_idx = self.clevr_dataset.vocab_questions["<EOS>"]
+        question_mark_idx = self.clevr_dataset.vocab_questions["?"]
 
-        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx'))
-        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx)
+        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx"))
+        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx)
         self.State = namedtuple('State', ('text', 'img', "answer"))
         self.max_len = max_len
 
@@ -51,11 +52,18 @@ class ClevrEnv(gym.Env):
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
         self.condition_answer = condition_answer
 
+    def check_if_done(self, action):
+        done = False
+        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
+        if is_action_terminal or self.step_idx == (self.max_len - 1):
+            done = True
+        return done
+
     def step(self, action):
         # note that the padding of ref questions and generated dialog has been removed.
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
-        done = True if action.item() == self.special_tokens.EOS_idx or self.step_idx == (self.max_len - 1) else False
+        done = self.check_if_done(action)
         question_tokens_padded, question_tokens = np.zeros((self.max_len + 1)), self.state.text.numpy().ravel()
         # question_tokens_padded[:question_tokens.shape[0]] = question_tokens  # if needed
         question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
