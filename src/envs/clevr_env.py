@@ -54,7 +54,7 @@ class ClevrEnv(gym.Env):
 
     def check_if_done(self, action):
         done = False
-        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
+        is_action_terminal = action.item() in [self.special_tokens.EOS_idx]
         if is_action_terminal or self.step_idx == (self.max_len - 1):
             done = True
         return done
