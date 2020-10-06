@@ -3,10 +3,11 @@ import os
 
 import h5py
 import numpy as np
+import pandas as pd
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-import pandas as pd
+
 from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
@@ -314,16 +315,17 @@ class DialogMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
         self.key = "dialog"
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.html')
         self.h5_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
+        self.path_images = self.agent.env.path_images
 
     def fill_(self, **kwargs):
         pass
 
     def reinit_train_test(self, train_test):
         self.train_test = train_test
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.html')
 
     def compute_(self, **kwargs):
         with torch.no_grad():
@@ -340,10 +342,19 @@ class DialogMetric(Metric):
                 ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
                                                                            decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
-                string = ' IMG {} - question index {}:'.format(kwargs[
-                                                                   "img_idx"],
-                                                               kwargs[
-                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
+
+                string = ' IMG {} - question index {}:'.format(kwargs["img_idx"], kwargs["question_idx"])
+                string += '\n DIALOG: {} \n VQA ANSWER: {} \n TRUE ANSWER: {} \n REF QUESTION: {}'.format(state_decoded,
+                                                                                                          pred_answer_decoded,
+                                                                                                          ref_answer_decoded,
+                                                                                                          ref_question_decoded)
+                string += '\n' + '-' * 40
+                if self.train_test == "test":
+                    img_name="CLEVR_{}_{:06d}".format(self.train_test, kwargs["img_idx"])
+                    path = os.path.join(self.path_images, img_name)
+                    string += "<img src={}>".format(path)
+                    string += '\n' + '-' * 40
+
             else:
                 closest_question_decoded = kwargs["closest_question"]
                 string = 'IMG {}:'.format(kwargs[
@@ -459,7 +470,7 @@ class Return(Metric):
 
     def post_treatment(self):
         csv = os.path.join(self.agent.out_path, self.train_test + '_std_history.csv')
-        serie=pd.Series(self.dict_metric).rolling(window=100).std()
+        serie = pd.Series(self.dict_metric).rolling(window=100).std()
         serie.to_csv(csv)
 
 

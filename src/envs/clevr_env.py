@@ -16,7 +16,7 @@ class ClevrEnv(gym.Env):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein_",
                  reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False):
+                 condition_answer=True, reward_vocab=None, mask_answers=False, path_images="CLEVR_v1.0"):
         super(ClevrEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
@@ -51,6 +51,7 @@ class ClevrEnv(gym.Env):
         self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
         self.condition_answer = condition_answer
+        self.path_images = path_images
 
     def check_if_done(self, action):
         done = False
