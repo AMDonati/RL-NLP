@@ -95,12 +95,17 @@ class ClevrEnv(gym.Env):
             self.ref_questions = self.ref_questions[self.num_questions:, :]
             self.ref_answers = self.ref_answers[self.num_questions:]
 
-        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
-                                      for question in self.ref_questions.numpy()]
         self.ref_question_idx = random.choice(range(self.ref_questions.size(0)))
 
         self.ref_question = self.ref_questions[self.ref_question_idx]
-        self.ref_answer = self.ref_answers[self.ref_question_idx]
+        if self.condition_answer != "none":
+            self.ref_questions = self.ref_questions[self.ref_question_idx:self.ref_question_idx + 1]
+            self.ref_answers = self.ref_answers[self.ref_question_idx:self.ref_question_idx + 1]
+
+        self.ref_answer = self.ref_answers[0]
+        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
+                                      for question in self.ref_questions.numpy()]
+
         state_question = [self.special_tokens.SOS_idx]
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
                                 self.img_feats.unsqueeze(0), self.ref_answer)
