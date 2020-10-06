@@ -3,10 +3,11 @@ import os
 
 import h5py
 import numpy as np
+import pandas as pd
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-import pandas as pd
+
 from utils.utils_train import write_to_csv, write_to_csv_by_row
 
 
@@ -459,7 +460,7 @@ class Return(Metric):
 
     def post_treatment(self):
         csv = os.path.join(self.agent.out_path, self.train_test + '_std_history.csv')
-        serie=pd.Series(self.dict_metric).rolling(window=100).std()
+        serie = pd.Series(self.dict_metric).rolling(window=100).std()
         serie.to_csv(csv)
 
 
@@ -538,16 +539,12 @@ class BleuMetric(Metric):
         self.key = "bleu"
         self.train_test = train_test
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
-        self.condition_answer = agent.env.condition_answer
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
             question_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=["<SOS>"],
                                                                      stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
-            if self.condition_answer != "none":
-                question_idx = kwargs["ref_question_idx"]
-                ref_questions = ref_questions[question_idx:question_idx + 1]
             ref_questions = [q.split() for q in ref_questions]
             question_tokens = question_decoded.split()
             score = sentence_bleu(ref_questions, question_tokens)
