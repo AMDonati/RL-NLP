@@ -21,6 +21,7 @@ class ClevrEnv(gym.Env):
         self.mode = mode
         self.data_path = data_path
         modes = {"train": "train", "test_images": "val", "test_text": "train"}
+        self.clevr_mode=modes[self.mode]
         h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
         h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(modes[self.mode]))
         vocab_path = os.path.join(data_path, 'vocab.json')

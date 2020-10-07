@@ -343,24 +343,20 @@ class DialogMetric(Metric):
                                                                            decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
 
-                string = ' IMG {} - question index {}:'.format(kwargs["img_idx"], kwargs["question_idx"])
-                string += '\n DIALOG: {} \n VQA ANSWER: {} \n TRUE ANSWER: {} \n REF QUESTION: {}'.format(state_decoded,
-                                                                                                          pred_answer_decoded,
-                                                                                                          ref_answer_decoded,
-                                                                                                          ref_question_decoded)
-                string += '\n' + '-' * 40
-                if self.train_test == "test":
-                    img_name="CLEVR_{}_{:06d}".format(self.train_test, kwargs["img_idx"])
-                    path = os.path.join(self.path_images, img_name)
-                    string += "<img src={}>".format(path)
-                    string += '\n' + '-' * 40
-
+                values = [kwargs["img_idx"], kwargs["question_idx"], state_decoded, pred_answer_decoded,
+                          ref_answer_decoded, ref_question_decoded]
             else:
-                closest_question_decoded = kwargs["closest_question"]
-                string = 'IMG {}:'.format(kwargs[
-                                              "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+                values = [kwargs["img_idx"], state_decoded, kwargs["closest_question"]]
+            string = '<table><tr>'
+            if self.train_test[:4] == "test":
+                img_name = "CLEVR_{}_{:06d}.png".format(self.agent.env.clevr_mode, kwargs["img_idx"])
+                path = os.path.join(self.agent.env.data_path, self.path_images, "images",self.agent.env.clevr_mode, img_name)
+                values.append("<img src={}>".format(os.path.abspath(path)))
+
+            string += "<td><ul><li>" + "</li><li>".join(list(map(str, values))) + "</li></ul></td></tr></table>"
+
             self.metric.append(string)
-            # write dialog in a .txt file:
+            # write dialog in a .html file:
             with open(self.out_dialog_file, 'a') as f:
                 f.write(string + '\n')
             pass
