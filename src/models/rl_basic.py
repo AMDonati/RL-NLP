@@ -54,10 +54,7 @@ class PolicyLSTMBatch(nn.Module):
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
-        try:
-            logits = self.action_head(embedding)  # (B,S,num_tokens)
-        except:
-            print("error")
+        logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
         probs = F.softmax(logits, dim=-1)
