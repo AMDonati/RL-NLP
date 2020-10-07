@@ -77,7 +77,10 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_)
                       "epsilon_truncated": args_.epsilon_truncated,
                       "epsilon_truncated_rate": args_.epsilon_truncated_rate,
                       "train_seed": args_.train_seed,
-                      "is_loss_correction": args_.is_loss_correction}
+                      "is_loss_correction": args_.is_loss_correction,
+                      "train_metrics": args.train_metrics,
+                      "test_metrics": args.test_metrics
+                      }
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -165,6 +168,14 @@ def get_parser():
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
     parser.add_argument('-path_images', type=str, default="CLEVR_v1.0", help="path images")
+    parser.add_argument('-test_metrics', nargs='+', type=str,
+                        default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words"],
+                        help="test metrics")
+    parser.add_argument('-train_metrics', nargs='+', type=str,
+                        default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",
+                                 "valid_actions",
+                                 "dialog", "policy", "action_probs", "action_probs_truncated", "eps_truncation",
+                                 "ttr_question"], help="train metrics")
 
     return parser
 

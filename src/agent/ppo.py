@@ -20,7 +20,7 @@ class PPO(Agent):
                  epsilon_truncated=0.,
                  train_seed=0,
                  epsilon_truncated_rate=1.,
-                 is_loss_correction=1):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[]):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
@@ -34,7 +34,7 @@ class PPO(Agent):
                        epsilon_truncated=epsilon_truncated,
                        train_seed=train_seed,
                        epsilon_truncated_rate=epsilon_truncated_rate,
-                       is_loss_correction=is_loss_correction)
+                       is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -81,7 +81,7 @@ class PPO(Agent):
             # adding the is_ratio:
             if self.is_loss_correction and self.truncate_mode is not None:
                 sampling_term = old_logprobs_truncated * (
-                            1 - self.epsilon_truncated) + self.epsilon_truncated * old_logprobs
+                        1 - self.epsilon_truncated) + self.epsilon_truncated * old_logprobs
                 # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
                 is_ratios = torch.exp(old_logprobs - sampling_term.to(self.device)).view(-1)
                 ratios = ratios * is_ratios

@@ -21,7 +21,7 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[]):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -60,22 +60,21 @@ class Agent:
         if not os.path.isdir(self.checkpoints_path):
             os.makedirs(self.checkpoints_path)
         self.generated_text = []
+        self.train_metrics_names = train_metrics
+        self.test_metrics_names = test_metrics
         self.init_metrics()
         self.start_episode = 1
         self.train_seed = train_seed
 
+
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             ["reward", "dialog"]}
-        #["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words"]}
-
+                             self.test_metrics_names}
+        self.train_metrics = {key: metrics[key](self, train_test="train") for key in
+                              self.train_metrics_names}
         if self.env.reward_type == 'levenshtein_':
             for key in ["ppl", "ratio_closest_questions"]:
                 self.test_metrics[key] = metrics[key](self, train_test="test")
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              ["running_return", "return", "lm_valid_actions", "policies_discrepancy", "valid_actions",
-                               "dialog", "policy", "action_probs", "action_probs_truncated", "eps_truncation",
-                               "ttr_question"]}
         if self.truncate_mode is not None:
             for key in ["action_probs_lm"]:
                 self.train_metrics[key] = metrics[key](self, train_test="train")

@@ -341,7 +341,7 @@ class DialogMetric(Metric):
                                                                             decode_answers=True)
                 ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
                                                                            decode_answers=True)
-                ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
+                ref_question_decoded = kwargs["ref_questions_decoded"][0]
 
                 values = [kwargs["img_idx"], kwargs["question_idx"], state_decoded, pred_answer_decoded,
                           ref_answer_decoded, ref_question_decoded]
