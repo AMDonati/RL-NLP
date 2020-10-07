@@ -199,8 +199,7 @@ class Agent:
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
-                                     value,
-                                     state.answer)
+                                     value,state.answer)
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,

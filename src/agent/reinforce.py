@@ -30,8 +30,9 @@ class REINFORCE(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def evaluate(self, state_text, state_img, action):
-        policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, valid_actions=None)
+    def evaluate(self, state_text, state_img, states_answer, action):
+        policy_dist, policy_dist_truncated, value = self.policy(state_text, state_img, states_answer,
+                                                                valid_actions=None)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy
@@ -91,7 +92,8 @@ class REINFORCE(Agent):
 
         # compute new log_probs for comparison with old ones:
         states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
-        policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img))
+        policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img),
+                                                                torch.stack(self.memory.states_answer))
         new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
         ratios = torch.exp(torch.log(new_probs) - logprobs).detach()
         self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
