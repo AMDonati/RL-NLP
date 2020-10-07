@@ -315,16 +315,17 @@ class DialogMetric(Metric):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
         self.key = "dialog"
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.html')
         self.h5_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
+        self.path_images = self.agent.env.path_images
 
     def fill_(self, **kwargs):
         pass
 
     def reinit_train_test(self, train_test):
         self.train_test = train_test
-        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.html')
 
     def compute_(self, **kwargs):
         with torch.no_grad():
@@ -340,18 +341,22 @@ class DialogMetric(Metric):
                                                                             decode_answers=True)
                 ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
                                                                            decode_answers=True)
-                #ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
-                ref_question_decoded = "NA"
-                string = ' IMG {} - question index {}:'.format(kwargs[
-                                                                   "img_idx"],
-                                                               kwargs[
-                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
+                ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
+
+                values = [kwargs["img_idx"], kwargs["question_idx"], state_decoded, pred_answer_decoded,
+                          ref_answer_decoded, ref_question_decoded]
             else:
-                closest_question_decoded = kwargs["closest_question"]
-                string = 'IMG {}:'.format(kwargs[
-                                              "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+                values = [kwargs["img_idx"], state_decoded, kwargs["closest_question"]]
+            string = '<table><tr>'
+            if self.train_test[:4] == "test":
+                img_name = "CLEVR_{}_{:06d}.png".format(self.agent.env.clevr_mode, kwargs["img_idx"])
+                path = os.path.join(self.agent.env.data_path, self.path_images, "images",self.agent.env.clevr_mode, img_name)
+                values.append("<img src={}>".format(os.path.abspath(path)))
+
+            string += "<td><ul><li>" + "</li><li>".join(list(map(str, values))) + "</li></ul></td></tr></table>"
+
             self.metric.append(string)
-            # write dialog in a .txt file:
+            # write dialog in a .html file:
             with open(self.out_dialog_file, 'a') as f:
                 f.write(string + '\n')
             pass
