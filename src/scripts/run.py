@@ -167,7 +167,6 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="log interval ")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
-    parser.add_argument('-path_images', type=str, default="CLEVR_v1.0", help="path images")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words"],
                         help="test metrics")
@@ -218,7 +217,7 @@ def run(args):
 
     env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                    num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                   reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, path_images=args.path_images)
+                   reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
     # if args.reward == 'vqa':
     #     test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
     #                           num_questions=args.num_questions, reward_path=args.reward_path,
@@ -227,9 +226,8 @@ def run(args):
     # else:
     test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                           num_questions=args.num_questions, reward_path=args.reward_path,
-                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, path_images=args.path_images)
-                 for
-                 mode in ["test_images", "test_text"]]
+                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                 for mode in ["test_images", "test_text"]]
 
     pretrained_lm = None
     if args.lm_path is not None:

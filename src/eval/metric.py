@@ -325,7 +325,6 @@ class DialogMetric(Metric):
         self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.html')
         self.h5_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
-        self.path_images = self.agent.env.path_images
         self.drive_service = self.get_google_service()
 
     def fill_(self, **kwargs):
@@ -359,8 +358,6 @@ class DialogMetric(Metric):
             if self.train_test[:4] == "test":
                 img_name = "CLEVR_{}_{:06d}.png".format(self.agent.env.clevr_mode, kwargs["img_idx"])
                 id = self.get_id_image(img_name)
-                # path = os.path.join(self.agent.env.data_path, self.path_images, "images", self.agent.env.clevr_mode,
-                # img_name)
                 url = "https://drive.google.com/uc?export=view&id={}".format(id)
                 values.append("<img src={}>".format(url))
 
@@ -374,16 +371,18 @@ class DialogMetric(Metric):
 
     def get_id_image(self, name):
         page_token = None
+        id="unknown"
         while True:
             try:
                 response = self.drive_service.files().list(q="name = '{}'".format(name),
                                                            spaces='drive',
                                                            fields='nextPageToken, files(id, name)',
                                                            pageToken=page_token).execute()
+                file = response["files"][0]
+                id = file.get('id')
+
             except Exception as e:
                 print(e)
-            file = response["files"][0]
-            id = file.get('id')
             break
         return id
 
