@@ -231,6 +231,23 @@ class ActionProbsTruncated(Metric):
         logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
 
 
+class SumProbsOverTruncated(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "sum_probs_truncated"
+
+    def fill_(self, **kwargs):
+        sum_over_truncated_space = 1
+        if kwargs["valid_actions"] is not None:
+            sum_over_truncated_space = torch.gather(kwargs["dist"].probs, -1,
+                                                    kwargs["valid_actions"]).sum().cpu().detach().numpy()
+        self.measure.append(float(sum_over_truncated_space))
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
 class LMActionProbs(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
@@ -371,7 +388,7 @@ class DialogMetric(Metric):
 
     def get_id_image(self, name):
         page_token = None
-        id="unknown"
+        id = "unknown"
         while True:
             try:
                 response = self.drive_service.files().list(q="name = '{}'".format(name),
@@ -768,4 +785,4 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "action_probs_lm": LMActionProbs,
            "running_return": RunningReturn,
            "policy": PolicyMetric,
-           "eps_truncation": EpsilonTruncation, "return": Return}
+           "eps_truncation": EpsilonTruncation, "return": Return, "sum_probs": SumProbsOverTruncated}
