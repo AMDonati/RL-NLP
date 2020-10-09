@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import torch
-from google_auth_httplib2 import Request
+from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
