@@ -1,14 +1,21 @@
 import logging
 import os
+import pickle
 
 import h5py
 import numpy as np
 import pandas as pd
 import torch
+from google_auth_httplib2 import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
 
 from utils.utils_train import write_to_csv, write_to_csv_by_row
+
+# If modifying these scopes, delete the file token.pickle.
+SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 
 class Metric:
@@ -319,6 +326,7 @@ class DialogMetric(Metric):
         self.h5_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
         self.path_images = self.agent.env.path_images
+        self.drive_service = self.get_google_service()
 
     def fill_(self, **kwargs):
         pass
@@ -350,16 +358,57 @@ class DialogMetric(Metric):
             string = '<table><tr>'
             if self.train_test[:4] == "test":
                 img_name = "CLEVR_{}_{:06d}.png".format(self.agent.env.clevr_mode, kwargs["img_idx"])
-                path = os.path.join(self.agent.env.data_path, self.path_images, "images",self.agent.env.clevr_mode, img_name)
-                values.append("<img src={}>".format(os.path.abspath(path)))
+                id = self.get_id_image(img_name)
+                # path = os.path.join(self.agent.env.data_path, self.path_images, "images", self.agent.env.clevr_mode,
+                # img_name)
+                url = "https://drive.google.com/uc?export=view&id={}".format(id)
+                values.append("<img src={}>".format(url))
 
-            string += "<td><ul><li>" + "</li><li>".join(list(map(str, values))) + "</li></ul></td></tr></table>"
+                string += "<td><ul><li>" + "</li><li>".join(list(map(str, values))) + "</li></ul></td></tr></table>"
 
-            self.metric.append(string)
-            # write dialog in a .html file:
-            with open(self.out_dialog_file, 'a') as f:
-                f.write(string + '\n')
-            pass
+                self.metric.append(string)
+                # write dialog in a .html file:
+                with open(self.out_dialog_file, 'a') as f:
+                    f.write(string + '\n')
+                pass
+
+    def get_id_image(self, name):
+        page_token = None
+        while True:
+            try:
+                response = self.drive_service.files().list(q="name = '{}'".format(name),
+                                                           spaces='drive',
+                                                           fields='nextPageToken, files(id, name)',
+                                                           pageToken=page_token).execute()
+            except Exception as e:
+                print(e)
+            file = response["files"][0]
+            id = file.get('id')
+            break
+        return id
+
+    def get_google_service(self):
+        creds = None
+        # The file token.pickle stores the user's access and refresh tokens, and is
+        # created automatically when the authorization flow completes for the first
+        # time.
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+        # If there are no (valid) credentials available, let the user log in.
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    'credentials.json', SCOPES)
+                creds = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
+
+        service = build('drive', 'v3', credentials=creds)
+        return service
 
     def write_to_csv(self):
         '''save padded array of generated dialog for later use (for example with word cloud)'''
