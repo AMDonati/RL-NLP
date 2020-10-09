@@ -333,8 +333,61 @@ class EpsilonTruncation(Metric):
 
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
-
 class DialogMetric(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "text"
+        self.key = "dialog"
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+        self.h5_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.h5')
+        self.generated_dialog = {}
+
+    def fill_(self, **kwargs):
+        pass
+
+    def reinit_train_test(self, train_test):
+        self.train_test = train_test
+        self.out_dialog_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key + '.txt')
+
+    def compute_(self, **kwargs):
+        with torch.no_grad():
+            if not self.train_test + '_' + self.key in self.generated_dialog.keys():
+                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text.squeeze().cpu()]
+            else:
+                self.generated_dialog[self.train_test + '_' + self.key].append(
+                    kwargs["state"].text.cpu().view(-1))
+            state_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
+                                                                  ignored=[])
+            if self.agent.env.reward_type == 'vqa':
+                pred_answer_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(),
+                                                                            decode_answers=True)
+                ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
+                                                                           decode_answers=True)
+                ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
+                string = ' IMG {} - question index {}:'.format(kwargs[
+                                                                   "img_idx"],
+                                                               kwargs[
+                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
+            else:
+                closest_question_decoded = kwargs["closest_question"]
+                string = 'IMG {}:'.format(kwargs[
+                                              "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
+            self.metric.append(string)
+            # write dialog in a .txt file:
+            with open(self.out_dialog_file, 'a') as f:
+                f.write(string + '\n')
+            pass
+
+    def write_to_csv(self):
+        '''save padded array of generated dialog for later use (for example with word cloud)'''
+        if self.train_test != "train":
+            for key, dialog in self.generated_dialog.items():
+                generated_dialog = pad_sequence(dialog, batch_first=True).cpu().numpy()
+                with h5py.File(self.h5_dialog_file, 'w') as f:
+                    f.create_dataset(key, data=generated_dialog)
+
+
+class DialogImageMetric(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
@@ -785,4 +838,5 @@ metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions"
            "action_probs_lm": LMActionProbs,
            "running_return": RunningReturn,
            "policy": PolicyMetric,
-           "eps_truncation": EpsilonTruncation, "return": Return, "sum_probs": SumProbsOverTruncated}
+           "eps_truncation": EpsilonTruncation, "return": Return, "sum_probs": SumProbsOverTruncated,
+           "dialogimage": DialogImageMetric}
