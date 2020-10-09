@@ -5,6 +5,7 @@ from configparser import ConfigParser
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from transformers import AutoModelWithLMHead
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
@@ -168,13 +169,14 @@ def get_parser():
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words", "sum_probs"],
+                        default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words",
+                                 "sum_probs"],
                         help="test metrics")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",
                                  "valid_actions",
                                  "dialog", "policy", "action_probs", "action_probs_truncated", "eps_truncation",
-                                 "ttr_question","sum_probs"], help="train metrics")
+                                 "ttr_question", "sum_probs"], help="train metrics")
 
     return parser
 
@@ -229,10 +231,12 @@ def run(args):
                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                  for mode in ["test_images", "test_text"]]
 
-    pretrained_lm = None
+    #pretrained_lm = None
     if args.lm_path is not None:
         pretrained_lm = torch.load(args.lm_path, map_location=torch.device('cpu'))
         pretrained_lm.eval()
+    else:
+        pretrained_lm = AutoModelWithLMHead.from_pretrained("gpt2")
 
     models = {"lstm": PolicyLSTMBatch}
 

@@ -9,7 +9,6 @@ import time
 import numpy as np
 import torch
 import torch.optim as optim
-from torch.distributions import Categorical
 
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
@@ -66,7 +65,6 @@ class Agent:
         self.start_episode = 1
         self.train_seed = train_seed
 
-
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
                              self.test_metrics_names}
@@ -92,25 +90,22 @@ class Agent:
             self.epsilon_truncated = 1
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
-    def act(self, state, mode='sampling', truncation=True, baseline=False, train=True, timestep=0):
+    def act(self, state, mode='sampling', truncation=True, train=True, timestep=0):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
                                                                                   logits_lm,
-                                                                                  baseline=baseline,
                                                                                   alpha=alpha)
         action = self.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
-                                    valid_actions=valid_actions,
-                                    mode=mode, timestep=timestep)
+                                    valid_actions=valid_actions, mode=mode, timestep=timestep)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
         if self.policy.train_policy == 'truncated':
             assert torch.all(torch.eq(policy_dist_truncated.probs, policy_dist.probs))
         return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False):
-        policy = self.start_policy if baseline else self.policy
-        policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
+        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
                                                            valid_actions=valid_actions,
                                                            logits_lm=logits_lm, alpha=alpha)
         # TODO; add an assert here if valid_actions is None and alpha = 0.
@@ -130,34 +125,6 @@ class Agent:
         if policy_to_sample_from.probs.size() != policy_dist.probs.size():
             action = torch.gather(valid_actions, 1, action.view(1, 1))
         return action
-
-    def generate_one_episode_with_lm(self, env, test_mode='sampling'):  # TODO: refactor this with alpha = 1.
-        state, ep_reward = env.reset(), 0
-        with torch.no_grad():
-            for i in range(env.max_len):
-                log_probas, hidden = self.pretrained_lm(state.text.to(self.device))  # output (1, num_tokens)
-                if test_mode == 'sampling':
-                    softmax = log_probas[-1, :].squeeze().exp()
-                    action = Categorical(softmax).sample()
-                elif test_mode == 'greedy':
-                    action = log_probas[-1, :].squeeze().argmax()
-                new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
-                state = new_state
-                ep_reward += reward
-                if done:
-                    break
-        for key in ["reward", "ppl_dialog_lm", "bleu"]:
-            self.test_metrics[key].reinit_train_test(self.test_metrics[key].train_test + '_' + 'fromLM')
-            self.test_metrics[key].fill(done=True, new_state=new_state, reward=reward,
-                                        closest_question=closest_question,
-                                        state=state,
-                                        ref_questions_decoded=env.ref_questions_decoded,
-                                        ref_question_idx=env.ref_question_idx)
-            self.test_metrics[key].compute()
-        # reset metrics key value for writing:
-        for m in self.test_metrics.values():
-            m.reinit_train_test(env.mode + '_' + test_mode)
-        return state, env.dialog, ep_reward, closest_question
 
     def save(self, out_file):
         with open(out_file, 'wb') as f:
@@ -185,7 +152,7 @@ class Agent:
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, baselines=baselines)
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
-                             test_mode='sampling', baseline=False):
+                             test_mode='sampling'):
         state, ep_reward = env.reset(seed), 0
         metrics = self.train_metrics if train else self.test_metrics
         for t in range(0, env.max_len):
@@ -193,13 +160,12 @@ class Agent:
                 valid_actions, actions_probs, log_probs_truncated), dist = self.act(state=state,
                                                                                     train=train,
                                                                                     mode=test_mode,
-                                                                                    truncation=truncation,
-                                                                                    baseline=baseline, timestep=t)
+                                                                                    truncation=truncation, timestep=t)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
-                                     value,state.answer)
+                                     value, state.answer)
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
