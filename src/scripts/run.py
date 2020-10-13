@@ -169,8 +169,8 @@ def get_parser():
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words",
-                                 "sum_probs"],
+                        default=["reward", "dialog", "bleu", #"ppl_dialog_lm",
+                                 "ttr_question", "unique_words", "sum_probs"],
                         help="test metrics")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",

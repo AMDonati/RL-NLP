@@ -17,4 +17,5 @@ if __name__ == '__main__':
     next_token = torch.multinomial(probs, num_samples=1)
     generated = torch.cat([input_ids, next_token], dim=-1)
     resulting_string = tokenizer.decode(generated.tolist()[0])
+    print("next_token: {}".format(tokenizer.decoder[int(next_token.numpy())]) )
     print(resulting_string)
