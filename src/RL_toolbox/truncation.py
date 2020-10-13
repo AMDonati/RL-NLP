@@ -43,8 +43,8 @@ def mask_inf_truncature(valid_actions, logits, num_tokens=87):
 
 
 class Truncation:
-    def __init__(self, agent):
-        self.language_model = agent.pretrained_lm
+    def __init__(self, agent, pretrained_lm=None):
+        self.language_model = pretrained_lm
         self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
         self.lm_to_clevr_trad = {value: self.tokenizer.encoder[key] if key in self.tokenizer.encoder else None for
                                  key, value in
@@ -78,11 +78,11 @@ class Truncation:
             input_ids = self.tokenizer.encode(text, return_tensors="pt")
             logits_lm = self.language_model(input_ids)[0][:, -1, :]
             logits = -torch.ones(len(self.lm_to_clevr_trad)) * 1e32
-            logits[list(self.clevr_to_lm_trad.values())]=logits_lm[0][list(self.clevr_to_lm_trad.keys())]
+            logits[list(self.clevr_to_lm_trad.values())] = logits_lm[0][list(self.clevr_to_lm_trad.keys())]
             # filtered_next_token_logits = top_k_top_p_filtering(next_token_logits, top_k=50, top_p=1.0)
             # probs = F.softmax(filtered_next_token_logits, dim=-1)
             # next_token = torch.multinomial(probs, num_samples=1)
-            logits=logits.unsqueeze(dim=0)
+            logits = logits.unsqueeze(dim=0)
             log_probas = F.log_softmax(logits, dim=-1)
 
         return log_probas, logits
@@ -112,7 +112,7 @@ class NoTruncation(Truncation):
 
 class TopK(Truncation):
     def __init__(self, agent, **kwargs):
-        Truncation.__init__(self, agent)
+        Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.num_truncated = kwargs["num_truncated"]
 
     def truncate(self, log_probas, logits):
@@ -124,7 +124,7 @@ class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
 
     def __init__(self, agent, **kwargs):
-        Truncation.__init__(self, agent)
+        Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.p_th = kwargs["p_th"]
 
     def truncate(self, log_probas, logits):
@@ -139,7 +139,7 @@ class ProbaThreshold(Truncation):
 class SampleVA(Truncation):
     def __init__(self, agent, **kwargs):
         '''See Overleaf for details on this truncation fn.'''
-        Truncation.__init__(self, agent)
+        Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.k_max = kwargs["num_truncated"]
 
     def truncate(self, log_probas, logits):

@@ -10,6 +10,7 @@ from transformers import AutoModelWithLMHead
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
+from models.language_model import LanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import compute_write_all_metrics
 from utils.utils_train import create_logger
@@ -169,7 +170,7 @@ def get_parser():
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["reward", "dialog", "bleu", #"ppl_dialog_lm",
+                        default=["reward", "dialog", "bleu",  # "ppl_dialog_lm",
                                  "ttr_question", "unique_words", "sum_probs"],
                         help="test metrics")
     parser.add_argument('-train_metrics', nargs='+', type=str,
@@ -231,12 +232,12 @@ def run(args):
                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                  for mode in ["test_images", "test_text"]]
 
-    #pretrained_lm = None
     if args.lm_path is not None:
-        pretrained_lm = torch.load(args.lm_path, map_location=torch.device('cpu'))
-        pretrained_lm.eval()
+        lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
+        lm_model.eval()
     else:
-        pretrained_lm = AutoModelWithLMHead.from_pretrained("gpt2")
+        lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
+    pretrained_lm = LanguageModel(lm_model)
 
     models = {"lstm": PolicyLSTMBatch}
 

@@ -29,10 +29,7 @@ class Agent:
         self.gamma = gamma
         self.log_interval = log_interval
         self.test_envs = test_envs
-        self.pretrained_lm = pretrained_lm
         self.truncate_mode = truncate_mode
-        if self.pretrained_lm is not None:
-            self.pretrained_lm.to(self.device)
         self.alpha_logits_lm = alpha_logits
         self.alpha_decay_rate = alpha_decay_rate
         self.env = env
@@ -50,7 +47,7 @@ class Agent:
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
-                                                         p_th=p_th_)  # adding the truncation class.
+                                                         p_th=p_th_, pretrained_lm=pretrained_lm)  # adding the truncation class.
         else:
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_)
         self.writer = writer
