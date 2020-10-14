@@ -87,7 +87,7 @@ class Agent:
             self.epsilon_truncated = 1
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
-    def act(self, state, mode='sampling', truncation=True, train=True, timestep=0):
+    def act(self, state, mode='sampling', truncation=True,  timestep=0):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
@@ -116,7 +116,11 @@ class Agent:
         if self.pretrain:
             action = self.env.ref_question[timestep]
         elif mode == 'sampling':
-            action = policy_to_sample_from.sample()
+            try:
+                action = policy_to_sample_from.sample()
+            except:
+                action = policy_dist.sample()
+                print("error")
         elif mode == 'greedy':
             action = torch.argmax(policy_to_sample_from.probs).view(1).detach()
         if policy_to_sample_from.probs.size() != policy_dist.probs.size():
@@ -155,7 +159,6 @@ class Agent:
         for t in range(0, env.max_len):
             action, log_probs, value, (
                 valid_actions, actions_probs, log_probs_truncated), dist = self.act(state=state,
-                                                                                    train=train,
                                                                                     mode=test_mode,
                                                                                     truncation=truncation, timestep=t)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())

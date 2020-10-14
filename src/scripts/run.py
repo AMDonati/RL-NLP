@@ -176,7 +176,7 @@ def get_parser():
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",
                                  "valid_actions",
-                                 "dialog", "policy", "action_probs", "action_probs_truncated", "eps_truncation",
+                                 "dialog", "action_probs", "action_probs_truncated", "eps_truncation",
                                  "ttr_question", "sum_probs"], help="train metrics")
 
     return parser
@@ -237,7 +237,7 @@ def run(args):
         lm_model.eval()
     else:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-    pretrained_lm = LanguageModel(lm_model)
+    pretrained_lm = LanguageModel(lm_model, env.clevr_dataset)
 
     models = {"lstm": PolicyLSTMBatch}
 

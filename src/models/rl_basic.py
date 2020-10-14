@@ -25,7 +25,7 @@ class PolicyLSTMBatch(nn.Module):
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "gather": gather_truncature, "masked_inf": mask_inf_truncature}
-        self.truncate = truncature["masked"]
+        self.truncate = truncature["masked_inf"]
         self.train_policy = train_policy
         self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
         self.fusion = fusion
@@ -70,6 +70,8 @@ class PolicyLSTMBatch(nn.Module):
                 policy_dist = policy_dist_truncated
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
+        if torch.isnan(policy_dist_truncated.probs).any():
+            print("problem")
         return policy_dist, policy_dist_truncated
 
     def process_fusion(self, embed_text, img_feat_, img_feat, answer):

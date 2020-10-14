@@ -3,10 +3,8 @@ import logging
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from transformers import AutoTokenizer
 
 from RL_toolbox.RL_functions import masked_softmax
-from models.LM_networks import LSTMModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -37,7 +35,8 @@ def mask_inf_truncature(valid_actions, logits, num_tokens=87):
     mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
     probs_truncated = F.softmax(mask, dim=-1)
     # check that the truncation is right.
-    assert probs_truncated[:, valid_actions].sum(dim=-1) == 1, "ERROR IN TRUNCATION FUNCTION"
+    if probs_truncated[:, valid_actions].sum(dim=-1) - 1 > 1e-6:
+        print("ERROR IN TRUNCATION FUNCTION")
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
 
@@ -45,14 +44,9 @@ def mask_inf_truncature(valid_actions, logits, num_tokens=87):
 class Truncation:
     def __init__(self, agent, pretrained_lm=None):
         self.language_model = pretrained_lm
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
-        self.lm_to_clevr_trad = {value: self.tokenizer.encoder[key] if key in self.tokenizer.encoder else None for
-                                 key, value in
-                                 agent.env.clevr_dataset.vocab_questions.items()}
-        self.clevr_to_lm_trad = {value: agent.env.clevr_dataset.vocab_questions[key]
-                                 for key, value in self.tokenizer.encoder.items() if
-                                 key in agent.env.clevr_dataset.vocab_questions}
+
         self.dataset = agent.env.clevr_dataset
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def get_valid_actions(self, state, truncation):
         if not truncation:
@@ -61,31 +55,10 @@ class Truncation:
             # log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
             # logits = logits.view(len(state.text), seq_len, -1)
             # logits = logits[:, -1, :]
-            log_probas, logits = self.get_lm_logits(state, )
+            # log_probas, logits = self.get_lm_logits(state, )
+            log_probas, logits = self.language_model.forward(state.text.to(self.device))
             valid_actions, action_probs = self.truncate(log_probas, logits)
             return valid_actions, action_probs, logits
-
-    def get_lm_logits(self, state):
-        if self.language_model.__class__ in [LSTMModel]:
-            seq_len = state.text.size(1)
-            log_probas, logits = self.language_model(state.text.to(self.device))
-            logits = logits.view(len(state.text), seq_len, -1)
-            logits = logits[:, -1, :]
-            log_probas = log_probas.view(len(state.text), seq_len, -1)
-            log_probas = log_probas[:, -1, :]
-        else:
-            text = "bos " + self.dataset.idx2word(state.text.cpu().numpy().ravel(), stop_at_end=True)
-            input_ids = self.tokenizer.encode(text, return_tensors="pt")
-            logits_lm = self.language_model(input_ids)[0][:, -1, :]
-            logits = -torch.ones(len(self.lm_to_clevr_trad)) * 1e32
-            logits[list(self.clevr_to_lm_trad.values())] = logits_lm[0][list(self.clevr_to_lm_trad.keys())]
-            # filtered_next_token_logits = top_k_top_p_filtering(next_token_logits, top_k=50, top_p=1.0)
-            # probs = F.softmax(filtered_next_token_logits, dim=-1)
-            # next_token = torch.multinomial(probs, num_samples=1)
-            logits = logits.unsqueeze(dim=0)
-            log_probas = F.log_softmax(logits, dim=-1)
-
-        return log_probas, logits
 
     def truncate(self, log_probas, logits):
         return None, None

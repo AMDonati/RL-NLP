@@ -546,7 +546,8 @@ class PPLDialogfromLM(Metric):
     def fill_(self, **kwargs):
         if kwargs["done"]:
             with torch.no_grad():
-                log_probas, hidden = self.agent.pretrained_lm(kwargs["new_state"].text[:, :-1].to(self.agent.device))
+                log_probas, hidden = self.agent.truncation.language_model.forward(
+                    kwargs["new_state"].text[:, :-1].to(self.agent.device))
                 for i, word in enumerate(kwargs["new_state"].text[:, 1:].view(-1)):
                     self.measure.append(log_probas[i, word.cpu().numpy()])
 
@@ -803,7 +804,7 @@ class PolicyMetric(Metric):
             top_words_decoded = self.agent.env.clevr_dataset.idx2word(top_k_indices.cpu().numpy()[0])
             # get top_words from the language model:
             seq_len = kwargs["state"].text.size(1)
-            log_probas, _ = self.agent.pretrained_lm(kwargs["state"].text.to(self.agent.device))
+            log_probas, _ = self.agent.truncation.language_model.forward(kwargs["state"].text.to(self.agent.device))
             log_probas = log_probas.view(len(kwargs["state"].text), seq_len, -1)
             _, top_k_indices_lm = torch.topk(log_probas[:, -1, :], 10, sorted=True)
             top_k_indices, top_k_weights, top_k_indices_lm = top_k_indices.squeeze(), top_k_weights.squeeze(), top_k_indices_lm.squeeze()
