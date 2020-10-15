@@ -68,12 +68,6 @@ class Agent:
                              self.test_metrics_names}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
                               self.train_metrics_names}
-        if self.env.reward_type == 'levenshtein_':
-            for key in ["ppl", "ratio_closest_questions"]:
-                self.test_metrics[key] = metrics[key](self, train_test="test")
-        if self.truncate_mode is not None:
-            for key in ["action_probs_lm"]:
-                self.train_metrics[key] = metrics[key](self, train_test="train")
         if self.truncate_mode == 'sample_va' or self.truncate_mode == 'proba_thr':
             self.train_metrics["size_valid_actions"] = metrics["size_valid_actions"](self, train_test="train")
 
