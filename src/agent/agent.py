@@ -21,7 +21,7 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[]):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1.):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -51,9 +51,9 @@ class Agent:
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
-                                                         p_th=p_th_)  # adding the truncation class.
+                                                         p_th=p_th_,top_p=top_p)  # adding the truncation class.
         else:
-            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_)
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -65,7 +65,6 @@ class Agent:
         self.init_metrics()
         self.start_episode = 1
         self.train_seed = train_seed
-
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
@@ -199,7 +198,7 @@ class Agent:
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
-                                     value,state.answer)
+                                     value, state.answer)
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,

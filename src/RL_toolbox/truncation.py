@@ -123,7 +123,7 @@ class TopP(Truncation):
         '''See Overleaf for details on this truncation fn.'''
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.top_p = kwargs["top_p"]
-        self.filter_value == -float("Inf")
+        self.filter_value = -float("Inf")
         self.min_tokens_to_keep = 1
 
     def truncate(self, log_probas, logits):

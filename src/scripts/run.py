@@ -79,7 +79,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_)
                       "train_seed": args_.train_seed,
                       "is_loss_correction": args_.is_loss_correction,
                       "train_metrics": args.train_metrics,
-                      "test_metrics": args.test_metrics
+                      "test_metrics": args.test_metrics,
+                      "top_p": args.top_p
                       }
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
@@ -167,14 +168,17 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="log interval ")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-mask_answers', type=int, default=0, help="mask answers")
+    parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
+
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words", "sum_probs"],
+                        default=["reward", "dialog", "bleu", "ppl_dialog_lm", "ttr_question", "unique_words",
+                                 "sum_probs"],
                         help="test metrics")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",
                                  "valid_actions",
                                  "dialog", "policy", "action_probs", "action_probs_truncated", "eps_truncation",
-                                 "ttr_question","sum_probs"], help="train metrics")
+                                 "ttr_question", "sum_probs"], help="train metrics")
 
     return parser
 
