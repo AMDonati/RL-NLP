@@ -127,6 +127,7 @@ class TopP(Truncation):
         self.min_tokens_to_keep = 1
 
     def truncate(self, log_probas, logits):
+        valid_actions = None
         if self.top_p < 1.0:
             sorted_logits, sorted_indices = torch.sort(logits, descending=True)
             cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
@@ -143,7 +144,8 @@ class TopP(Truncation):
             # scatter sorted tensors to original indexing
             indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
             logits[indices_to_remove] = self.filter_value
-        return logits
+            _, valid_actions = torch.where(indices_to_remove == False)
+        return valid_actions.unsqueeze(dim=0), logits
 
 
 truncations = {"no_trunc": NoTruncation, "top_k": TopK, "proba_thr": ProbaThreshold, "sample_va": SampleVA,
