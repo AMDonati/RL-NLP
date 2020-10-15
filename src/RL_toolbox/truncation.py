@@ -64,9 +64,6 @@ class NoTruncation(Truncation):
     def __init__(self, agent, **kwargs):
         Truncation.__init__(self, agent)
 
-    # def truncate(self, log_probas, logits):
-    #     return None, None
-
     def get_valid_actions(self, state, truncation):
         if self.alpha_logits_lm > 0:
             with torch.no_grad():
@@ -127,25 +124,20 @@ class TopP(Truncation):
         self.min_tokens_to_keep = 1
 
     def truncate(self, log_probas, logits):
-        valid_actions = None
-        if self.top_p < 1.0:
-            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-            cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        # valid_actions, action_probs = None, logits
+        # if self.top_p < 1.0:
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
-            # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
-            sorted_indices_to_remove = cumulative_probs > self.top_p
-            if self.min_tokens_to_keep > 1:
-                # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
-                sorted_indices_to_remove[..., :self.min_tokens_to_keep] = 0
-            # Shift the indices to the right to keep also the first token above the threshold
-            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-            sorted_indices_to_remove[..., 0] = 0
-
-            # scatter sorted tensors to original indexing
-            indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-            logits[indices_to_remove] = self.filter_value
-            _, valid_actions = torch.where(indices_to_remove == False)
-        return valid_actions.unsqueeze(dim=0), logits
+        # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
+        sorted_indices_to_remove = cumulative_probs > self.top_p
+        # scatter sorted tensors to original indexing
+        indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+        # logits[indices_to_remove] = self.filter_value
+        _, valid_actions = torch.where(indices_to_remove == False)
+        action_probs = logits[:, valid_actions]
+        valid_actions = valid_actions.unsqueeze(dim=0)
+        return valid_actions, action_probs
 
 
 truncations = {"no_trunc": NoTruncation, "top_k": TopK, "proba_thr": ProbaThreshold, "sample_va": SampleVA,

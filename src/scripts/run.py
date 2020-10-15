@@ -5,7 +5,7 @@ from configparser import ConfigParser
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from transformers import AutoModelWithLMHead
+from transformers import AutoModelWithLMHead, AutoTokenizer
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
@@ -180,7 +180,7 @@ def get_parser():
                         default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",
                                  "valid_actions",
                                  "dialog", "action_probs", "action_probs_truncated", "eps_truncation",
-                                 "ttr_question", "sum_probs"], help="train metrics")
+                                 "ttr_question", "sum_probs","action_probs_lm"], help="train metrics")
 
     return parser
 
@@ -238,9 +238,11 @@ def run(args):
     if args.lm_path is not None:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
+        tokenizer=None
     else:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-    pretrained_lm = LanguageModel(lm_model, env.clevr_dataset)
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    pretrained_lm = LanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset, tokenizer=tokenizer)
 
     models = {"lstm": PolicyLSTMBatch}
 

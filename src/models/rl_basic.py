@@ -71,7 +71,7 @@ class PolicyLSTMBatch(nn.Module):
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         if torch.isnan(policy_dist_truncated.probs).any():
-            print("problem")
+            print("policy dist truncated with nan")
         return policy_dist, policy_dist_truncated
 
     def process_fusion(self, embed_text, img_feat_, img_feat, answer):

@@ -6,24 +6,25 @@ from models.LM_networks import LSTMModel
 
 
 class LanguageModel:
-    def __init__(self, pretrained_lm, clevr_dataset):
+    def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
         self.language_model = pretrained_lm
         self.dataset = clevr_dataset
         self.forward_func = self.forward_clevr if self.language_model.__class__ in [LSTMModel] else self.forward_generic
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.tokenizer = tokenizer
         self.clevr_to_lm_trad = {value: self.tokenizer.encode(" " + key)[0] for
                                  key, value in self.dataset.vocab_questions.items() if
                                  len(self.tokenizer.encode(" " + key)) == 1}
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(self, state):
         return self.forward_func(state)
 
-    def forward_clevr(self, state):
-        seq_len = state.text.size(1)
-        log_probas, logits = self.language_model(state.text.to(self.device))
-        logits = logits.view(len(state.text), seq_len, -1)
+    def forward_clevr(self, state_text):
+        seq_len = state_text.size(1)
+        log_probas, logits = self.language_model(state_text.to(self.device))
+        logits = logits.view(len(state_text), seq_len, -1)
         logits = logits[:, -1, :]
-        log_probas = log_probas.view(len(state.text), seq_len, -1)
+        log_probas = log_probas.view(len(state_text), seq_len, -1)
         log_probas = log_probas[:, -1, :]
         return log_probas, logits
 
