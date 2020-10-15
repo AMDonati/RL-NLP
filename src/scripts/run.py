@@ -10,7 +10,7 @@ from transformers import AutoModelWithLMHead, AutoTokenizer
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
-from models.language_model import LanguageModel
+from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import compute_write_all_metrics
 from utils.utils_train import create_logger
@@ -180,7 +180,7 @@ def get_parser():
                         default=["running_return", "return", "lm_valid_actions", "policies_discrepancy",
                                  "valid_actions",
                                  "dialog", "action_probs", "action_probs_truncated", "eps_truncation",
-                                 "ttr_question", "sum_probs","action_probs_lm"], help="train metrics")
+                                 "ttr_question", "sum_probs"], help="train metrics")
 
     return parser
 
@@ -238,11 +238,12 @@ def run(args):
     if args.lm_path is not None:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
-        tokenizer=None
+        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset)
     else:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    pretrained_lm = LanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset, tokenizer=tokenizer)
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
+                                             tokenizer=tokenizer)
 
     models = {"lstm": PolicyLSTMBatch}
 
