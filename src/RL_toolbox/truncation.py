@@ -9,7 +9,7 @@ from RL_toolbox.RL_functions import masked_softmax
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def gather_truncature(valid_actions, logits, num_tokens=87):
+def gather_truncature(valid_actions, logits, num_tokens=86):
     logits = torch.gather(logits.clone().detach(), -1, valid_actions)
     probs = F.softmax(logits, dim=-1)
     return Categorical(probs)
@@ -44,7 +44,7 @@ def mask_inf_truncature(valid_actions, logits, num_tokens=87):
 class Truncation:
     def __init__(self, agent, pretrained_lm=None):
         self.language_model = pretrained_lm
-
+        self.alpha_logits_lm = agent.alpha_logits_lm
         self.dataset = agent.env.clevr_dataset
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -52,10 +52,6 @@ class Truncation:
         if not truncation:
             return None, None, 0
         with torch.no_grad():
-            # log_probas, logits = self.agent.pretrained_lm(state.text.to(self.agent.device))
-            # logits = logits.view(len(state.text), seq_len, -1)
-            # logits = logits[:, -1, :]
-            # log_probas, logits = self.get_lm_logits(state, )
             log_probas, logits = self.language_model.forward(state.text.to(self.device))
             valid_actions, action_probs = self.truncate(log_probas, logits)
             return valid_actions, action_probs, logits
@@ -75,9 +71,7 @@ class NoTruncation(Truncation):
         if self.alpha_logits_lm > 0:
             with torch.no_grad():
                 seq_len = state.text.size(1)
-                log_probas, logits = self.language_model(state.text.to(self.device))
-                logits = logits.view(len(state.text), seq_len, -1)
-                logits = logits[:, -1, :]
+                log_probas, logits = self.language_model.forward(state.text.to(self.device))
         else:
             logits = 0
         return None, None, logits
@@ -124,7 +118,36 @@ class SampleVA(Truncation):
         return valid_actions.unsqueeze(0), action_probs
 
 
-truncations = {"no_trunc": NoTruncation, "top_k": TopK, "proba_thr": ProbaThreshold, "sample_va": SampleVA}
+class TopP(Truncation):
+    def __init__(self, agent, **kwargs):
+        '''See Overleaf for details on this truncation fn.'''
+        Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
+        self.top_p = kwargs["top_p"]
+        self.filter_value = -float("Inf")
+        self.min_tokens_to_keep = 1
+
+    def truncate(self, log_probas, logits):
+        if self.top_p < 1.0:
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+            # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
+            sorted_indices_to_remove = cumulative_probs > self.top_p
+            if self.min_tokens_to_keep > 1:
+                # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
+                sorted_indices_to_remove[..., :self.min_tokens_to_keep] = 0
+            # Shift the indices to the right to keep also the first token above the threshold
+            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+            sorted_indices_to_remove[..., 0] = 0
+
+            # scatter sorted tensors to original indexing
+            indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+            logits[indices_to_remove] = self.filter_value
+        return logits
+
+
+truncations = {"no_trunc": NoTruncation, "top_k": TopK, "proba_thr": ProbaThreshold, "sample_va": SampleVA,
+               "top_p": TopP}
 
 if __name__ == '__main__':
     temp = torch.tensor([0.1, 0.2, 0.5, 0.7, 0.9])

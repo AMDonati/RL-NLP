@@ -20,7 +20,7 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[]):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1.):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = policy.to(self.device)
         self.start_policy = policy  # keep pretrained policy (or random policy if not pretrain) as a test baseline.
@@ -47,9 +47,10 @@ class Agent:
         p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
-                                                         p_th=p_th_, pretrained_lm=pretrained_lm)  # adding the truncation class.
+                                                         p_th=p_th_, pretrained_lm=pretrained_lm,
+                                                         top_p=top_p)  # adding the truncation class.
         else:
-            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_)
+            self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p)
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -87,7 +88,7 @@ class Agent:
             self.epsilon_truncated = 1
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
-    def act(self, state, mode='sampling', truncation=True,  timestep=0):
+    def act(self, state, mode='sampling', truncation=True, timestep=0):
         valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
@@ -103,8 +104,8 @@ class Agent:
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
-                                                           valid_actions=valid_actions,
-                                                           logits_lm=logits_lm, alpha=alpha)
+                                                                valid_actions=valid_actions,
+                                                                logits_lm=logits_lm, alpha=alpha)
         # TODO; add an assert here if valid_actions is None and alpha = 0.
         return policy_dist, policy_dist_truncated, value
 
