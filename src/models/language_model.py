@@ -35,7 +35,7 @@ class GenericLanguageModel(LanguageModel):
                                  len(self.tokenizer.encode(" " + key)) == 1}
 
     def forward(self, state_text):
-        text = "bos " + self.dataset.idx2word(state_text.cpu().numpy().ravel(), stop_at_end=True)
+        text = self.tokenizer.bos_token+" " + self.dataset.idx2word(state_text.cpu().numpy().ravel(), stop_at_end=True)
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
         logits_lm = self.language_model(input_ids)[0][:, -1, :]
         logits = -torch.ones(len(self.dataset.vocab_questions)) * 1e32
