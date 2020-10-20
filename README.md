@@ -24,7 +24,7 @@ To download the dataset directly via the shell, you can run the following comman
 * To run all the scripts from the origin repo (RL-NLP), run first the following command line: `export PYTHONPATH=src:${PYTHONPATH}`
 
 ### Preprocessing the dataset questions
-To preprocess the questions of the three datasets, run the 3 following command lines (in this order): 
+To preprocess the questions of the three datasets, run the scripts src/sh/preprocess_questions or the 3 following command lines (in this order): 
 
 * `python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/questions/CLEVR_train_questions.json" \`
 `-out_vocab_path "data/vocab.json" -out_h5_path "data/train_questions.h5" -min_token_count 1`
@@ -36,7 +36,7 @@ To preprocess the questions of the three datasets, run the 3 following command l
 `-out_vocab_path "data/vocab.json" -out_h5_path "data/test_questions.h5" -min_token_count 1`
 
 ### Extracting the image features
-To extract the image features, run the following command lines (batch size arg must be tuned depending on memory availability): 
+To extract the image features, run the script src/sh/extract_features.py or the 3 following command lines (batch size arg must be tuned depending on memory availability): 
 * `python src/preprocessing/extract_features.py \`
   `--input_image_dir data/CLEVR_v1.0/images/train \`
   `--output_h5_file data/train_features.h5 --batch_size 128`
@@ -51,9 +51,12 @@ To extract the image features, run the following command lines (batch size arg m
 
 ## Training the models 
 #### Link to the pre-trained models 
-* Language Model .pt file [here](https://drive.google.com/drive/folders/1zRT4EF8xNmilzZMYysyhCj73oQKvBLsX?usp=sharing). 
-* Pretrained Policy .pt file (word_emb_size = 32, hidden_size = 64) [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing). 
-* Pretrained VQA model (FiLM version [here](https://drive.google.com/file/d/15HiUyfcXcJyGdZEs-knb9EQEFGfyg4cj/view?usp=sharing)
+1. Language Model .pt file [here](https://drive.google.com/drive/folders/1zRT4EF8xNmilzZMYysyhCj73oQKvBLsX?usp=sharing). 
+2. Levenshtein Task: 
+  * Pretrained Policy .pt file (word_emb_size = 32, hidden_size = 64) [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing). 
+3. VQA task: 
+  * Pretrained VQA model (FiLM version [here](https://drive.google.com/file/d/15HiUyfcXcJyGdZEs-knb9EQEFGfyg4cj/view?usp=sharing). 
+  * Pretrained Policy [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing)
 ### Training the Language Model on the Dataset of Questions
 `python src/train/train_LM_network.py -model "lstm" -num_layers 1 -emb_size 512  \`
 `-hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data" \`
@@ -65,16 +68,8 @@ To extract the image features, run the following command lines (batch size arg m
  N.B: When training only on a CPU, the max_samples args is required to train only on a subset of the dataset. 
  
 ### Training the RL Agent 
-#### from scrach (arg -truncate_mode is None): ex on 2000 Img, length of episode = 20, 50,000 episodes. 
-`python src/scripts/run.py -max_len 20 -data_path "data" -out_path "output/RL/2000_img_len_20" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 50000 -num_truncated 87 -debug "0,2000" -grad_clip 1 -num_questions 8 -lm_path "output/lm_model/model.pt"`
-#### with policy pretraining: add the -policy_path arg. 
-`python src/scripts/run.py -max_len 20 -data_path "data" -out_path "output/RL/2000_img_len_20" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 50000 -policy_path "output/lstmwordbatch_pretraining/SL_LSTM_32_64/model.pt" -debug "0,2000" -num_questions 8 -num_truncated 87 -lm_path "output/lm_model/model.pt"`
-#### with truncation: add the -truncate_mode arg (choose between 'top_k', 'proba_thr', 'sample_va')
-* `python src/scripts/run.py -max_len 20 -data_path "data" -out_path "output/RL/2000_img_len_20" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 50000 -lm_path "output/lm_model/model.pt" -num_truncated 10 -debug "0,2000" -grad_clip 1 -num_questions 8 -truncate_mode "top_k"`
-* `python src/scripts/run.py -max_len 20 -data_path "data" -out_path "output/RL/2000_img_len_20_truncate_modes" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 50000 -lm_path "output/lm_model/model.pt" -debug "0,2000" -grad_clip 1 -num_questions 8 -truncate_mode "proba_thr" -num_episodes_test 200`
-* `python src/scripts/run.py -max_len 20 -data_path "data" -out_path "output/RL/2000_img_len_20_truncate_modes" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 50000 -lm_path "output/lm_model/model.pt" -num_truncated 30 -debug "0,2000" -grad_clip 1 -num_questions 8 -truncate_mode "sample_va" -num_episodes_test 200`
-#### Eval only (after training): -num_episodes_train 0 and -policy_path arg is used to upload the trained policy model. 
-`python src/scripts/run.py -max_len 20 -data_path "data" -out_path "output/RL/2000_img_len_20" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 0 -num_truncated 87 -debug "0,2000" -num_questions 8 -lm_path "output/lm_model/model.pt" -policy_path "output/RL/2000_img_len_20/experiments/train/02/model.pth" -num_episodes_test 200`
+* See examples in src/scripts/sh.
+* The folder "debug" allows to run small experiments on each of the algo for the 2 CLEVR tasks (Levenshtein & VQA rewards). 
 
 #### logging on tensorboard to display results: 
 * `cd output/2000_img_len_20"`
