@@ -1,0 +1,6 @@
+#!/bin/bash
+echo "-------------------------- top-k 30---------------------------------------------------------------------------------------------------"
+python src/scripts/run.py -max_len 40 -data_path "data" -out_path "output/RL/exp_clvr_vqa_20000img" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 100000 -debug "0,20000" -reward "vqa" -reward_path "output/vqa_model_film/model.pt" -condition_answer "after_fusion" -num_episodes_test 500 -reward_vocab "data/closure_vocab.json" -mask_answers 1 -truncate_mode "top_k" -num_truncated 30 -grad_clip 1
+echo "-------------------------- top-k 40---------------------------------------------------------------------------------------------------"
+python src/scripts/run.py -max_len 40 -data_path "data" -out_path "output/RL/exp_clvr_vqa_20000img" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 100000 -debug "0,20000" -reward "vqa" -reward_path "output/vqa_model_film/model.pt" -condition_answer "after_fusion" -num_episodes_test 500 -reward_vocab "data/closure_vocab.json" -mask_answers 1 -truncate_mode "top_k" -num_truncated 40 -grad_clip 1
+
