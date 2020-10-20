@@ -65,7 +65,6 @@ class Metric:
                                         np.round(len(value))]
                 logging.info('{}: {} +/- {}'.format(key, np.round(np.mean(value), decimals=3),
                                                     np.round(np.std(value), decimals=3)))
-            # write_to_csv(self.out_csv_file + '.csv', self.dict_metric)
             write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
 
     def post_treatment(self):
@@ -158,6 +157,15 @@ class SumProbsOverTruncated(Metric):
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
 
+    def write(self, **kwargs):
+        if not "no_trunc" in self.train_test:
+            if self.type == "scalar":
+                self.agent.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
+            else:
+                self.agent.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
+            self.idx_write += 1
+            self.metric_history.extend(self.metric)
+            self.metric = []
 
 class RunningReturn(Metric):
     '''Training running return.'''
