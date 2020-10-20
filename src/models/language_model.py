@@ -4,8 +4,8 @@ import torch.nn.functional as F
 
 class LanguageModel:
     def __init__(self, pretrained_lm, clevr_dataset):
-        self.language_model = pretrained_lm
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.language_model = pretrained_lm.to(self.device)
         self.dataset = clevr_dataset
 
     def forward(self, state):
