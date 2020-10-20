@@ -8,7 +8,6 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.rl_basic import PolicyLSTMBatch_SL
 from train.train_functions import train_one_epoch_policy, evaluate_policy

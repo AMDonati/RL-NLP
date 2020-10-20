@@ -6,14 +6,13 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
-
-from RL_toolbox.truncation import gather_truncature, mask_truncature, mask_inf_truncature
+from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 
 
 class PolicyLSTMBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, train_policy="all_space", fusion="cat", env=None,
+                 kernel_size=1, stride=5, fusion="cat", env=None,
                  condition_answer="none"):
         super(PolicyLSTMBatch, self).__init__()
 
@@ -24,9 +23,8 @@ class PolicyLSTMBatch(nn.Module):
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
-        truncature = {"masked": mask_truncature, "gather": gather_truncature, "masked_inf": mask_inf_truncature}
+        truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
-        self.train_policy = train_policy
         self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
@@ -66,12 +64,10 @@ class PolicyLSTMBatch(nn.Module):
         policy_dist = Categorical(probs)
         if valid_actions is not None:
             policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens)
-            if self.train_policy == 'truncated':
-                policy_dist = policy_dist_truncated
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         if torch.isnan(policy_dist_truncated.probs).any():
-            print("policy dist truncated with nan")
+            print("policy dist truncated with nan") #TODO: why this one and why not an assert ?
         return policy_dist, policy_dist_truncated
 
     def process_fusion(self, embed_text, img_feat_, img_feat, answer):
@@ -93,8 +89,6 @@ class PolicyLSTMBatch(nn.Module):
         if self.condition_answer == "before_lstm" and answer is not None:
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
-            # text = torch.cat([answer.view(text.size(0), 1), text], dim=1)
-
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         return ht[-1]
@@ -161,8 +155,6 @@ class PolicyLSTMBatch_SL(PolicyLSTMWordBatch_SL):
         img_feat = state_img.to(self.device)
         img_feat_ = F.relu(self.conv(img_feat))
 
-        # img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
-        # embedding = torch.cat((img_feat__, embed_text), dim=-1)
         if self.fusion == "film":
             gammabeta = self.gammabeta(embed_text).view(embed_text.size(0), embed_text.size(1), 2, self.num_filters)
             gamma, beta = gammabeta[:, :, 0, :], gammabeta[:, :, 1, :]

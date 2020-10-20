@@ -1,19 +1,10 @@
 import logging
-
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-
 from RL_toolbox.RL_functions import masked_softmax
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def gather_truncature(valid_actions, logits, num_tokens=86):
-    logits = torch.gather(logits.clone().detach(), -1, valid_actions)
-    probs = F.softmax(logits, dim=-1)
-    return Categorical(probs)
-
 
 def mask_truncature(valid_actions, logits, num_tokens=86):
     mask = torch.zeros(logits.size(0), num_tokens).to(device)
@@ -28,7 +19,6 @@ def mask_truncature(valid_actions, logits, num_tokens=86):
         logging.error("ERROR IN TRUNCATION FUNCTION")
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
-
 
 def mask_inf_truncature(valid_actions, logits, num_tokens=87):
     mask = torch.ones(logits.size(0), num_tokens) * -1e32
@@ -62,12 +52,11 @@ class Truncation:
 
 class NoTruncation(Truncation):
     def __init__(self, agent, **kwargs):
-        Truncation.__init__(self, agent)
+        Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
 
     def get_valid_actions(self, state, truncation):
         if self.alpha_logits_lm > 0:
             with torch.no_grad():
-                seq_len = state.text.size(1)
                 log_probas, logits = self.language_model.forward(state.text.to(self.device))
         else:
             logits = 0
@@ -86,7 +75,6 @@ class TopK(Truncation):
 
 class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
-
     def __init__(self, agent, **kwargs):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.p_th = kwargs["p_th"]
@@ -124,18 +112,14 @@ class TopP(Truncation):
         self.min_tokens_to_keep = 1
 
     def truncate(self, log_probas, logits):
-        # valid_actions, action_probs = None, logits
-        # if self.top_p < 1.0:
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)
         cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
         # Remove tokens with cumulative probability above the threshold (token with 0 are kept)
         sorted_indices_to_remove = cumulative_probs > self.top_p
         # scatter sorted tensors to original indexing
         indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        # logits[indices_to_remove] = self.filter_value
         _, valid_actions = torch.where(indices_to_remove == False)
-        action_probs = logits[:, valid_actions]
+        action_probs = F.softmax(logits[:, valid_actions], dim=-1)
         valid_actions = valid_actions.unsqueeze(dim=0)
         return valid_actions, action_probs
 
@@ -215,3 +199,8 @@ if __name__ == '__main__':
     action = sample_va.sample_action(dist, dist_truncated, valid_actions)
     print("action", action)
     print("action shape", action.size())
+
+    print("top p ...")
+    # test top p:
+    top_p = TopP(agent=agent, top_p=0.5)
+    valid_actions, action_probs = top_p.get_valid_actions(state)

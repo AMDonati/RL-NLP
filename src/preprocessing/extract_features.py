@@ -46,7 +46,6 @@ def build_model(args):
 
 
 def run_batch(cur_batch, model):
-    # TODO: use a torch.data.utils.Dataset instead.
     mean = np.array([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1)
     std = np.array([0.229, 0.224, 0.224]).reshape(1, 3, 1, 1)
 
@@ -93,7 +92,7 @@ def main(args):
             img = img.transpose(2, 0, 1)[None]  # eq. to np.newaxis.
             cur_batch.append(img)
             if len(cur_batch) == args.batch_size:
-                feats = run_batch(cur_batch, model)  # TODO: replace this by a DataLoader Object.
+                feats = run_batch(cur_batch, model)
                 if feat_dset is None:
                     N = len(input_paths)
                     _, C, H, W = feats.shape

@@ -1,14 +1,13 @@
 import logging
 import os
 import pickle
-
 import h5py
 import numpy as np
 import pandas as pd
 import torch
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+# from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
 
@@ -76,6 +75,8 @@ class Metric:
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
 
 class VAMetric(Metric):
+    '''Display the valid action space in the training log.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
@@ -122,7 +123,8 @@ class SizeVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            self.measure.append(kwargs["valid_actions"].size(1))
+            if self.agent.truncate_mode == 'sample_va' or self.agent.truncate_mode == 'proba_thr' or self.agent.truncate_mode == 'top_p':
+                self.measure.append(kwargs["valid_actions"].size(1))
 
     def compute_(self, **kwargs):
         self.metric = [np.round(np.mean(self.measure))]
@@ -130,108 +132,17 @@ class SizeVAMetric(Metric):
         self.idx_csv += 1
 
     def write_to_csv(self):
-        size_per_timestep = [[val[i] for val in self.dict_metric.values()] for i in
-                             range(min([len(val) for val in self.dict_metric.values()]))]
-        self.dict_metric["mean_size"] = np.round(np.mean([np.mean(val) for val in self.dict_metric.values()]))
-        self.dict_metric["mean_by_timestep"] = [np.round(np.mean(item)) for item in size_per_timestep]
-        write_to_csv(self.out_csv_file, self.dict_metric)
-
-
-class LMVAMetric(Metric):
-    '''Monitor the mismatch between the valid actions space and the ref questions.'''
-
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.counter = 0
-        self.key = "lm_valid_actions"
-
-    def fill_(self, **kwargs):
-        if kwargs["valid_actions"] is not None:
-            closest_question = self.agent.env.clevr_dataset.word2idx(kwargs["closest_question"].split())
-            if len(closest_question) > self.idx_word:
-                if closest_question[self.idx_word] not in kwargs["valid_actions"]:
-                    self.counter += 1
-                    logging.info("+VA")
-
-    def compute_(self, **kwargs):
-        self.metric = [self.counter]
-
-
-class PoliciesRatioMetric(Metric):
-    '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
-
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "policies_discrepancy"
-
-    def fill_(self, **kwargs):
-        ratios = np.exp(
-            kwargs["log_probs"].detach().cpu().numpy() - kwargs["log_probs_truncated"].detach().cpu().numpy())
-        self.measure.append(ratios)
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-
-
-class LMPolicyProbsRatio(Metric):
-    '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
-
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "lm_policy_probs_ratio"
-
-    def fill_(self, **kwargs):
-        if kwargs["valid_actions"] is not None:
-            lm_log_probs = kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]].detach().cpu().numpy()
-            ratios = np.exp(lm_log_probs - kwargs["log_probs"].detach().cpu().numpy())
-        else:
-            ratios = 0
-        self.measure.append(ratios)
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-
-
-class ActionProbs(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "action_probs"
-
-    def fill_(self, **kwargs):
-        self.measure.append(kwargs["log_probs"])
-
-    def compute_(self, **kwargs):
-        ep_log_probs = torch.stack(self.measure).clone().detach()
-        self.ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
-        self.metric.append(np.mean(self.ep_probs))
-
-    def log(self, **kwargs):
-        logging.info('episode action probs: {}'.format(self.ep_probs))
-
-
-class ActionProbsTruncated(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "action_probs_truncated"
-
-    def fill_(self, **kwargs):
-        self.measure.append(kwargs["log_probs_truncated"])
-
-    def compute_(self, **kwargs):
-        ep_log_probs_truncated = torch.stack(self.measure).clone().detach()
-        self.ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
-        self.metric.append(np.mean(self.ep_probs_truncated))
-
-    def log(self, **kwargs):
-        logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
+        if self.agent.truncate_mode == 'sample_va' or self.agent.truncate_mode == 'proba_thr' or self.agent.truncate_mode == 'top_p':
+            size_per_timestep = [[val[i] for val in self.dict_metric.values()] for i in
+                                 range(min([len(val) for val in self.dict_metric.values()]))]
+            self.dict_metric["mean_size"] = np.round(np.mean([np.mean(val) for val in self.dict_metric.values()]))
+            self.dict_metric["mean_by_timestep"] = [np.round(np.mean(item)) for item in size_per_timestep]
+            write_to_csv(self.out_csv_file, self.dict_metric)
 
 
 class SumProbsOverTruncated(Metric):
+    '''Compute the sum of the probabilities the action space given by the language model.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -248,28 +159,9 @@ class SumProbsOverTruncated(Metric):
         self.metric.append(np.mean(self.measure))
 
 
-class LMActionProbs(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "action_probs_lm"
-
-    def fill_(self, **kwargs):
-        if kwargs["action"] in kwargs["valid_actions"]:
-            self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
-        else:
-            self.measure.append(torch.tensor([0.]).to(self.agent.device))
-
-    def compute_(self, **kwargs):
-        lm_probs = torch.stack(self.measure).cpu().clone().detach()
-        self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
-        self.metric.append(np.mean(self.ep_lm_probs))
-
-    def log(self, **kwargs):
-        logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
-
-
 class RunningReturn(Metric):
+    '''Training running return.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -293,6 +185,8 @@ class RunningReturn(Metric):
 
 
 class EpsilonTruncation(Metric):
+    '''Counts the number of actions not in the valid actions space when doing epsilon truncation...'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -307,7 +201,7 @@ class EpsilonTruncation(Metric):
     def fill_(self, **kwargs):
         if self.agent.epsilon_truncated > 0:
             if kwargs["action"] not in kwargs["valid_actions"]:
-                self.counter += 1  # TODO: a moving average instead ?
+                self.counter += 1
                 action_decoded = self.agent.env.clevr_dataset.idx2word(kwargs["action"].cpu().numpy(), ignored=[])
                 action_prob = np.exp(kwargs["log_probs"].cpu().detach().numpy()).item()
                 self.measure.append("Episode {} - Img {}/ Action: {}/ Policy prob: {:2.4f}".format(kwargs["i_episode"],
@@ -334,6 +228,8 @@ class EpsilonTruncation(Metric):
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
 class DialogMetric(Metric):
+    """Display the test dialog."""
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
@@ -363,11 +259,11 @@ class DialogMetric(Metric):
                                                                             decode_answers=True)
                 ref_answer_decoded = self.agent.env.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
                                                                            decode_answers=True)
-                ref_question_decoded = kwargs["ref_questions_decoded"][kwargs["question_idx"]]
+                ref_question_decoded = kwargs["ref_questions_decoded"]
                 string = ' IMG {} - question index {}:'.format(kwargs[
                                                                    "img_idx"],
                                                                kwargs[
-                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded + '\n' + '-' * 40
+                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded[0] + '\n' + '-' * 40
             else:
                 closest_question_decoded = kwargs["closest_question"]
                 string = 'IMG {}:'.format(kwargs[
@@ -388,6 +284,8 @@ class DialogMetric(Metric):
 
 
 class DialogImageMetric(Metric):
+    '''Display the Dialog on a html format at test time.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "text"
@@ -490,6 +388,7 @@ class DialogImageMetric(Metric):
 
 class PPLMetric(Metric):
     """
+    Compute the ppl of the learning policy on the ref questions.
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
 
@@ -544,20 +443,21 @@ class PPLDialogfromLM(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
+        if kwargs["done"] and self.agent.truncation.language_model.name == "clevr":
             with torch.no_grad():
-                log_probas, hidden = self.agent.truncation.language_model.forward(
-                    kwargs["new_state"].text[:, :-1].to(self.agent.device))
+                log_probas, hidden = self.agent.truncation.language_model.get_logits_all_sequence(
+                    kwargs["new_state"].text[:, :-1].to(self.agent.device))  # TODO: replace new_state by state?
                 for i, word in enumerate(kwargs["new_state"].text[:, 1:].view(-1)):
                     self.measure.append(log_probas[i, word.cpu().numpy()])
 
     def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-        self.metric.append(ppl)
-        if not self.train_test + '_' + self.key in self.dict_metric:
-            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
-        else:
-            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+        if self.agent.truncation.language_model.name == "clevr":
+            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+            self.metric.append(ppl)
+            if not self.train_test + '_' + self.key in self.dict_metric:
+                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+            else:
+                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def write(self):
         pass
@@ -589,26 +489,12 @@ class Return(Metric):
         serie.to_csv(csv)
 
 
-class Reward2Metric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "reward"
-
-    def fill_(self, **kwargs):
-        self.measure.append(kwargs["reward"])
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.sum(self.measure))
-
-
 class RewardMetric(Metric):
     """Computes:
     - The raw reward (the one used in the training algo)
     - The normalised reward (the one monitored at test time)
     - The length of each test episode
     """
-
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -622,7 +508,7 @@ class RewardMetric(Metric):
             self.measure["reward"] = [kwargs["reward"]]
             len_episode = len(self.agent.env.clevr_dataset.idx2word(kwargs["new_state"].text[0, 1:].cpu().numpy(),
                                                                     ignored=[]).split())
-            if self.agent.env.reward_type == 'levenshtein_':
+            if self.agent.env.reward_type == 'levenshtein':
                 norm_reward = [kwargs["reward"] / max(len_episode,
                                                       len(kwargs["closest_question"].split()))]
             else:
@@ -658,6 +544,8 @@ class RewardMetric(Metric):
 
 
 class BleuMetric(Metric):
+    '''Compute the bleu score over the ref questions and the generated dialog.'''
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
@@ -788,7 +676,7 @@ class UniqueWordsMetric(Metric):
         pass
 
 
-# --------------------------------------- OTHERS ----------------------------------------------------------------------------------------------------
+# --------------------------------------- OLD METRICS ----------------------------------------------------------------------------------------------------
 
 class PolicyMetric(Metric):
     def __init__(self, agent, train_test):
@@ -830,14 +718,123 @@ class PolicyMetric(Metric):
         logging.info('--------------------------------------------------------------------')
 
 
-metrics = {"dialog": DialogMetric, "valid_actions": VAMetric, "lm_valid_actions": LMVAMetric, "reward": RewardMetric,
-           "policies_discrepancy": PoliciesRatioMetric, "lm_policy_probs_ratio": LMPolicyProbsRatio, "bleu": BleuMetric,
-           "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "size_valid_actions": SizeVAMetric,
-           "ttr_question": TTRQuestionMetric, "unique_words": UniqueWordsMetric,
-           "ratio_closest_questions": RefQuestionsMetric,
-           "action_probs": ActionProbs, "action_probs_truncated": ActionProbsTruncated,
-           "action_probs_lm": LMActionProbs,
-           "running_return": RunningReturn,
-           "policy": PolicyMetric,
-           "eps_truncation": EpsilonTruncation, "return": Return, "sum_probs": SumProbsOverTruncated,
-           "dialogimage": DialogImageMetric}
+class LMVAMetric(Metric):
+    '''Monitor the mismatch between the valid actions space and the ref questions.'''
+
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.counter = 0
+        self.key = "lm_valid_actions"
+
+    def fill_(self, **kwargs):
+        if kwargs["valid_actions"] is not None:
+            closest_question = self.agent.env.clevr_dataset.word2idx(kwargs["closest_question"].split())
+            if len(closest_question) > self.idx_word:
+                if closest_question[self.idx_word] not in kwargs["valid_actions"]:
+                    self.counter += 1
+                    logging.info("+VA")
+
+    def compute_(self, **kwargs):
+        self.metric = [self.counter]
+
+
+class PoliciesRatioMetric(Metric):
+    '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
+
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "policies_discrepancy"
+
+    def fill_(self, **kwargs):
+        ratios = np.exp(
+            kwargs["log_probs"].detach().cpu().numpy() - kwargs["log_probs_truncated"].detach().cpu().numpy())
+        self.measure.append(ratios)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
+class LMPolicyProbsRatio(Metric):
+    '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
+
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "lm_policy_probs_ratio"
+
+    def fill_(self, **kwargs):
+        if kwargs["valid_actions"] is not None:
+            lm_log_probs = kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]].detach().cpu().numpy()
+            ratios = np.exp(lm_log_probs - kwargs["log_probs"].detach().cpu().numpy())
+        else:
+            ratios = 0
+        self.measure.append(ratios)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
+class ActionProbs(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "action_probs"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["log_probs"])
+
+    def compute_(self, **kwargs):
+        ep_log_probs = torch.stack(self.measure).clone().detach()
+        self.ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
+        self.metric.append(np.mean(self.ep_probs))
+
+    def log(self, **kwargs):
+        logging.info('episode action probs: {}'.format(self.ep_probs))
+
+
+class ActionProbsTruncated(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "action_probs_truncated"
+
+    def fill_(self, **kwargs):
+        self.measure.append(kwargs["log_probs_truncated"])
+
+    def compute_(self, **kwargs):
+        ep_log_probs_truncated = torch.stack(self.measure).clone().detach()
+        self.ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
+        self.metric.append(np.mean(self.ep_probs_truncated))
+
+    def log(self, **kwargs):
+        logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
+
+
+class LMActionProbs(Metric):
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test)
+        self.type = "scalar"
+        self.key = "action_probs_lm"
+
+    def fill_(self, **kwargs):
+        if kwargs["action"] in kwargs["valid_actions"]:
+            self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
+        else:
+            self.measure.append(torch.tensor([0.]).to(self.agent.device))
+
+    def compute_(self, **kwargs):
+        lm_probs = torch.stack(self.measure).cpu().clone().detach()
+        self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
+        self.metric.append(np.mean(self.ep_lm_probs))
+
+    def log(self, **kwargs):
+        logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
+
+
+metrics = {"running_return": RunningReturn, "return": Return,
+           "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric, "eps_truncation": EpsilonTruncation,
+           "dialog": DialogMetric, "dialogimage": DialogImageMetric, "reward": RewardMetric,
+           "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
+           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated}

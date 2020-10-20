@@ -5,9 +5,6 @@ from csv import writer
 import numpy as np
 import os
 
-#TODO: add color logging:
-# https://pypi.org/project/colorlog/
-# https://medium.com/@galea/python-logging-example-with-color-formatting-file-handlers-6ee21d363184
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -78,7 +75,7 @@ def compute_write_all_metrics(agent, output_path, logger, keep=None):
         metric.write_to_csv()
         # saving the mean of all metrics in a single csv file:
         if metric.dict_stats:
-            list_stats = list(metric.dict_stats.values())  # TODO: check if key contains no trunc.
+            list_stats = list(metric.dict_stats.values())
             if keep is not None:
                 csv_file = "all_metrics_{}.csv".format(keep)
                 list_stats = []

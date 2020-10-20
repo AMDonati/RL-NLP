@@ -7,7 +7,6 @@ import torch
 from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-# TODO: add the intermediate reward (diff of R(t+1)-R(t))
 from vr.utils import load_execution_engine, load_program_generator
 
 
@@ -41,38 +40,6 @@ class Cosine(Reward):
         S = cosine_similarity(X[0:1], X[1:])
         rew = max(S[0])
         return rew
-
-
-class Levenshtein(Reward):
-    def __init__(self, correct_vocab=False, path=None, vocab=None, dataset=None):
-        Reward.__init__(self, path)
-        self.correct_vocab = correct_vocab
-
-    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
-        if question is None:
-            return 0., "N/A"
-        else:
-            distances = [nltk.edit_distance(question.split(), true_question.split()) / (
-                max(len(question.split()), len(true_question.split()))) for true_question in
-                         ep_questions_decoded]
-            similarities = [1 - dist for dist in distances]
-            sim_question_idx = np.asarray(similarities).argmax()
-            closest_question = ep_questions_decoded[sim_question_idx]
-
-            if self.correct_vocab:
-                rew_vocab = self.get_rew_vocab(question, closest_question)
-                reward = (1 - 0.1) * max(similarities) + 0.1 * rew_vocab
-            else:
-                reward = max(similarities)
-
-            return reward, closest_question
-
-    def get_rew_vocab(self, question, closest_question):
-        vocab_ref_question = closest_question.split()
-        vocab_question = question.split()
-        intersect = list(set(vocab_ref_question).intersection(vocab_question))
-        return len(intersect) / len(vocab_ref_question)
-
 
 class Levenshtein_(Reward):
     def __init__(self, path=None, vocab=None, dataset=None):
@@ -151,10 +118,10 @@ class VQAAnswer(Reward):
             scores = self.execution_engine(state.img.to(self.device), programs_pred)
             _, preds = scores.data.cpu().max(1)
             reward = (preds == real_answer).sum().item()
-        return reward, "N/A", preds  # TODO: add closest question here?
+        return reward, "N/A", preds
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein, "levenshtein_": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
@@ -259,11 +226,4 @@ if __name__ == '__main__':
     print('ref_questions', ref_questions)
     print('reward w/o vocab', reward_func.get(str, ref_questions))
     print('rew with vocab', reward_func_vocab.get(str, ref_questions))
-    # --------------- Combined Reward ----------------------------------------------------------------------------------------------
-    # print("combined reward...")
 
-    # reward_func = rewards["combined"](reward_func_1="levenshtein",
-    # reward_func_2="correct_vocab", alpha=0.1, path=None)
-
-# TODO: code a reward for taking in account the good words.
-# TODO: editing distance that rewards correctly the length of question.

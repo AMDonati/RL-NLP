@@ -26,7 +26,7 @@ class CLEVR_Dataset(Dataset):
 
         # load feats in memory.
         feats_hf = h5py.File(self.features_path, 'r')
-        self.all_feats = feats_hf.get('features')  # TODO: eventually add max pool here.
+        self.all_feats = feats_hf.get('features')
 
         # load dataset objects in memory except img:
         questions_hf = h5py.File(self.questions_path, 'r')
