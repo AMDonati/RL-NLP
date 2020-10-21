@@ -78,7 +78,7 @@ class Agent:
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
     def act(self, state, mode='sampling', truncation=True, timestep=0):
-        valid_actions, action_probs, logits_lm = self.truncation.get_valid_actions(state, truncation)
+        valid_actions, action_probs, logits_lm, log_probas_lm = self.truncation.get_valid_actions(state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
                                                                                   logits_lm,
@@ -88,7 +88,8 @@ class Agent:
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
-        return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm
+        return action, log_prob, value, (
+            valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm, log_probas_lm
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
@@ -146,10 +147,11 @@ class Agent:
         metrics = self.train_metrics if train else self.test_metrics
         for t in range(0, env.max_len):
             action, log_probs, value, (
-                valid_actions, actions_probs, log_probs_truncated), dist, logits_lm = self.act(state=state,
-                                                                                               mode=test_mode,
-                                                                                               truncation=truncation,
-                                                                                               timestep=t)
+                valid_actions, actions_probs, log_probs_truncated), dist, logits_lm, log_probas_lm = self.act(
+                state=state,
+                mode=test_mode,
+                truncation=truncation,
+                timestep=t)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
@@ -165,7 +167,8 @@ class Agent:
                             log_probs_truncated=log_probs_truncated,
                             test_mode=test_mode,
                             pred_answer=pred_answer,
-                            i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm)
+                            i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm,
+                            log_probas_lm=log_probas_lm, timestep=t)
             state = new_state
             ep_reward += reward
 

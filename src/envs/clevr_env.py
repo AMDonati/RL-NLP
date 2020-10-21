@@ -72,8 +72,6 @@ class ClevrEnv(gym.Env):
                                                                      real_answer=self.ref_answer,
                                                                      state=self.state)
         self.step_idx += 1
-        if done:
-            self.dialog = question #TODO: self.dialog is never used: to remove ?
         return self.state, (reward, closest_question, pred_answer), done, {}
 
     def reset(self, seed=None):

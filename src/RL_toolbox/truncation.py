@@ -1,10 +1,13 @@
 import logging
+
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
+
 from RL_toolbox.RL_functions import masked_softmax
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def mask_truncature(valid_actions, logits, num_tokens=86):
     mask = torch.zeros(logits.size(0), num_tokens).to(device)
@@ -19,6 +22,7 @@ def mask_truncature(valid_actions, logits, num_tokens=86):
         logging.error("ERROR IN TRUNCATION FUNCTION")
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
+
 
 def mask_inf_truncature(valid_actions, logits, num_tokens=87):
     mask = (torch.ones(logits.size(0), num_tokens) * -1e32).to(device)
@@ -42,9 +46,9 @@ class Truncation:
         if not truncation:
             return None, None, 0
         with torch.no_grad():
-            log_probas, logits = self.language_model.forward(state.text.to(self.device))
-            valid_actions, action_probs = self.truncate(log_probas, logits)
-            return valid_actions, action_probs, logits
+            log_probas_lm, logits_lm = self.language_model.forward(state.text.to(self.device))
+            valid_actions, action_probs = self.truncate(log_probas_lm, logits_lm)
+            return valid_actions, action_probs, logits_lm, log_probas_lm
 
     def truncate(self, log_probas, logits):
         return None, None
@@ -57,10 +61,10 @@ class NoTruncation(Truncation):
     def get_valid_actions(self, state, truncation):
         if self.alpha_logits_lm > 0:
             with torch.no_grad():
-                log_probas, logits = self.language_model.forward(state.text.to(self.device))
+                log_probas_lm, logits_lm = self.language_model.forward(state.text.to(self.device))
         else:
-            logits = 0
-        return None, None, logits
+            logits_lm = 0
+        return None, None, logits_lm, log_probas_lm
 
 
 class TopK(Truncation):
@@ -75,6 +79,7 @@ class TopK(Truncation):
 
 class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
+
     def __init__(self, agent, **kwargs):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.p_th = kwargs["p_th"]
