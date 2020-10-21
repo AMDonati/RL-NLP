@@ -131,7 +131,7 @@ dmypy.json
 # Custom
 .idea
 data/*
-!data/flickr
+!data/flickr/*
 output/*
 runs/
 
