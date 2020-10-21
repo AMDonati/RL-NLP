@@ -459,7 +459,10 @@ class PPLDialogfromLM(Metric):
             self.measure.append(kwargs["logits_lm"][:, kwargs["action"]])
 
     def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+        if len(self.measure) > 0:
+            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+        else:
+            ppl = 0
         self.metric.append(ppl)
         if not self.train_test + '_' + self.key in self.dict_metric:
             self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
