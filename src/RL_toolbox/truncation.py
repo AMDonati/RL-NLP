@@ -44,7 +44,7 @@ class Truncation:
 
     def get_valid_actions(self, state, truncation):
         if not truncation:
-            return None, None, 0
+            return None, None, 0, None
         with torch.no_grad():
             log_probas_lm, logits_lm = self.language_model.forward(state.text.to(self.device))
             valid_actions, action_probs = self.truncate(log_probas_lm, logits_lm)
@@ -63,7 +63,7 @@ class NoTruncation(Truncation):
             with torch.no_grad():
                 log_probas_lm, logits_lm = self.language_model.forward(state.text.to(self.device))
         else:
-            logits_lm = 0
+            logits_lm, log_probas_lm = 0, None
         return None, None, logits_lm, log_probas_lm
 
 

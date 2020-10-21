@@ -438,7 +438,7 @@ class PPLDialogfromLM(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        if type(kwargs["log_probas_lm"]) == torch.Tensor:
+        if kwargs["log_probas_lm"] is not None:
             self.measure.append(kwargs["log_probas_lm"][:, kwargs["action"]])
 
     def compute_(self, **kwargs):
