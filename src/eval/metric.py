@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+
 import h5py
 import numpy as np
 import pandas as pd
@@ -162,10 +163,12 @@ class SumProbsOverTruncated(Metric):
             if self.type == "scalar":
                 self.agent.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
             else:
-                self.agent.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
+                self.agent.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]),
+                                           self.idx_write)
             self.idx_write += 1
             self.metric_history.extend(self.metric)
             self.metric = []
+
 
 class RunningReturn(Metric):
     '''Training running return.'''
@@ -271,7 +274,8 @@ class DialogMetric(Metric):
                 string = ' IMG {} - question index {}:'.format(kwargs[
                                                                    "img_idx"],
                                                                kwargs[
-                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + ref_question_decoded[0] + '\n' + '-' * 40
+                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + \
+                         ref_question_decoded[0] + '\n' + '-' * 40
             else:
                 closest_question_decoded = kwargs["closest_question"]
                 string = 'IMG {}:'.format(kwargs[
@@ -451,7 +455,8 @@ class PPLDialogfromLM(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["logits_lm"][:,kwargs["action"]])
+        if type(kwargs["action"]) == torch.Tensor:
+            self.measure.append(kwargs["logits_lm"][:, kwargs["action"]])
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
@@ -497,6 +502,7 @@ class RewardMetric(Metric):
     - The normalised reward (the one monitored at test time)
     - The length of each test episode
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test)
         self.type = "scalar"
