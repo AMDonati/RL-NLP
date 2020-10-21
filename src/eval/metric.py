@@ -451,21 +451,15 @@ class PPLDialogfromLM(Metric):
         self.out_csv_file = os.path.join(self.agent.out_path, self.train_test + '_' + self.key)
 
     def fill_(self, **kwargs):
-        if kwargs["done"] and self.agent.truncation.language_model.name == "clevr":
-            with torch.no_grad():
-                log_probas, hidden = self.agent.truncation.language_model.get_logits_all_sequence(
-                    kwargs["new_state"].text[:, :-1].to(self.agent.device))  # TODO: replace new_state by state?
-                for i, word in enumerate(kwargs["new_state"].text[:, 1:].view(-1)):
-                    self.measure.append(log_probas[i, word.cpu().numpy()])
+        self.measure.append(kwargs["logits_lm"][:,kwargs["action"]])
 
     def compute_(self, **kwargs):
-        if self.agent.truncation.language_model.name == "clevr":
-            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-            self.metric.append(ppl)
-            if not self.train_test + '_' + self.key in self.dict_metric:
-                self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
-            else:
-                self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+        self.metric.append(ppl)
+        if not self.train_test + '_' + self.key in self.dict_metric:
+            self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
+        else:
+            self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
 
     def write(self):
         pass

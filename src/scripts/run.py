@@ -2,9 +2,11 @@ import argparse
 import datetime
 import os
 from configparser import ConfigParser
+
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
+
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv
@@ -118,7 +120,7 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "size_valid_actions",
-                                 "valid_actions",
+                                 "valid_actions", "ppl_dialog_lm",
                                  "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,

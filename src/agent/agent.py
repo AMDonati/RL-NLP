@@ -88,7 +88,7 @@ class Agent:
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
-        return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist
+        return action, log_prob, value, (valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
@@ -146,9 +146,10 @@ class Agent:
         metrics = self.train_metrics if train else self.test_metrics
         for t in range(0, env.max_len):
             action, log_probs, value, (
-                valid_actions, actions_probs, log_probs_truncated), dist = self.act(state=state,
-                                                                                    mode=test_mode,
-                                                                                    truncation=truncation, timestep=t)
+                valid_actions, actions_probs, log_probs_truncated), dist, logits_lm = self.act(state=state,
+                                                                                               mode=test_mode,
+                                                                                               truncation=truncation,
+                                                                                               timestep=t)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
@@ -164,7 +165,7 @@ class Agent:
                             log_probs_truncated=log_probs_truncated,
                             test_mode=test_mode,
                             pred_answer=pred_answer,
-                            i_episode=i_episode, ref_question_idx=env.ref_question_idx)
+                            i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm)
             state = new_state
             ep_reward += reward
 
