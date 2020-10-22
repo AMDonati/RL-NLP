@@ -37,7 +37,7 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_)
                       "is_loss_correction": args_.is_loss_correction,
                       "train_metrics": args_.train_metrics,
                       "test_metrics": args_.test_metrics,
-                      "top_p": args.top_p
+                      "top_p": args_.top_p
                       }
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
