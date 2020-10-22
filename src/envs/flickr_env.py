@@ -12,6 +12,11 @@ class FlickrEnv(gym.Env):
 
     def __init__(self):
         super(FlickrEnv, self).__init__()
+        args, task_cfg = self.get_cfg()
+        task_batch_size, task_num_iters, task_ids, task_datasets_train, task_datasets_val, task_dataloader_train, task_dataloader_val = self.load_dataset(
+            args, task_cfg)
+        dataloader = list(task_dataloader_train.values())[0]
+        self.iter_data_train = iter(dataloader)
 
     def get_cfg(self):
         parser = argparse.ArgumentParser()
@@ -188,16 +193,11 @@ class FlickrEnv(gym.Env):
         )
         return task_batch_size, task_num_iters, task_ids, task_datasets_train, task_datasets_val, task_dataloader_train, task_dataloader_val
 
-    def step(self):
-        args, task_cfg = self.get_cfg()
-        task_batch_size, task_num_iters, task_ids, task_datasets_train, task_datasets_val, task_dataloader_train, task_dataloader_val = self.load_dataset(
-            args, task_cfg)
-        dataloader=list(task_dataloader_train.values())[0]
-        iter_data_train = iter(dataloader)
-        batch=iter_data_train.next()
+    def reset(self):
+        batch = self.iter_data_train.next()
         print(batch)
 
 
 if __name__ == '__main__':
     env = FlickrEnv()
-    env.step()
+    env.reset()
