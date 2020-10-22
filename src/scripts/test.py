@@ -20,7 +20,10 @@ def cast_value(value):
         if val.is_integer():
             val = int(val)
     except:
-        val = value
+        try:
+            val = [val0.split("'")[1] for val0 in value.split(",")]
+        except:
+            val = value
     finally:
         return val
 

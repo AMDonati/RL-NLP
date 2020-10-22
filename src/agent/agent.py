@@ -62,9 +62,9 @@ class Agent:
 
     def init_metrics(self):
         self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             self.test_metrics_names}
+                             self.test_metrics_names if key in metrics}
         self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              self.train_metrics_names}
+                              self.train_metrics_names if key in metrics}
 
     def update_per_episode(self, i_episode, alpha_min=0.001, update_every=500, num_episodes_train=1000):
         if self.alpha_decay_rate > 0 and self.alpha_logits_lm > alpha_min:
