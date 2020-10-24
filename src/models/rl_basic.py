@@ -6,6 +6,7 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
+
 from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 
 
@@ -33,7 +34,9 @@ class PolicyLSTMBatch(nn.Module):
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
-        if self.fusion == "film":
+        if self.fusion == "none":
+            self.fusion_dim = self.hidden_size
+        elif self.fusion == "film":
             self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)
             self.film = contrib_nn.FiLM()
             self.fusion_dim = self.num_filters * h_out ** 2
@@ -67,11 +70,13 @@ class PolicyLSTMBatch(nn.Module):
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         if torch.isnan(policy_dist_truncated.probs).any():
-            print("policy dist truncated with nan") #TODO: why this one and why not an assert ?
+            print("policy dist truncated with nan")  # TODO: why this one and why not an assert ?
         return policy_dist, policy_dist_truncated
 
     def process_fusion(self, embed_text, img_feat_, img_feat, answer):
-        if self.fusion == "film":
+        if self.fusion == "none":
+            embedding = embed_text
+        elif self.fusion == "film":
             gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
