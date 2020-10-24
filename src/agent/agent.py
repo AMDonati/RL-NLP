@@ -78,7 +78,8 @@ class Agent:
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
     def act(self, state, mode='sampling', truncation=True, timestep=0):
-        valid_actions, action_probs, logits_lm, log_probas_lm = self.truncation.get_valid_actions(state, truncation)
+        valid_actions, action_probs, logits_lm, log_probas_lm, origin_log_probs_lm = self.truncation.get_valid_actions(
+            state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
                                                                                   logits_lm,
@@ -89,7 +90,7 @@ class Agent:
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
         return action, log_prob, value, (
-            valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm, log_probas_lm
+            valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm, log_probas_lm, origin_log_probs_lm
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
@@ -147,7 +148,8 @@ class Agent:
         metrics = self.train_metrics if train else self.test_metrics
         for t in range(0, env.max_len):
             action, log_probs, value, (
-                valid_actions, actions_probs, log_probs_truncated), dist, logits_lm, log_probas_lm = self.act(
+                valid_actions, actions_probs,
+                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm = self.act(
                 state=state,
                 mode=test_mode,
                 truncation=truncation,
@@ -160,15 +162,12 @@ class Agent:
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
-                            actions_probs=actions_probs,
-                            ref_question=env.ref_questions,
+                            actions_probs=actions_probs, ref_question=env.ref_questions,
                             ref_questions_decoded=env.ref_questions_decoded, reward=reward,
                             closest_question=closest_question, new_state=new_state, log_probs=log_probs,
-                            log_probs_truncated=log_probs_truncated,
-                            test_mode=test_mode,
-                            pred_answer=pred_answer,
+                            log_probs_truncated=log_probs_truncated, test_mode=test_mode, pred_answer=pred_answer,
                             i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm,
-                            log_probas_lm=log_probas_lm, timestep=t)
+                            log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm)
             state = new_state
             ep_reward += reward
 
@@ -273,7 +272,7 @@ class Agent:
                                                                                                'train_action_probs_lm']]}})
         # write to csv train metrics:
         for _, metric in self.train_metrics.items():
-            metric.write_to_csv()
+            metric.write()
 
         for _, metric in self.train_metrics.items():  # TODO: refactor...
             metric.post_treatment()
