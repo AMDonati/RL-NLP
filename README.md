@@ -19,6 +19,7 @@ To download the dataset directly via the shell, you can run the following comman
 * And activate it: `conda activate rl-nlp`
 * The required library can be installed via the file requirements.txt: `pip install -r requirements.txt`
 * The code relies on the CLOSURE github: you need to install it with: `python -m pip install git+https://github.com/gqkc/CLOSURE.git --upgrade`
+* And on the VILBERT multi-task github: `python -m pip install git+https://github.com/gqkc/vilbert-multi-task.git`
 
 ## Data preprocessing
 * To run all the scripts from the origin repo (RL-NLP), run first the following command line: `export PYTHONPATH=src:${PYTHONPATH}`
