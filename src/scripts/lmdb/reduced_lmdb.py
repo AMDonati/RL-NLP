@@ -16,7 +16,7 @@ import lmdb
 #         reduced_db_txn.commit()
 #         if i > 10:
 #            break
-#     #.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
+#     #reduced_db_txn.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
 #     #reduced_db_txn.commit()
 #     #reduced_db.close()
 #

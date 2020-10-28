@@ -302,6 +302,7 @@ class VQADataset(Dataset):
                     entry["answer"]["labels"] = None
                     entry["answer"]["scores"] = None
 
+
     def __getitem__(self, index):
         entry = self.entries[index]
         image_id = entry["image_id"]
