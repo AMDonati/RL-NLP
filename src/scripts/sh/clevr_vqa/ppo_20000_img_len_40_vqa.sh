@@ -18,3 +18,6 @@ python src/scripts/run.py -max_len 40 -data_path "data" -out_path "output/RL/exp
 echo "-------------------------- top_p 0.8---------------------------------------------------------------------------------------------------"
 python src/scripts/run.py -max_len 40 -data_path "data" -out_path "output/RL/exp_clvr_vqa_20000img" -model "lstm" -update_every 128 -agent "PPO" -K_epochs 20 -eps_clip 0.02 -lr 0.001 -word_emb_size 32 -hidden_size 64 -num_episodes_train 100000 -debug "0,20000" -lm_path "output/lm_model/model.pt" -reward "vqa" -reward_path "output/vqa_model_film/model.pt" -condition_answer "after_fusion" -num_episodes_test 500 -reward_vocab "data/closure_vocab.json" -mask_answers 1 -truncate_mode "top_p" -top_p 0.9 -grad_clip 1
 
+python src/scripts/lmdb/reduced_lmdb.py -lmdb_path "data/vilbert-mt/data/datasets/coco/features_100/COCO_trainval_resnext152_faster_rcnn_genome.lmdb" \
+-reduced_path "data/vilbert-mt/data/datasets/coco/coco_reduced_trainval.lmdb"
+

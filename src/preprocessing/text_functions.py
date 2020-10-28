@@ -37,7 +37,7 @@ def tokenize(s, add_start_token, add_end_token, punct_to_keep, punct_to_remove, 
 
     if punct_to_remove is not None:
         for p in punct_to_remove:
-            s = s.replace(p, '') #TODO: remove instead ?
+            s = s.replace(p, '')
 
     tokens = s.split(delim)
     start_token_upper = tokens[0]

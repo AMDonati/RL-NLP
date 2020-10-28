@@ -19,3 +19,6 @@ google-auth-httplib2
 google-auth-oauthlib
 transformers
 gym
+lmdb
+PyYAML
+easydict

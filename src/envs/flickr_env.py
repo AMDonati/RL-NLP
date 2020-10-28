@@ -1,5 +1,4 @@
 import argparse
-
 import gym
 import yaml
 from easydict import EasyDict as edict
