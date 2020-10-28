@@ -78,7 +78,8 @@ class Agent:
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
     def act(self, state, mode='sampling', truncation=True, timestep=0):
-        valid_actions, action_probs, logits_lm, log_probas_lm = self.truncation.get_valid_actions(state, truncation)
+        valid_actions, action_probs, logits_lm, log_probas_lm, origin_log_probs_lm = self.truncation.get_valid_actions(
+            state, truncation)
         alpha = self.alpha_logits_lm
         policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
                                                                                   logits_lm,
@@ -89,7 +90,7 @@ class Agent:
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
         return action, log_prob, value, (
-            valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm, log_probas_lm
+            valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm, log_probas_lm, origin_log_probs_lm
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
@@ -147,7 +148,8 @@ class Agent:
         metrics = self.train_metrics if train else self.test_metrics
         for t in range(0, env.max_len):
             action, log_probs, value, (
-                valid_actions, actions_probs, log_probs_truncated), dist, logits_lm, log_probas_lm = self.act(
+                valid_actions, actions_probs,
+                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm = self.act(
                 state=state,
                 mode=test_mode,
                 truncation=truncation,
@@ -160,15 +162,12 @@ class Agent:
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
-                            actions_probs=actions_probs,
-                            ref_question=env.ref_questions,
+                            actions_probs=actions_probs, ref_question=env.ref_questions,
                             ref_questions_decoded=env.ref_questions_decoded, reward=reward,
                             closest_question=closest_question, new_state=new_state, log_probs=log_probs,
-                            log_probs_truncated=log_probs_truncated,
-                            test_mode=test_mode,
-                            pred_answer=pred_answer,
+                            log_probs_truncated=log_probs_truncated, test_mode=test_mode, pred_answer=pred_answer,
                             i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm,
-                            log_probas_lm=log_probas_lm, timestep=t)
+                            log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm)
             state = new_state
             ep_reward += reward
 
@@ -221,25 +220,16 @@ class Agent:
                             truncation=trunc)
                     for _, metric in self.test_metrics.items():
                         metric.write()
-                    dialogs[key].append(
-                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx,
-                                                                                 env.ref_question_idx,
-                                                                                 key) + self.env.clevr_dataset.idx2word(
-                            state.text[:, 1:].numpy()[
-                                0]) + '----- closest question:' + closest_question + '------ reward: {}'.format(
-                            ep_reward))
                     if i == env.ref_questions.size(0) - 1:
                         # reset metrics key value for writing:
                         for m in self.test_metrics.values():
                             m.reinit_train_test(env.mode + '_' + test_mode)
-            for _, dialog in dialogs.items():
-                logging.info('\n'.join(dialog))
-            logging.info("-" * 60)
+        for _, metric in self.test_metrics.items():
+            metric.post_treatment()
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
-        logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, self.train_metrics[
-            "running_return"].metric[0]))
+        logging.info('Last reward: {:.2f}'.format(ep_reward))
         logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
         logging.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.train_metrics.items():
@@ -259,6 +249,9 @@ class Agent:
             if i_episode % self.log_interval == 0:
                 self.log_at_train(i_episode=i_episode, ep_reward=ep_reward, state=state,
                                   closest_question=closest_question, valid_actions=valid_actions)
+                # write train metrics:
+                for _, metric in self.train_metrics.items():
+                    metric.write()
 
             if i_episode % 1000 == 0:
                 elapsed = time.time() - current_time
@@ -271,11 +264,8 @@ class Agent:
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
-        # write to csv train metrics:
-        for _, metric in self.train_metrics.items():
-            metric.write_to_csv()
 
-        for _, metric in self.train_metrics.items():  # TODO: refactor...
+        for _, metric in self.train_metrics.items():
             metric.post_treatment()
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info(

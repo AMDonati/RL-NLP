@@ -121,7 +121,7 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "size_valid_actions",
-                                 "valid_actions",
+                                 "valid_actions","ppl",
                                  "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,

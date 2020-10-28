@@ -44,11 +44,11 @@ class Truncation:
 
     def get_valid_actions(self, state, truncation):
         if not truncation:
-            return None, None, 0, None
+            return None, None, 0, None, None
         with torch.no_grad():
-            log_probas_lm, logits_lm = self.language_model.forward(state.text.to(self.device))
+            log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device))
             valid_actions, action_probs = self.truncate(log_probas_lm, logits_lm)
-            return valid_actions, action_probs, logits_lm, log_probas_lm
+            return valid_actions, action_probs, logits_lm, log_probas_lm, origin_log_probs_lm
 
     def truncate(self, log_probas, logits):
         return None, None
@@ -61,10 +61,10 @@ class NoTruncation(Truncation):
     def get_valid_actions(self, state, truncation):
         if self.alpha_logits_lm > 0:
             with torch.no_grad():
-                log_probas_lm, logits_lm = self.language_model.forward(state.text.to(self.device))
+                log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device))
         else:
-            logits_lm, log_probas_lm = 0, None
-        return None, None, logits_lm, log_probas_lm
+            logits_lm, log_probas_lm, origin_log_probs_lm = 0, None, None
+        return None, None, logits_lm, log_probas_lm, origin_log_probs_lm
 
 
 class TopK(Truncation):

@@ -1,20 +1,22 @@
 import argparse
 import csv
 import logging
-from csv import writer
-import numpy as np
 import os
+from csv import writer
+
+import numpy as np
 
 
 def str2bool(v):
     if isinstance(v, bool):
-       return v
+        return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 def write_to_csv(output_dir, dic):
     """Write a python dic to csv."""
@@ -64,28 +66,19 @@ def write_to_csv_by_row(output_dir, dic):
         list_of_elem = [key] + value
         append_list_as_row(output_dir, list_of_elem)
 
+
 def compute_write_all_metrics(agent, output_path, logger, keep=None):
     # write to csv test scalar metrics:
     all_metrics = {}
-    csv_file = "all_metrics.csv"
+    csv_file = "all_metrics.csv" if keep is None else "all_metrics_{}.csv".format(keep)
+
     logger.info(
         "------------------------------------- test metrics statistics -----------------------------------------")
     for key, metric in agent.test_metrics.items():
         logger.info('------------------- {} -------------------'.format(key))
-        metric.write_to_csv()
+        # metric.write_to_csv()
         # saving the mean of all metrics in a single csv file:
-        if metric.dict_stats:
-            list_stats = list(metric.dict_stats.values())
-            if keep is not None:
-                csv_file = "all_metrics_{}.csv".format(keep)
-                list_stats = []
-                for key, value in metric.dict_stats.items():
-                    if keep in key:
-                        list_stats.append(value)
-            if isinstance(list_stats[0], dict):
-                all_metrics[metric.key] = np.round(np.mean(
-                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
-            else:
-                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
+        if metric.stats is not None:
+            list_stats = list(metric.stats)
+            all_metrics[metric.key] = np.round(np.mean(list_stats[0]), decimals=3)
     write_to_csv(os.path.join(output_path, csv_file), all_metrics)
-

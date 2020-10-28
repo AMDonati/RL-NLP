@@ -16,7 +16,6 @@ class LanguageModel:
 class ClevrLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
         LanguageModel.__init__(self, pretrained_lm, clevr_dataset)
-        self.name = "clevr"
 
     def forward(self, state_text):
         seq_len = state_text.size(1)
@@ -25,7 +24,7 @@ class ClevrLanguageModel(LanguageModel):
         logits = logits[:, -1, :]
         log_probas = log_probas.view(len(state_text), seq_len, -1)
         log_probas = log_probas[:, -1, :]
-        return log_probas, logits
+        return log_probas, logits, log_probas
 
 
 class GenericLanguageModel(LanguageModel):
@@ -35,17 +34,18 @@ class GenericLanguageModel(LanguageModel):
         self.clevr_to_lm_trad = {value: self.tokenizer.encode(" " + key)[0] for
                                  key, value in self.dataset.vocab_questions.items() if
                                  len(self.tokenizer.encode(" " + key)) == 1}
-        self.name = 'generic'
 
     def forward(self, state_text):
-        text = self.tokenizer.bos_token+" " + self.dataset.idx2word(state_text.cpu().numpy().ravel(), stop_at_end=True)
+        text = self.tokenizer.bos_token + " " + self.dataset.idx2word(state_text.cpu().numpy().ravel(),
+                                                                      stop_at_end=True)
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
-        logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :] # first output of lm (logits) > shape (B,S,V)
+        origin_logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :]
+        origin_log_probs_lm = F.log_softmax(origin_logits_lm, dim=-1)
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
-        logits[list(self.clevr_to_lm_trad.keys())] = logits_lm[0][list(self.clevr_to_lm_trad.values())] # shape (82) > CLEVR vocab minus special tokens.
+        logits[list(self.clevr_to_lm_trad.keys())] = origin_logits_lm[0][list(self.clevr_to_lm_trad.values())]
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
-        return log_probas, logits
+        return log_probas, logits, origin_log_probs_lm
 
 class BertGeneration(LanguageModel):
     '''
