@@ -399,4 +399,4 @@ if __name__ == '__main__':
     (q, target, input_mask, seqment_id, co_attention_mask, question_id) = vqa_dataset.__getitem__(1)
     print(q)
     print(vqa_dataset.idx2word(q.numpy()))
-    print(target.shape) #3129 answers. 
+    print(target.shape) #3129 answers.

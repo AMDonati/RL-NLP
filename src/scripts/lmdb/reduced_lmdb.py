@@ -19,9 +19,10 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-lmdb_path", type=str, default='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.lmdb',
-                        help="data folder containing questions embeddings and img features")
+                        help="data folder for the full lmdb")
+    parser.add_argument("-reduced_path", type=str, default="../vilbert-multi-task/data/datasets/flickr30k/reduced.lmdb")
     args = parser.parse_args()
-    reduced_db = lmdb.open("../vilbert-multi-task/data/datasets/flickr30k/reduced.lmdb")
+    reduced_db = lmdb.open(args.reduced_path)
 
     reduced_db_txn = reduced_db.begin(write=True)
 
