@@ -1,11 +1,13 @@
 import pickle
-
 import lmdb
 
-def save(reduced_db_txn, path='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.lmdb'):
+def save(reduced_path, path='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.lmdb'):
     db = lmdb.open(path)
     db_txn = db.begin(write=False)
     cursor = db_txn.cursor()
+
+    reduced_db = lmdb.open(reduced_path)
+    reduced_db_txn = reduced_db.begin(write=True)
 
     i = 0
     for key, value in cursor:
@@ -14,6 +16,9 @@ def save(reduced_db_txn, path='data/datasets/flickr30k/flickr30k_resnext152_fast
         reduced_db_txn.commit()
         if i > 10:
            break
+    reduced_db_txn.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
+    reduced_db_txn.commit()
+    reduced_db.close()
 
 if __name__ == '__main__':
     import argparse
@@ -22,12 +27,13 @@ if __name__ == '__main__':
                         help="data folder for the full lmdb")
     parser.add_argument("-reduced_path", type=str, default="../vilbert-multi-task/data/datasets/flickr30k/reduced.lmdb")
     args = parser.parse_args()
-    reduced_db = lmdb.open(args.reduced_path)
+    #reduced_db = lmdb.open(args.reduced_path)
 
-    reduced_db_txn = reduced_db.begin(write=True)
+    #reduced_db_txn = reduced_db.begin(write=True)
 
-    save(reduced_db_txn, args.lmdb_path)
+    #save(reduced_db_txn, args.lmdb_path)
+    save(args.reduced_path, args.lmdb_path)
 
-    reduced_db_txn.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
-    reduced_db_txn.commit()
-    reduced_db.close()
+    #reduced_db_txn.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
+    #reduced_db_txn.commit()
+    #reduced_db.close()
