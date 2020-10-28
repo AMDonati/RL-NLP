@@ -5,7 +5,8 @@ from configparser import ConfigParser
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from transformers import AutoModelWithLMHead, AutoTokenizer
+from transformers import AutoModelWithLMHead, AutoTokenizer, BertGenerationTokenizer, BertGenerationConfig, \
+    BertGenerationDecoder
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
@@ -145,15 +146,25 @@ def create_config_file(conf_file, args):
 
 
 def get_pretrained_lm(args, env):
-    if args.lm_path is not None:
+    if "gpt" in args.lm_path:
+        lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")  # TODO: use a config to change the vocabulary ?
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
+                                             tokenizer=tokenizer)
+    elif "bert" in args.lm_path:
+        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder') # vocab size: 50358
+        tokenizer_2 = BertGenerationTokenizer.from_pretrained("patrickvonplaten/bert2bert-cnn_dailymail-fp16")
+        config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
+        config.is_decoder = True
+        lm_model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
+                                                         config=config, return_dict=True)
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
+                                             tokenizer=tokenizer)
+    else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
         pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset)
-    else:
-        lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        tokenizer = AutoTokenizer.from_pretrained("gpt2")
-        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
-                                             tokenizer=tokenizer)
+
     return pretrained_lm
 
 

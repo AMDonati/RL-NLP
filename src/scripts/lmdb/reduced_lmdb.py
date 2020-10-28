@@ -2,7 +2,7 @@ import pickle
 
 import lmdb
 
-def save(path='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.lmdb'):
+def save(reduced_db_txn, path='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.lmdb'):
     db = lmdb.open(path)
     db_txn = db.begin(write=False)
     cursor = db_txn.cursor()
@@ -16,19 +16,17 @@ def save(path='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.l
            break
 
 if __name__ == '__main__':
-
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-lmdb_path", type=str, default='data/datasets/flickr30k/flickr30k_resnext152_faster_rcnn_genome.lmdb',
+                        help="data folder containing questions embeddings and img features")
+    args = parser.parse_args()
     reduced_db = lmdb.open("../vilbert-multi-task/data/datasets/flickr30k/reduced.lmdb")
-
 
     reduced_db_txn = reduced_db.begin(write=True)
 
-    #save(path, reduced_db_txn)
+    save(reduced_db_txn, args.lmdb_path)
 
     reduced_db_txn.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
     reduced_db_txn.commit()
     reduced_db.close()
-
-    #cursor = reduced_db_txn.cursor()
-
-    #for key, value in cursor:
-        #print(key)

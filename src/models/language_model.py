@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from transformers import BertGenerationConfig, BertGenerationEncoder, BertGenerationDecoder, BertGenerationTokenizer
 
 
 class LanguageModel:
@@ -26,13 +27,6 @@ class ClevrLanguageModel(LanguageModel):
         log_probas = log_probas[:, -1, :]
         return log_probas, logits
 
-    def get_logits_all_sequence(self, state_text):
-        seq_len = state_text.size(1)
-        log_probas, logits = self.language_model(state_text.to(self.device))
-        logits = logits.view(len(state_text), seq_len, -1)
-        log_probas = log_probas.view(len(state_text), seq_len, -1)
-        return log_probas.squeeze(dim=0), logits.squeeze(dim=0)
-
 
 class GenericLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
@@ -46,21 +40,35 @@ class GenericLanguageModel(LanguageModel):
     def forward(self, state_text):
         text = self.tokenizer.bos_token+" " + self.dataset.idx2word(state_text.cpu().numpy().ravel(), stop_at_end=True)
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
-        logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :]
+        logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :] # first output of lm (logits) > shape (B,S,V)
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
-        logits[list(self.clevr_to_lm_trad.keys())] = logits_lm[0][list(self.clevr_to_lm_trad.values())]
+        logits[list(self.clevr_to_lm_trad.keys())] = logits_lm[0][list(self.clevr_to_lm_trad.values())] # shape (82) > CLEVR vocab minus special tokens.
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
         return log_probas, logits
 
-    def get_logits_all_sequence(self, state_text):
-        #TODO: to complete, to be able to get the ppl from GPT...
-        text = self.tokenizer.bos_token + " " + self.dataset.idx2word(state_text.cpu().numpy().ravel(),
-                                                                      stop_at_end=True)
-        input_ids = self.tokenizer.encode(text, return_tensors="pt")
-        logits_lm = self.language_model(input_ids)[0]
-        logits = -torch.ones(len(self.dataset.vocab_questions)) * 1e32
-        logits[list(self.clevr_to_lm_trad.keys())] = logits_lm[0][list(self.clevr_to_lm_trad.values())]
-        logits = logits.unsqueeze(dim=0)
-        log_probas = F.log_softmax(logits, dim=-1)
-        return log_probas, logits
+class BertGeneration(LanguageModel):
+    '''
+    https://huggingface.co/transformers/model_doc/bertgeneration.html
+    From: https://arxiv.org/pdf/1907.12461.pdf
+    '''
+    def __init__(self, pretrained_lm, clevr_dataset, tokenizer):
+
+        # ENCODER PART:
+        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
+        model = BertGenerationEncoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
+                                                           return_dict=True)
+
+        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+        outputs = model(**inputs)
+        last_hidden_states = outputs.last_hidden_state
+
+        # DECODER PART:
+        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
+        config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
+        config.is_decoder = True
+        model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
+                                                           config=config, return_dict=True)
+        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
+        outputs = model(**inputs)
+        prediction_logits = outputs.logits
