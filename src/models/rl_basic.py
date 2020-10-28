@@ -108,8 +108,7 @@ class PolicyLSTMWordBatch_SL(nn.Module):
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
-        self.action_head = nn.Linear(self.hidden_size,
-                                     num_tokens)
+        self.action_head = nn.Linear(self.hidden_size, num_tokens)
 
     def forward(self, state_text, state_img):
         embedding = self._get_embed_text(state_text)

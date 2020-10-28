@@ -72,20 +72,10 @@ def compute_write_all_metrics(agent, output_path, logger, keep=None):
         "------------------------------------- test metrics statistics -----------------------------------------")
     for key, metric in agent.test_metrics.items():
         logger.info('------------------- {} -------------------'.format(key))
-        metric.write_to_csv()
+        #metric.write_to_csv()
         # saving the mean of all metrics in a single csv file:
-        if metric.dict_stats:
-            list_stats = list(metric.dict_stats.values())
-            if keep is not None:
-                csv_file = "all_metrics_{}.csv".format(keep)
-                list_stats = []
-                for key, value in metric.dict_stats.items():
-                    if keep in key:
-                        list_stats.append(value)
-            if isinstance(list_stats[0], dict):
-                all_metrics[metric.key] = np.round(np.mean(
-                    [e["norm_reward"][0] for e in list_stats]), decimals=3)  # trick for the reward metric case.
-            else:
-                all_metrics[metric.key] = np.round(np.mean([e[0] for e in list_stats]), decimals=3)
+        if metric.stats is not None:
+            list_stats = list(metric.stats)
+            all_metrics[metric.key] = np.round(np.mean(list_stats[0]), decimals=3)
     write_to_csv(os.path.join(output_path, csv_file), all_metrics)
 

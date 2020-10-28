@@ -220,25 +220,16 @@ class Agent:
                             truncation=trunc)
                     for _, metric in self.test_metrics.items():
                         metric.write()
-                    dialogs[key].append(
-                        'DIALOG {} for img {} - question_index {} - {}: '.format(i, env.img_idx,
-                                                                                 env.ref_question_idx,
-                                                                                 key) + self.env.clevr_dataset.idx2word(
-                            state.text[:, 1:].numpy()[
-                                0]) + '----- closest question:' + closest_question + '------ reward: {}'.format(
-                            ep_reward))
                     if i == env.ref_questions.size(0) - 1:
                         # reset metrics key value for writing:
                         for m in self.test_metrics.values():
                             m.reinit_train_test(env.mode + '_' + test_mode)
-            for _, dialog in dialogs.items():
-                logging.info('\n'.join(dialog))
-            logging.info("-" * 60)
+        for _, metric in self.test_metrics.items():
+            metric.post_treatment()
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
-        logging.info('Last reward: {:.2f}\tAverage reward: {:.2f}'.format(ep_reward, self.train_metrics[
-            "running_return"].metric[0]))
+        logging.info('Last reward: {:.2f}'.format(ep_reward))
         logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
         logging.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.train_metrics.items():
@@ -258,6 +249,9 @@ class Agent:
             if i_episode % self.log_interval == 0:
                 self.log_at_train(i_episode=i_episode, ep_reward=ep_reward, state=state,
                                   closest_question=closest_question, valid_actions=valid_actions)
+                # write train metrics:
+                for _, metric in self.train_metrics.items():
+                    metric.write()
 
             if i_episode % 1000 == 0:
                 elapsed = time.time() - current_time
@@ -270,11 +264,8 @@ class Agent:
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
-        # write to csv train metrics:
-        for _, metric in self.train_metrics.items():
-            metric.write()
 
-        for _, metric in self.train_metrics.items():  # TODO: refactor...
+        for _, metric in self.train_metrics.items():
             metric.post_treatment()
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info(

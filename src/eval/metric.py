@@ -12,14 +12,12 @@ from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
 
-from utils.utils_train import write_to_csv
-
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 
 class Metric:
-    def __init__(self, agent, train_test):
+    def __init__(self, agent, train_test, key, type):
         self.measure = []
         self.metric = []
         self.metric_history = []
@@ -29,10 +27,15 @@ class Metric:
         self.clevr_dataset = agent.env.clevr_dataset
         self.out_path = agent.out_path
         self.writer = agent.writer
-        self.language_model = self.agent.truncation.language_model
-
+        self.language_model = agent.truncation.language_model
+        self.reward_type = agent.env.reward_type
+        self.type = type
+        self.key = key
         self.train_test = train_test
-        self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
+        # self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
+        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key + ".csv")
+        self.stats_path = os.path.join(self.out_path, self.train_test + "_" + self.key + '_stats.csv')
+        self.stats = None
 
     def fill(self, **kwargs):
         self.fill_(**kwargs)
@@ -54,7 +57,7 @@ class Metric:
     def write(self, **kwargs):
         if self.type == "scalar":
             self.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
-        else:
+        elif self.type == "text":
             self.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
         self.metric_history.extend(self.metric)
@@ -63,17 +66,12 @@ class Metric:
     def log(self, **kwargs):
         pass
 
-    def write_to_csv(self):
-        if self.dict_metric:
-            for key, value in self.dict_metric.items():
-                self.dict_stats[key] = [np.round(np.mean(value), decimals=3), np.round(np.std(value), decimals=3),
-                                        np.round(len(value))]
-                logging.info('{}: {} +/- {}'.format(key, np.round(np.mean(value), decimals=3),
-                                                    np.round(np.std(value), decimals=3)))
-            write_to_csv(self.out_csv_file + '_stats.csv', self.dict_stats)
-
     def post_treatment(self):
-        pass
+        serie = pd.Series(self.metric_history)
+        serie.to_csv(self.out_csv_file)
+        if self.type == "scalar":
+            self.stats = [serie.mean(), serie.std(), serie.size]
+            pd.Series(self.stats).to_csv(self.stats_path)
 
 
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
@@ -82,23 +80,20 @@ class VAMetric(Metric):
     '''Display the valid action space in the training log.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "text"
-        self.key = "valid_actions"
+        Metric.__init__(self, agent, train_test, "valid_actions", "text")
 
     def fill_(self, **kwargs):
         state_decoded = self.clevr_dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=['<PAD>'])
+        string = ""
         if kwargs["valid_actions"] is not None:
             top_words_decoded = self.clevr_dataset.idx2word(kwargs["valid_actions"].cpu().numpy()[0])
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                              zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
-        else:
-            string = ""
         self.measure.append(string)
 
     def compute_(self, **kwargs):
-        self.metric = self.measure
+        self.metric.extend(self.measure)
 
     def log(self, **kwargs):
         if kwargs["valid_actions"] is not None:
@@ -114,31 +109,22 @@ class SizeVAMetric(Metric):
     '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
+        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar")
         self.counter = 0
-        self.key = "size_valid_actions"
-        self.dict_metric = {}
-        self.idx_csv = 1
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_size_va_history.csv')
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             self.measure.append(kwargs["valid_actions"].size(1))
 
     def compute_(self, **kwargs):
-        self.metric = [np.round(np.mean(self.measure))]
-        self.dict_metric[self.idx_csv] = self.measure
-        self.idx_csv += 1
+        self.metric.extend(self.measure)
 
 
 class SumProbsOverTruncated(Metric):
     '''Compute the sum of the probabilities the action space given by the language model.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "sum_probs_truncated"
+        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar")
 
     def fill_(self, **kwargs):
         sum_over_truncated_space = 1
@@ -148,32 +134,7 @@ class SumProbsOverTruncated(Metric):
         self.measure.append(float(sum_over_truncated_space))
 
     def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-
-
-class RunningReturn(Metric):
-    '''Training running return.'''
-
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "running_return"
-        self.running_return = 0
-        self.idx_episode = 1
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_running_return_history.csv')
-
-    def fill_(self, **kwargs):
-        self.measure.append(kwargs["reward"])
-
-    def compute_(self, **kwargs):
-        ep_reward = np.sum(self.measure)
-        self.running_return = 0.05 * ep_reward + (1 - 0.05) * self.running_return
-        self.metric = [self.running_return]
-        self.dict_metric[self.idx_episode] = self.running_return
-        self.idx_episode += 1
-
-    def write_to_csv(self):
-        write_to_csv(self.out_csv_file, self.dict_metric)
+        self.metric.extend(self.measure)
 
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
@@ -181,9 +142,7 @@ class DialogMetric(Metric):
     """Display the test dialog."""
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "text"
-        self.key = "dialog"
+        Metric.__init__(self, agent, train_test, "dialog", "text")
         self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.txt')
         self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
@@ -197,23 +156,17 @@ class DialogMetric(Metric):
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            if not self.train_test + '_' + self.key in self.generated_dialog.keys():
-                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text.squeeze().cpu()]
-            else:
-                self.generated_dialog[self.train_test + '_' + self.key].append(
-                    kwargs["state"].text.cpu().view(-1))
             state_decoded = self.clevr_dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
                                                         ignored=[])
-            if self.agent.env.reward_type == 'vqa':
+            if self.reward_type == 'vqa':
                 pred_answer_decoded = self.clevr_dataset.idx2word(kwargs["pred_answer"].numpy(),
                                                                   decode_answers=True)
                 ref_answer_decoded = self.clevr_dataset.idx2word([kwargs["ref_answer"].numpy().item()],
                                                                  decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"]
-                string = ' IMG {} - question index {}:'.format(kwargs[
-                                                                   "img_idx"],
-                                                               kwargs[
-                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + \
+                string = ' IMG {} - question index {}:'.format(kwargs["img_idx"],
+                                                               kwargs["question_idx"]) \
+                         + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + \
                          ref_question_decoded[0] + '\n' + '-' * 40
             else:
                 closest_question_decoded = kwargs["closest_question"]
@@ -238,9 +191,7 @@ class DialogImageMetric(Metric):
     '''Display the Dialog on a html format at test time.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "text"
-        self.key = "dialog"
+        Metric.__init__(self, agent, train_test, "dialog", "text")
         self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
         self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
@@ -335,10 +286,7 @@ class PPLMetric(Metric):
     """
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "ppl"
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key)
+        Metric.__init__(self, agent, train_test, "scalar", "ppl")
 
     def fill_(self, **kwargs):
         with torch.no_grad():
@@ -350,18 +298,12 @@ class PPLMetric(Metric):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
         self.metric.append(ppl)
 
-    def write(self):
-        pass
-
 
 class PPLDialogfromLM(Metric):
     '''Computes the PPL of the Language Model over the generated dialog'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "ppl_dialog_lm"
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key)
+        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar")
 
     def fill_(self, **kwargs):
         if kwargs["log_probas_lm"] is not None:
@@ -376,36 +318,21 @@ class PPLDialogfromLM(Metric):
 
 class Return(Metric):
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "return"
-        self.idx_episode = 1
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_return_history.csv')
+        Metric.__init__(self, agent, train_test, "return", "scalar")
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["reward"])
 
     def compute_(self, **kwargs):
         ep_return = np.sum(self.measure)
-        self.metric = [ep_return]
-        self.dict_metric[self.idx_episode] = ep_return
-        self.idx_episode += 1
-
-    def post_treatment(self):
-        csv = os.path.join(self.out_path, self.train_test + '_std_history.csv')
-        serie = pd.Series(self.dict_metric).rolling(window=100).std()
-        serie.to_csv(csv)
+        self.metric.append(ep_return)
 
 
 class BleuMetric(Metric):
     '''Compute the bleu score over the ref questions and the generated dialog.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "bleu"
-        self.train_test = train_test
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key)
+        Metric.__init__(self, agent, train_test, "bleu", "scalar")
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -429,10 +356,7 @@ class RefQuestionsMetric(Metric):
     '''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "ratio_closest_questions"
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key)
+        Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar")
 
     def fill_(self, **kwargs):
         if "test_images" in self.train_test:
@@ -465,10 +389,7 @@ class TTRQuestionMetric(Metric):
     '''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "ttr_question"
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key)
+        Metric.__init__(self, agent, train_test, "ttr_question", "scalar")
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -478,23 +399,16 @@ class TTRQuestionMetric(Metric):
         diversity_metric = len(set(list(self.measure))) / len(self.measure)
         self.metric.append(diversity_metric)
 
-    def write(self):
-        pass
-
 
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "unique_words"
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key)
+        Metric.__init__(self, agent, train_test, "unique_words", "scalar")
 
     def fill_(self, **kwargs):
-        if "sampling" in self.train_test:
-            if kwargs["done"]:
-                self.measure.append(list(kwargs["new_state"].text.numpy()[0]))
+        if kwargs["done"]:
+            self.measure.append(list(kwargs["new_state"].text.numpy()[0]))
 
     def compute_(self, **kwargs):
         if "sampling" in self.train_test:
@@ -518,9 +432,7 @@ class UniqueWordsMetric(Metric):
 
 class PolicyMetric(Metric):
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "text"
-        self.key = "policy"
+        Metric.__init__(self, agent, train_test, "policy", "text")
 
     def fill_(self, **kwargs):
         # compute top_k_words from the Policy:
@@ -560,10 +472,8 @@ class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
+        Metric.__init__(self, agent, train_test, "lm_valid_actions", "scalar")
         self.counter = 0
-        self.key = "lm_valid_actions"
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
@@ -581,9 +491,7 @@ class PoliciesRatioMetric(Metric):
     '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "policies_discrepancy"
+        Metric.__init__(self, agent, train_test, "policies_discrepancy", "scalar")
 
     def fill_(self, **kwargs):
         ratios = np.exp(
@@ -598,9 +506,7 @@ class LMPolicyProbsRatio(Metric):
     '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "lm_policy_probs_ratio"
+        Metric.__init__(self, agent, train_test, "lm_policy_probs_ratio", "scalar")
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
@@ -616,9 +522,7 @@ class LMPolicyProbsRatio(Metric):
 
 class ActionProbs(Metric):
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "action_probs"
+        Metric.__init__(self, agent, train_test, "action_probs", "scalar")
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["log_probs"])
@@ -634,9 +538,7 @@ class ActionProbs(Metric):
 
 class ActionProbsTruncated(Metric):
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "action_probs_truncated"
+        Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar")
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["log_probs_truncated"])
@@ -652,9 +554,7 @@ class ActionProbsTruncated(Metric):
 
 class LMActionProbs(Metric):
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test)
-        self.type = "scalar"
-        self.key = "action_probs_lm"
+        Metric.__init__(self, agent, train_test, "action_probs_lm", "scalar")
 
     def fill_(self, **kwargs):
         if kwargs["action"] in kwargs["valid_actions"]:
@@ -671,8 +571,7 @@ class LMActionProbs(Metric):
         logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
-metrics = {"running_return": RunningReturn, "return": Return,
-           "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
+metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated}
