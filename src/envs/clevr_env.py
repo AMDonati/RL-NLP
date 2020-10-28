@@ -86,7 +86,7 @@ class ClevrEnv(gym.Env):
         self.ref_questions = questions[:, :self.max_len]
 
         # differentiating between the environment modes.
-        if self.mode == "train" and not self.mask_answers: #TODO: make it possible with mask_answers as well.
+        if self.mode == "train" and not self.mask_answers:
             self.ref_questions = self.ref_questions[0:self.num_questions, :]
             self.ref_answers = self.ref_answers[0:self.num_questions]
         elif self.mode == "test_text" and not self.mask_answers:

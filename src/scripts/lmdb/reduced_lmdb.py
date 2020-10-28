@@ -16,9 +16,9 @@ def save(reduced_path, path='data/datasets/flickr30k/flickr30k_resnext152_faster
         reduced_db_txn.commit()
         if i > 10:
            break
-    reduced_db_txn.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
-    reduced_db_txn.commit()
-    reduced_db.close()
+    #.put("keys".encode(), pickle.dumps([key for key, _ in reduced_db_txn.cursor()]))
+    #reduced_db_txn.commit()
+    #reduced_db.close()
 
 if __name__ == '__main__':
     import argparse
