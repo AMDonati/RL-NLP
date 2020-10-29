@@ -93,7 +93,7 @@ def get_parser():
     parser.add_argument('-condition_answer', type=str, default="none",
                         help="type of answer condition, default to none")
     # truncation args.
-    parser.add_argument('-lm_path', type=str,
+    parser.add_argument('-lm_path', type=str, default="gpt",
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
     parser.add_argument('-truncate_mode', type=str,
                         help="truncation mode")  # arg that says now if are truncating the action space or not.
@@ -121,9 +121,9 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["running_return", "size_valid_actions",
-                                 "valid_actions","ppl",
+                                 "valid_actions", "ppl",
                                  "dialog", "eps_truncation",
-                                 "ttr_question", "sum_probs"], help="train metrics")
+                                 "ttr_question", "sum_probs", "true_word_rank"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs"],
@@ -146,13 +146,14 @@ def create_config_file(conf_file, args):
 
 
 def get_pretrained_lm(args, env):
-    if "gpt" in args.lm_path:
+    if "gpt" == args.lm_path:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")  # TODO: use a config to change the vocabulary ?
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
                                              tokenizer=tokenizer)
-    elif "bert" in args.lm_path:
-        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder') # vocab size: 50358
+    elif "bert" == args.lm_path:
+        tokenizer = BertGenerationTokenizer.from_pretrained(
+            'google/bert_for_seq_generation_L-24_bbc_encoder')  # vocab size: 50358
         tokenizer_2 = BertGenerationTokenizer.from_pretrained("patrickvonplaten/bert2bert-cnn_dailymail-fp16")
         config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
         config.is_decoder = True

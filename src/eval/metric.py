@@ -68,7 +68,7 @@ class Metric:
 
     def post_treatment(self):
         serie = pd.Series(self.metric_history)
-        serie.to_csv(self.out_csv_file)
+        serie.to_csv(self.out_csv_file, index=False)
         if self.type == "scalar":
             self.stats = [serie.mean(), serie.std(), serie.size]
             pd.Series(self.stats).to_csv(self.stats_path)
@@ -359,20 +359,12 @@ class RefQuestionsMetric(Metric):
         Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar")
 
     def fill_(self, **kwargs):
-        if "test_images" in self.train_test:
-            if kwargs["done"]:
-                self.measure.append(kwargs["closest_question"])
+        if kwargs["done"]:
+            self.measure.append(kwargs["closest_question"])
 
     def compute_(self, **kwargs):
-        if "test_images" and "sampling" in self.train_test:
-            if len(self.measure) == kwargs["ref_question"].size(0):
-                unique_ratio = len(list(set(self.measure))) / len(self.measure)
-                self.metric.append(unique_ratio)
-                self.measure = []
-                if not self.train_test + '_' + self.key in self.dict_metric:
-                    self.dict_metric[self.train_test + '_' + self.key] = [self.metric[-1]]
-                else:
-                    self.dict_metric[self.train_test + '_' + self.key].append(self.metric[-1])
+        unique_ratio = len(list(set(self.measure))) / len(self.measure)
+        self.measure.append(unique_ratio)
 
     def compute(self, **kwargs):
         self.compute_(**kwargs)
@@ -400,6 +392,24 @@ class TTRQuestionMetric(Metric):
         self.metric.append(diversity_metric)
 
 
+class TrueWordRankLM(Metric):
+    """
+    Compute the rank of the true word in the original lm logits
+    """
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar")
+
+    def fill_(self, **kwargs):
+        true_action = int(kwargs["ref_question"][:, kwargs["timestep"]].squeeze().cpu().numpy())
+        true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
+        sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
+        rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
+        self.measure.append(rank)
+
+    def compute_(self, **kwargs):
+        self.metric.extend(self.measure)
+
+
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
 
@@ -417,7 +427,6 @@ class UniqueWordsMetric(Metric):
                 unique_tokens = np.unique(arr)
                 diversity_metric = len(unique_tokens) / len(arr)
                 self.metric.append(diversity_metric)
-                self.measure = []
 
     def compute(self, **kwargs):
         self.compute_(**kwargs)
@@ -574,4 +583,4 @@ class LMActionProbs(Metric):
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
-           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated}
+           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM}
