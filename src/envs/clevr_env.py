@@ -8,50 +8,74 @@ import torch
 
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
+from data_provider.vqa_dataset import *
+from transformers import BertTokenizer, GPT2Tokenizer
 
 
-class ClevrEnv(gym.Env):
-    """Clevr Env"""
+class GenericEnv(gym.Env):
+    """Generic Env"""
     metadata = {'render.modes': ['human']}
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
-                 reward_path=None, max_samples=None, debug=False, mode="train", num_questions=10, diff_reward=False,
+                 reward_path=None, mode="train", diff_reward=False,
+                 debug=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False):
-        super(ClevrEnv, self).__init__()
+        super(GenericEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
-        modes = {"train": "train", "test_images": "val", "test_text": "train"}
-        self.clevr_mode=modes[self.mode]
-        h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
-        h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(modes[self.mode]))
-        vocab_path = os.path.join(data_path, 'vocab.json')
-        self.debug = debug.split(",")
-        self.num_questions = num_questions
         self.mask_answers = mask_answers
-        self.clevr_dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
-                                           h5_feats_path=h5_feats_path,
-                                           vocab_path=vocab_path,
-                                           max_samples=max_samples, mask_answers=mask_answers)
-
-        SOS_idx = self.clevr_dataset.vocab_questions["<SOS>"]
-        EOS_idx = self.clevr_dataset.vocab_questions["<EOS>"]
-        question_mark_idx = self.clevr_dataset.vocab_questions["?"] #TODO: why this is needed?
-
-        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx"))
-        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx)
-        self.State = namedtuple('State', ('text', 'img', "answer"))
         self.max_len = max_len
+        self.condition_answer = condition_answer
+        self.debug = debug.split(",") if debug is not None else debug
 
-        self.reward_type = reward_type
-        self.reward_func = rewards[reward_type](path=reward_path, vocab=reward_vocab, dataset=self.clevr_dataset)
-        self.diff_reward = diff_reward
-        if diff_reward:
-            self.reward_func = Differential(self.reward_func)
+        self.State = namedtuple('State', ('text', 'img', "answer"))
+        # init env.
         self.step_idx = 0
         self.state, self.dialog = None, None
         self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
-        self.condition_answer = condition_answer
+
+    def set_special_tokens(self):
+        SOS_idx = self.dataset.vocab_questions["<SOS>"]
+        EOS_idx = self.dataset.vocab_questions["<EOS>"]
+        question_mark_idx = self.dataset.vocab_questions["?"]  # TODO: why this is needed?
+        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx"))
+        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx)
+
+    def set_reward_function(self, reward_type, reward_path, reward_vocab, diff_reward):
+        self.reward_type = reward_type
+        self.reward_func = rewards[reward_type](path=reward_path, vocab=reward_vocab, dataset=self.dataset)
+        self.diff_reward = diff_reward
+        if diff_reward:
+            self.reward_func = Differential(self.reward_func)
+
+    def reset(self):
+        pass
+
+
+class ClevrEnv(GenericEnv):
+    """Clevr Env"""
+    metadata = {'render.modes': ['human']}
+
+    def __init__(self, data_path, max_len, reward_type="levenshtein",
+                 reward_path=None, max_samples=None, debug=None, mode="train", num_questions=10, diff_reward=False,
+                 condition_answer=True, reward_vocab=None, mask_answers=False):
+        super(ClevrEnv, self).__init__(data_path, max_len, reward_type=reward_type,
+                                       reward_path=reward_path, mode=mode, debug=debug, diff_reward=diff_reward,
+                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False)
+
+        modes = {"train": "train", "test_images": "val", "test_text": "train"}
+        h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
+        h5_feats_path = os.path.join(data_path, '{}_features.h5'.format(modes[self.mode]))
+        vocab_path = os.path.join(data_path, 'vocab.json')
+        self.dataset = CLEVR_Dataset(h5_questions_path=h5_questions_path,
+                                     h5_feats_path=h5_feats_path,
+                                     vocab_path=vocab_path,
+                                     max_samples=max_samples, mask_answers=mask_answers)
+
+        self.num_questions = num_questions
+        self.set_special_tokens()
+        self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab, diff_reward=diff_reward)
 
     def check_if_done(self, action):
         done = False
@@ -65,7 +89,7 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
         done = self.check_if_done(action)
         question_tokens = self.state.text.numpy().ravel()
-        question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
+        question = self.dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
         reward, closest_question, pred_answer = self.reward_func.get(question=question,
                                                                      ep_questions_decoded=self.ref_questions_decoded,
                                                                      step_idx=self.step_idx, done=done,
@@ -76,13 +100,13 @@ class ClevrEnv(gym.Env):
 
     def reset(self, seed=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
-                                                                                                    self.clevr_dataset.all_feats.shape[
+                                                                                                    self.dataset.all_feats.shape[
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
         # getting the environment's elements: Img, ref_questions, ref_answers.
         self.img_idx = np.random.randint(range_images[0], range_images[1])
-        self.img_feats, questions, self.ref_answers = self.clevr_dataset.get_data_from_img_idx(self.img_idx)
+        self.img_feats, questions, self.ref_answers = self.dataset.get_data_from_img_idx(self.img_idx)
         self.ref_questions = questions[:, :self.max_len]
 
         # differentiating between the environment modes.
@@ -99,10 +123,11 @@ class ClevrEnv(gym.Env):
         self.ref_answer = self.ref_answers[self.ref_question_idx]
 
         if self.condition_answer != "none":
-            self.ref_questions = self.ref_questions[self.ref_question_idx:self.ref_question_idx + 1] #TODO: why this is needed ?
+            self.ref_questions = self.ref_questions[
+                                 self.ref_question_idx:self.ref_question_idx + 1]  # TODO: why this is needed ?
             self.ref_answers = self.ref_answers[self.ref_question_idx:self.ref_question_idx + 1]
 
-        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
+        self.ref_questions_decoded = [self.dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
         # initializing the state.
@@ -125,7 +150,44 @@ class ClevrEnv(gym.Env):
         pass
 
 
+class VQAEnv(GenericEnv):
+    """VQA Env"""
+    metadata = {'render.modes': ['human']}
+
+    def __init__(self, data_path, features_h5path="../../data/vqa-v2/reduced_coco_train.lmdb", max_len=20,
+                 reward_type="levenshtein",
+                 debug=None,
+                 reward_path=None, mode="train", diff_reward=False,
+                 condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=6,
+                 num_answers=1):
+        super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
+                                     reward_path=reward_path, debug=debug, mode=mode, diff_reward=diff_reward,
+                                     condition_answer=condition_answer, reward_vocab=reward_vocab,
+                                     mask_answers=mask_answers)
+
+        SPECIAL_TOKENS = {
+            '<PAD>': 0,
+            '<SOS>': 1,
+            '<EOS>': 2,
+            '<UNK>': 3,
+        }
+        # Loading VQA Dataset.
+        num_images = int(self.debug[1]) if self.debug is not None else self.debug
+        lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+        self.dataset = VQADataset(task="1_gpt", split=mode, dataroot=data_path,
+                                  image_features_reader=images_feature_reader, lm_tokenizer=lm_tokenizer,
+                                  reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True,
+                                  max_seq_length=max_seq_length, min_len_questions=min_len_questions,
+                                  num_answers=num_answers, num_images=num_images)
+        self.set_special_tokens()
+        self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
+                                 diff_reward=diff_reward)
+
+
 if __name__ == '__main__':
+    print("Testing Clevr Env...")
     env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,20', mode="test_images")
     seed = 123
     seed = np.random.randint(100000)
@@ -136,3 +198,8 @@ if __name__ == '__main__':
     print('Ref Answers', env.ref_answers)
     print('Ref Answer', env.ref_answer)
     print('Ref Question', env.ref_question)
+
+    print("Testing VQA Env...")
+    vqa_data_path = '../../data/vqa-v2'
+    env = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20")
+    print(len(env.dataset.vocab_questions))

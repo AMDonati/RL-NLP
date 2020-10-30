@@ -267,7 +267,7 @@ def run(args):
     models = {"lstm": PolicyLSTMBatch}
     # creating the policy model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
+    policy = models[args.model](env.dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters,
                                 fusion=args.fusion, env=env,
