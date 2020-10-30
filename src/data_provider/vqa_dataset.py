@@ -11,6 +11,8 @@ import logging
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import pandas as pd
+from nltk.tokenize import word_tokenize
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -31,8 +33,18 @@ def _create_entry(question, answer):
     }
     return entry
 
+def _filter_entry(question, answer, min_length=6, num_answer=1, filter_yes_no=True):
+    bool = False
+    len_question = len(question.split(' '))
+    num_answers = len(answer['labels'])
+    if len_question >=min_length and num_answers == num_answer:
+        bool = True
+        #if filter_yes_no:
+    return bool
+
 
 def _load_dataset(dataroot, name, clean_datasets):
+    #TODO: Filter question with one answer, min_length = 6, yes/no answers, number of images.
     """Load entries
     dataroot: root path of dataset
     name: 'train', 'val', 'trainval', 'minsval'
@@ -103,14 +115,6 @@ def _load_dataset(dataroot, name, clean_datasets):
         entries = []
         for question in questions:
             entries.append(question)
-    elif name == "mteval":
-        entries = []
-        remove_ids = np.load(os.path.join(dataroot, "cache", "coco_test_ids.npy"))
-        remove_ids = [int(x) for x in remove_ids]
-
-        for question, answer in zip(questions, answers):
-            if int(question["image_id"]) in remove_ids:
-                entries.append(_create_entry(question, answer))
     else:
         assert_eq(len(questions), len(answers))
         entries = []
@@ -141,13 +145,19 @@ class VQADataset(Dataset):
             special_tokens,
             max_seq_length=16,  # TODO: look at statistics on the dataset.
             max_region_num=101,
+            filter_entries=False,
+            min_len_questions=6,
+            num_answers=1,
+            filter_yes_no = True,
+            num_images=None
     ):
         super().__init__()
         self.split = split
         ans2label_path = os.path.join(dataroot, "cache", "trainval_ans2label.pkl")
-        label2ans_path = os.path.join(dataroot, "cache", "trainval_label2ans.pkl")
+        #label2ans_path = os.path.join(dataroot, "cache", "trainval_label2ans.pkl")
         self.ans2label = cPickle.load(open(ans2label_path, "rb"))
-        self.label2ans = cPickle.load(open(label2ans_path, "rb"))
+        #self.label2ans = cPickle.load(open(label2ans_path, "rb"))
+        self.label2ans = {v: k for k, v in self.ans2label.items()}
         self.num_labels = len(self.ans2label)
         self._max_region_num = max_region_num
         self._max_seq_length = max_seq_length
@@ -192,6 +202,12 @@ class VQADataset(Dataset):
             self.entries = cPickle.load(open(cache_path, "rb"))
             self.load_true_vocab(vocab_path)
             self.set_traduction_dictionnaries()
+        # filter entries if needed:
+        if filter_entries:
+            self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers, filter_yes_no=filter_yes_no,
+                                num_images=num_images)
+            if self.split == 'train':
+                self.split_entries()
 
     def set_tokenizer_special_tokens(self):
         self.lm_tokenizer.eos_token = '<EOS>'
@@ -244,14 +260,48 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def tokenize(self, max_length=16):
+    def filter_entries(self, min_len_questions=6, num_answers=1, filter_yes_no=True, num_images=100):
+        self.filtered_entries = []
+        yes_idx = vqa_dataset.ans2label["yes"]
+        no_idx = vqa_dataset.ans2label["no"]
+        for entry in self.entries:
+            len_q = len(word_tokenize(entry["question"]))
+            number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
+            if len_q >= min_len_questions and number_of_answers == num_answers:
+                if filter_yes_no:
+                    if entry["answer"]["labels"][0]!= yes_idx and entry["answer"]["labels"][0]!= no_idx:
+                        self.filtered_entries.append(entry)
+                else:
+                    self.filtered_entries.append(entry)
+        if num_images is not None:
+            df = pd.DataFrame.from_records(self.filtered_entries)
+            images_idx = np.sort(df.image_id.unique())
+            self.images_idx  = images_idx[:num_images]
+            self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in images_idx]
+        print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
+
+    def split_entries(self):
+        train_entries, test_entries = [], []
+        for img_idx in self.images_idx:
+            img_entries = [entry for entry in self.filtered_entries if entry["image_id"] == img_idx]
+            if len(img_entries) > 1:
+                test_entries.append(img_entries[-1])
+                img_entries.pop()
+                for l in img_entries:
+                    train_entries.append(l)
+        self.filtered_entries = train_entries
+        self.test_entries = test_entries
+        print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries), len(self.test_entries)))
+
+
+    def tokenize(self, max_length=16): #TODO: put 23 instead.
         """Tokenizes the questions.
         This will add q_token in each entry of the dataset.
         -1 represent nil, and should be treated as padding_index in embedding
         """
         for entry in self.entries:
             tokens = self.lm_tokenizer.encode(
-                entry["question"])  # TODO: use encode from tokenizer, and then convert to token_idx of the true vocab.
+                entry["question"])
             self.build_true_vocab(tokens)
             tokens = tokens[: max_length - 2]  # TODO: understand this max_length - 2.
 
@@ -303,8 +353,12 @@ class VQADataset(Dataset):
                     entry["answer"]["scores"] = None
 
 
-    def __getitem__(self, index):
-        entry = self.entries[index]
+    def __getitem__(self, index, sl=True):
+        if sl:
+            entries = self.entries
+        else:
+            entries = self.filtered_entries
+        entry = entries[index]
         image_id = entry["image_id"]
         question_id = entry["question_id"]
 
@@ -358,11 +412,11 @@ class VQADataset(Dataset):
             input_mask,
             segment_ids,
             co_attention_mask,
-            question_id #TODO: add img_id here ?
+            question_id #TODO: add img_id here and answer_label ?
         )
 
     def __len__(self):
-        return len(self.entries)
+        return len(self.entries) #TODO: replace by train_entries here ?
 
 
 if __name__ == '__main__':
@@ -384,6 +438,9 @@ if __name__ == '__main__':
     vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path, lm_tokenizer=lm_tokenizer,
                              reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True)
 
+    vqa_dataset.filter_entries()
+    vqa_dataset.split_entries()
+    df = pd.DataFrame.from_records(vqa_dataset.filtered_entries)
 
     # test of translate functions:
     lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
