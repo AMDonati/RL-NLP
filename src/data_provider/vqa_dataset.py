@@ -206,8 +206,8 @@ class VQADataset(Dataset):
         if filter_entries:
             self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers, filter_yes_no=filter_yes_no,
                                 num_images=num_images)
-            if self.split == 'train':
-                self.split_entries()
+            #if self.split == 'train':
+            self.split_entries()
 
     def set_tokenizer_special_tokens(self):
         self.lm_tokenizer.eos_token = '<EOS>'
