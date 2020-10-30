@@ -49,7 +49,7 @@ class GenericEnv(gym.Env):
         if diff_reward:
             self.reward_func = Differential(self.reward_func)
 
-    def reset(self):
+    def reset(self, seed):
         pass
 
 
@@ -173,17 +173,46 @@ class VQAEnv(GenericEnv):
         }
         # Loading VQA Dataset.
         num_images = int(self.debug[1]) if self.debug is not None else self.debug
+        if self.mode == "test_images":
+            num_images = None
         lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
-        self.dataset = VQADataset(task="1_gpt", split=mode, dataroot=data_path,
+        modes = {"train": "train", "test_images": "val", "test_text": "train", "minval": "minval"}
+        self.dataset = VQADataset(task="1_gpt", split=modes[self.mode], dataroot=data_path,
                                   image_features_reader=images_feature_reader, lm_tokenizer=lm_tokenizer,
                                   reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True,
                                   max_seq_length=max_seq_length, min_len_questions=min_len_questions,
-                                  num_answers=num_answers, num_images=num_images)
+                                  num_answers=num_answers, num_images=num_images, filter_entries=True)
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
+
+    def reset(self, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
+        self.env_idx = np.random.randint(0, len(entries))
+        (features, spatials, image_mask, q, target, labels, input_mask, seqment_id, co_attention_mask, question_id,
+         image_id) = self.dataset.__getitem__(self.env_idx, sl=False, mode=self.mode)
+        self.entry = entries[self.env_idx]
+        self.ref_question_idx = question_id
+        self.ref_question = q
+        self.ref_question_decoded = self.entry["question"]
+        self.ref_answer = labels
+        self.img_idx = image_id
+        self.img_feats = features
+
+        # initializing the state.
+        state_question = [self.special_tokens.SOS_idx]
+        self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
+                                self.img_feats.unsqueeze(0), self.ref_answer)
+        self.step_idx = 0
+        self.dialog = None
+
+        return self.state
+
+
 
 
 if __name__ == '__main__':
@@ -203,3 +232,11 @@ if __name__ == '__main__':
     vqa_data_path = '../../data/vqa-v2'
     env = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20")
     print(len(env.dataset.vocab_questions))
+    state = env.reset()
+    print("State idx", env.env_idx)
+    print('Img Idx', env.img_idx)
+    print('Question Idx', env.ref_question_idx)
+    print('Ref question', env.ref_question)
+    print("Ref Question decoded", env.ref_question_decoded)
+    print('Ref Answer', env.ref_answer)
+    print("entry", env.entry)

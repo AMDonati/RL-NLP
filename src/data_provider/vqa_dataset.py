@@ -137,7 +137,7 @@ class VQADataset(Dataset):
             special_tokens,
             max_seq_length=16,  # TODO: look at statistics on the dataset.
             max_region_num=101,
-            filter_entries=False,
+            filter_entries=True,
             min_len_questions=6,
             num_answers=1,
             filter_yes_no = True,
@@ -254,8 +254,8 @@ class VQADataset(Dataset):
 
     def filter_entries(self, min_len_questions=6, num_answers=1, filter_yes_no=True, num_images=100):
         self.filtered_entries = []
-        yes_idx = vqa_dataset.ans2label["yes"]
-        no_idx = vqa_dataset.ans2label["no"]
+        yes_idx = self.ans2label["yes"]
+        no_idx = self.ans2label["no"]
         for entry in self.entries:
             len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
@@ -345,11 +345,14 @@ class VQADataset(Dataset):
                     entry["answer"]["scores"] = None
 
 
-    def __getitem__(self, index, sl=True):
+    def __getitem__(self, index, sl=True, mode="train"):
         if sl:
             entries = self.entries
         else:
-            entries = self.filtered_entries
+            if mode == "test_text":
+                entries = self.test_entries
+            else:
+                entries = self.filtered_entries
         entry = entries[index]
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
@@ -394,10 +397,12 @@ class VQADataset(Dataset):
             image_mask,
             question,
             target,
+            labels,
             input_mask,
             segment_ids,
             co_attention_mask,
             question_id,
+            image_id
         )
 
         # return (
@@ -450,7 +455,7 @@ if __name__ == '__main__':
 
 
     # test of get_items:
-    (features, spatials, image_mask, q, target, input_mask, seqment_id, co_attention_mask, question_id) = vqa_dataset.__getitem__(1)
+    (features, spatials, image_mask, q, target, labels, input_mask, seqment_id, co_attention_mask, question_id, image_id) = vqa_dataset.__getitem__(1)
     print(q)
     print(vqa_dataset.idx2word(q.numpy()))
     print(target.shape) #3129 answers.
