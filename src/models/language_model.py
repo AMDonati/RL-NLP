@@ -46,29 +46,3 @@ class GenericLanguageModel(LanguageModel):
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
         return log_probas, logits, origin_log_probs_lm
-
-class BertGeneration(LanguageModel):
-    '''
-    https://huggingface.co/transformers/model_doc/bertgeneration.html
-    From: https://arxiv.org/pdf/1907.12461.pdf
-    '''
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer):
-
-        # ENCODER PART:
-        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
-        model = BertGenerationEncoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                           return_dict=True)
-
-        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-        outputs = model(**inputs)
-        last_hidden_states = outputs.last_hidden_state
-
-        # DECODER PART:
-        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
-        config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
-        config.is_decoder = True
-        model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                           config=config, return_dict=True)
-        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-        outputs = model(**inputs)
-        prediction_logits = outputs.logits

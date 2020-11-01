@@ -8,6 +8,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from vr.utils import load_execution_engine, load_program_generator
+from vilbert.vilbert import VILBertForVLTasks, BertConfig
 
 
 def get_vocab(key, vocab_path):
@@ -119,6 +120,41 @@ class VQAAnswer(Reward):
             _, preds = scores.data.cpu().max(1)
             reward = (preds == real_answer).sum().item()
         return reward, "N/A", preds
+
+class VILBERT(Reward):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None): #TODO: add env here?
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.dataset = dataset
+        self.task_id = 1
+        self.env = env
+        config = BertConfig.from_json_file(path) #TODO: find the json file from vilbert-mt github config folder.
+        self.model = VILBertForVLTasks.from_pretrained(
+            "bert-base-uncased",
+            config=config,
+            num_labels=self.env.dataset.num_labels)
+
+    def get(self, question, ep_questions_decoded):
+        (features, spatials, image_mask, q, target, labels, input_mask, segment_ids, co_attention_mask, question_id,
+         image_id) = self.env.dataset.__getitem__(self.env.env_idx, sl=False, mode=self.env.mode)
+        task_tokens = question.new().resize_(question.size(0), 1).fill_(int(self.task_id[4:])) #TODO: understand this line.
+
+        #TODO: trad question...
+
+        vil_prediction, vil_prediction_gqa, vil_logit, vil_binary_prediction, vil_tri_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, _ = self.model(
+            question,
+            features,
+            spatials,
+            segment_ids,
+            input_mask,
+            image_mask,
+            co_attention_mask,
+            task_tokens
+        )
+
+        # if task_cfg[task_id]["type"] == "VL-classifier":
+        #     loss = task_losses[task_id](vil_prediction, target)
+        #     loss = loss.mean() * target.size(1)
+        #     batch_score = compute_score_with_logits(vil_prediction, target).sum()
 
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu}

@@ -439,7 +439,7 @@ if __name__ == '__main__':
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
     vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path, lm_tokenizer=lm_tokenizer, image_features_reader=images_feature_reader,
-                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=16)
+                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=16, num_images=100)
 
     # test of translate functions:
     lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
