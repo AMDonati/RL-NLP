@@ -10,7 +10,8 @@ from transformers import AutoModelWithLMHead, AutoTokenizer, BertGenerationToken
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
-from envs.clevr_env import ClevrEnv
+from envs.clevr_env import *
+from data_provider._image_features_reader import *
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import compute_write_all_metrics
@@ -63,8 +64,8 @@ def get_parser():
     # model args
     parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-word_emb_size", type=int, default=8, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, default=24, help="dimension of the hidden state")
+    parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
     parser.add_argument('-num_filters', type=int, default=3, help="filters for conv")
@@ -80,6 +81,7 @@ def get_parser():
     parser.add_argument('-policy_path', type=str, default=None,
                         help="if specified, pre-trained model of the policy")
     # RL task args.
+    parser.add_argument("-env", type=str, default="clevr", help="choice of the RL Task. Possible values: clevr or vqa.")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="levenshtein", help="type of reward function")
@@ -151,20 +153,10 @@ def get_pretrained_lm(args, env):
         tokenizer = AutoTokenizer.from_pretrained("gpt2")  # TODO: use a config to change the vocabulary ?
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
                                              tokenizer=tokenizer)
-    elif "bert" == args.lm_path:
-        tokenizer = BertGenerationTokenizer.from_pretrained(
-            'google/bert_for_seq_generation_L-24_bbc_encoder')  # vocab size: 50358
-        tokenizer_2 = BertGenerationTokenizer.from_pretrained("patrickvonplaten/bert2bert-cnn_dailymail-fp16")
-        config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
-        config.is_decoder = True
-        lm_model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                         config=config, return_dict=True)
-        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
-                                             tokenizer=tokenizer)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
-        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset)
+        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.dataset)
 
     return pretrained_lm
 
@@ -208,6 +200,7 @@ def get_output_path(args):
 
 def log_hparams(logger, args):
     logger.info('-' * 20 + 'Experience hparams' + '-' * 20)
+    logger.info('TASK:{}'.format(args.env))
     logger.info('TASK REWARD: {}'.format(args.reward))
     logger.info("Episode Max Length: {}".format(args.max_len))
     logger.info("Number of Images: {}".format(args.debug.split(',')[1]))
@@ -235,6 +228,28 @@ def log_hparams(logger, args):
     logger.info("Number of TRAINING EPISODES: {}".format(args.num_episodes_train))
     logger.info("Number of TEST EPISODES: {}".format(args.num_episodes_test))
 
+def get_rl_env(args):
+    # upload env.
+    if args.env == "clevr":
+        env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
+                       num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+        test_modes = ["test_images", "test_text"] if not args.mask_answers else ["test_images"]
+        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+                              num_questions=args.num_questions, reward_path=args.reward_path,
+                              reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                     for mode in test_modes]
+    elif args.env == "vqa":
+        #env = VQAEnv(data_path=args.data_path, mode="minval", max_seq_length=16, debug="0,20")
+        env = VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode="minval", max_seq_length=16, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+        test_modes = ["test_images", "test_text"]
+        #test_envs = [VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=16, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                       #reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                     #for mode in test_modes]
+        test_envs = [env, env]
+    return env, test_envs
+
 
 def run(args):
     # check consistency hparams
@@ -254,14 +269,8 @@ def run(args):
     log_hparams(logger, args)
 
     # upload env & pretrained lm, policy network.
-    env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
-                   num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                   reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-    test_modes = ["test_images", "test_text"] if not args.mask_answers else ["test_images"]
-    test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
-                          num_questions=args.num_questions, reward_path=args.reward_path,
-                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-                 for mode in test_modes]
+    env, test_envs = get_rl_env(args)
+    #env = VQAEnv(data_path=args.data_path, mode="minval", max_seq_length=16, debug="0,20")
     pretrained_lm = get_pretrained_lm(args, env)
 
     models = {"lstm": PolicyLSTMBatch}

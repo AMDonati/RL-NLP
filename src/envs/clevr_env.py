@@ -49,7 +49,32 @@ class GenericEnv(gym.Env):
         if diff_reward:
             self.reward_func = Differential(self.reward_func)
 
+    def step(self, action):
+        action = torch.tensor(action).view(1, 1)
+        self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
+        done = self.check_if_done(action)
+        question_tokens = self.state.text.numpy().ravel()
+        question = self.dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
+        reward, closest_question, pred_answer = self.reward_func.get(question=question,
+                                                                     ep_questions_decoded=self.ref_questions_decoded,
+                                                                     step_idx=self.step_idx, done=done,
+                                                                     real_answer=self.ref_answer,
+                                                                     state=self.state)
+        self.step_idx += 1
+        return self.state, (reward, closest_question, pred_answer), done, {}
+
+    def check_if_done(self, action):
+        done = False
+        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
+        if is_action_terminal or self.step_idx == (self.max_len - 1):
+            done = True
+        return done
+
+
     def reset(self, seed):
+        pass
+
+    def render(self, mode='human', close=False):
         pass
 
 
@@ -76,27 +101,6 @@ class ClevrEnv(GenericEnv):
         self.num_questions = num_questions
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab, diff_reward=diff_reward)
-
-    def check_if_done(self, action):
-        done = False
-        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
-        if is_action_terminal or self.step_idx == (self.max_len - 1):
-            done = True
-        return done
-
-    def step(self, action):
-        action = torch.tensor(action).view(1, 1)
-        self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
-        done = self.check_if_done(action)
-        question_tokens = self.state.text.numpy().ravel()
-        question = self.dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
-        reward, closest_question, pred_answer = self.reward_func.get(question=question,
-                                                                     ep_questions_decoded=self.ref_questions_decoded,
-                                                                     step_idx=self.step_idx, done=done,
-                                                                     real_answer=self.ref_answer,
-                                                                     state=self.state)
-        self.step_idx += 1
-        return self.state, (reward, closest_question, pred_answer), done, {}
 
     def reset(self, seed=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
@@ -145,9 +149,6 @@ class ClevrEnv(GenericEnv):
             assert reward_true_question == 0, "ERROR IN REWARD FUNCTION"
 
         return self.state
-
-    def render(self, mode='human', close=False):
-        pass
 
 
 class VQAEnv(GenericEnv):
@@ -199,6 +200,7 @@ class VQAEnv(GenericEnv):
         self.ref_question_idx = question_id
         self.ref_question = q
         self.ref_question_decoded = self.entry["question"]
+        self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
         self.img_idx = image_id
         self.img_feats = features
@@ -240,3 +242,11 @@ if __name__ == '__main__':
     print("Ref Question decoded", env.ref_question_decoded)
     print('Ref Answer', env.ref_answer)
     print("entry", env.entry)
+
+    print("checking step function for VQA env...")
+    state, (reward, closest_question, pred_answer), done, _ = env.step(np.array(6))
+    print("state", state)
+    print("state decoded", env.dataset.idx2word(state.text.numpy().ravel()))
+    print("reward", reward)
+    print("closest_question", closest_question)
+    print("pred answer", pred_answer)

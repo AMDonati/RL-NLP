@@ -39,7 +39,7 @@ class Truncation:
     def __init__(self, agent, pretrained_lm=None):
         self.language_model = pretrained_lm
         self.alpha_logits_lm = agent.alpha_logits_lm
-        self.dataset = agent.env.clevr_dataset
+        self.dataset = agent.env.dataset
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def get_valid_actions(self, state, truncation):

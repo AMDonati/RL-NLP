@@ -40,7 +40,7 @@ class Agent:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
         else:
             self.eval_trunc = {"no_trunc": False}
-        p_th_ = p_th if p_th is not None else 1 / self.env.clevr_dataset.len_vocab
+        p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
         if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
                                                          p_th=p_th_, pretrained_lm=pretrained_lm,

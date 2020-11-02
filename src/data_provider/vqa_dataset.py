@@ -36,7 +36,6 @@ def _create_entry(question, answer):
     return entry
 
 def _load_dataset(dataroot, name, clean_datasets):
-    #TODO: Filter question with one answer, min_length = 6, yes/no answers, number of images.
     """Load entries
     dataroot: root path of dataset
     name: 'train', 'val', 'trainval', 'minsval'
@@ -146,9 +145,7 @@ class VQADataset(Dataset):
         super().__init__()
         self.split = split
         ans2label_path = os.path.join(dataroot, "cache", "trainval_ans2label.pkl")
-        #label2ans_path = os.path.join(dataroot, "cache", "trainval_label2ans.pkl")
         self.ans2label = cPickle.load(open(ans2label_path, "rb"))
-        #self.label2ans = cPickle.load(open(label2ans_path, "rb"))
         self.label2ans = {v: k for k, v in self.ans2label.items()}
         self.num_labels = len(self.ans2label)
         self._max_region_num = max_region_num
@@ -195,6 +192,10 @@ class VQADataset(Dataset):
             self.load_true_vocab(vocab_path)
             self.set_traduction_dictionnaries()
         # filter entries if needed:
+        self.len_vocab = len(self.vocab_questions)
+        logger.info("vocab size: {}".format(self.len_vocab))
+        self.len_vocab_answer = len(self.ans2label)
+        logger.info("number of answers: {}".format(self.len_vocab_answer))
         if filter_entries:
             self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers, filter_yes_no=filter_yes_no,
                                 num_images=num_images)
@@ -233,7 +234,7 @@ class VQADataset(Dataset):
         with open(vocab_out_path, 'r') as f:
             self.vocab_questions = json.load(f)
 
-    def idx2word(self, question_idx):
+    def idx2word(self, question_idx, stop_at_end=True):
         lm_question_idx = self.translate_for_lm(question_idx)
         question_decoded = self.lm_tokenizer.decode(lm_question_idx)
         return question_decoded
@@ -279,8 +280,8 @@ class VQADataset(Dataset):
             if len(img_entries) > 1:
                 test_entries.append(img_entries[-1])
                 img_entries.pop()
-                for l in img_entries:
-                    train_entries.append(l)
+            for l in img_entries:
+                train_entries.append(l)
         self.filtered_entries = train_entries
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries), len(self.test_entries)))
@@ -439,7 +440,7 @@ if __name__ == '__main__':
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
     vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path, lm_tokenizer=lm_tokenizer, image_features_reader=images_feature_reader,
-                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=16)
+                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=16, num_images=20)
 
     # test of translate functions:
     lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')

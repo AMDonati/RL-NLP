@@ -26,7 +26,7 @@ class PolicyLSTMBatch(nn.Module):
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
-        self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
+        self.answer_embedding = nn.Embedding(env.dataset.len_vocab_answer, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride
@@ -52,8 +52,9 @@ class PolicyLSTMBatch(nn.Module):
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
         state_answer = state_answer if state_answer is None else state_answer.to(self.device)
-        img_feat = state_img.to(self.device)
-        img_feat_ = F.relu(self.conv(img_feat))
+        img_feat = state_img.to(self.device) # shape (1, 1024, 14, 14) vs (1,101,2048)
+        #img_feat_ = F.relu(self.conv(img_feat)) # shape (1,3,7,7)
+        img_feat_ = img_feat
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
