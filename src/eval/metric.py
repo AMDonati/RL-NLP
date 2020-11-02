@@ -10,7 +10,6 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
-from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 # If modifying these scopes, delete the file token.pickle.
@@ -297,12 +296,13 @@ class PPLMetric(Metric):
     def fill_(self, **kwargs):
         if kwargs["done"]:
             with torch.no_grad():
-                sentence = kwargs["ref_questions_decoded"][0]
-                input_ids = self.language_model.tokenizer.encode(text=sentence, return_tensors="pt")
-                logits, _, _ = self.language_model.forward(input_ids.unsqueeze(dim=1))
-                origin_log_probs_lm = F.log_softmax(logits, dim=-1)
-                log_prob_actions = torch.gather(origin_log_probs_lm, -1, input_ids.unsqueeze(dim=-1))
-                self.measure.extend(log_prob_actions.squeeze())
+                input_ids = kwargs["ref_question"].view(1, -1)
+                # input_ids = self.clevr_dataset.question_tokenizer.encode(text=sentence, return_tensors="pt")
+                _, _, origin_log_probs_lm = self.language_model.forward(input_ids)
+                # origin_log_probs_lm = F.log_softmax(logits, dim=-1)
+                input_ids = input_ids.view(1, origin_log_probs_lm.size(1), - 1)
+                log_prob_actions = torch.gather(origin_log_probs_lm, -1, input_ids)
+                self.measure.extend(log_prob_actions.view(-1))
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
@@ -412,11 +412,11 @@ class TrueWordRankLM(Metric):
 
     def fill_(self, **kwargs):
         true_action = kwargs["action"].numpy().item()
-        true_action_decoded = self.clevr_dataset.question_tokenizer.decode(text=[true_action])
-        true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="gt")
-        # true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
-        sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
-        rank = int((indices.squeeze() == true_lm_action[0]).nonzero().squeeze().numpy())
+        # true_action_decoded = self.clevr_dataset.question_tokenizer.decode(text=[true_action])
+        # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
+        true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
+        sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
+        rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
         self.measure.append(rank)
 
     def compute_(self, **kwargs):

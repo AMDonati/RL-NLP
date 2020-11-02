@@ -25,17 +25,17 @@ class LanguageModel:
 
 
 class ClevrLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
-        LanguageModel.__init__(self, pretrained_lm, clevr_dataset, tokenizer)
+    def __init__(self, pretrained_lm, dataset, tokenizer=None):
+        LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer)
 
     def forward(self, state_text):
         seq_len = state_text.size(1)
         log_probas, logits = self.language_model(state_text.to(self.device))
         logits = logits.view(len(state_text), seq_len, -1)
         logits = logits[:, -1, :]
-        log_probas = log_probas.view(len(state_text), seq_len, -1)
-        log_probas = log_probas[:, -1, :]
-        return log_probas, logits, log_probas
+        last_log_probas = log_probas.view(len(state_text), seq_len, -1)
+        last_log_probas = last_log_probas[:, -1, :]
+        return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
 
 
 class GenericLanguageModel(LanguageModel):
@@ -43,16 +43,18 @@ class GenericLanguageModel(LanguageModel):
         LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=" ")
 
     def forward(self, state_text):
-        text = self.tokenizer.bos_token + " " + self.dataset.question_tokenizer.decode(
-            text=state_text.cpu().numpy().ravel(), stop_at_end=True)
+        text = self.dataset.question_tokenizer.decode(text=state_text.cpu().numpy().ravel(), stop_at_end=True)
+        if text == "":
+            text = self.tokenizer.bos_token
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
-        origin_logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :]
+        origin_logits_lm = self.language_model(input_ids.to(self.device))[0]
         origin_log_probs_lm = F.log_softmax(origin_logits_lm, dim=-1)
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
-        logits[list(self.dataset_to_lm_trad.keys())] = origin_logits_lm[0][list(self.dataset_to_lm_trad.values())]
+        logits[list(self.dataset_to_lm_trad.keys())] = origin_logits_lm[:, -1, :][0][
+            list(self.dataset_to_lm_trad.values())]
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
-        return log_probas, logits, origin_log_probs_lm
+        return log_probas, logits, origin_log_probs_lm.view(input_ids.size(0), input_ids.size(1), -1)
 
 
 class BertGeneration(LanguageModel):
