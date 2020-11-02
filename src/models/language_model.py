@@ -4,18 +4,25 @@ from transformers import BertGenerationConfig, BertGenerationEncoder, BertGenera
 
 
 class LanguageModel:
-    def __init__(self, pretrained_lm, clevr_dataset):
+    def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.tokenizer = tokenizer
         self.language_model = pretrained_lm.to(self.device)
         self.dataset = clevr_dataset
 
     def forward(self, state):
         pass
 
+    def encode(self, **kwargs):
+        return self.tokenizer.encode(**kwargs)
+
+    def decode(self, **kwargs):
+        return self.tokenizer.decode(**kwargs)
+
 
 class ClevrLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
-        LanguageModel.__init__(self, pretrained_lm, clevr_dataset)
+        LanguageModel.__init__(self, pretrained_lm, clevr_dataset, tokenizer)
 
     def forward(self, state_text):
         seq_len = state_text.size(1)
@@ -29,14 +36,13 @@ class ClevrLanguageModel(LanguageModel):
 
 class GenericLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
-        LanguageModel.__init__(self, pretrained_lm, clevr_dataset)
-        self.tokenizer = tokenizer
+        LanguageModel.__init__(self, pretrained_lm, clevr_dataset, tokenizer)
         self.clevr_to_lm_trad = {value: self.tokenizer.encode(" " + key)[0] for
                                  key, value in self.dataset.vocab_questions.items() if
                                  len(self.tokenizer.encode(" " + key)) == 1}
 
     def forward(self, state_text):
-        text = self.tokenizer.bos_token + " " + self.dataset.idx2word(state_text.cpu().numpy().ravel(),
+        text = self.tokenizer.bos_token + " " + self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(),
                                                                       stop_at_end=True)
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
         origin_logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :]

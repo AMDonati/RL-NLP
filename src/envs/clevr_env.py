@@ -65,7 +65,7 @@ class ClevrEnv(gym.Env):
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
         done = self.check_if_done(action)
         question_tokens = self.state.text.numpy().ravel()
-        question = self.clevr_dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
+        question = self.clevr_dataset.question_tokenizer.decode(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
         reward, closest_question, pred_answer = self.reward_func.get(question=question,
                                                                      ep_questions_decoded=self.ref_questions_decoded,
                                                                      step_idx=self.step_idx, done=done,
@@ -102,7 +102,7 @@ class ClevrEnv(gym.Env):
             self.ref_questions = self.ref_questions[self.ref_question_idx:self.ref_question_idx + 1] #TODO: why this is needed ?
             self.ref_answers = self.ref_answers[self.ref_question_idx:self.ref_question_idx + 1]
 
-        self.ref_questions_decoded = [self.clevr_dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
+        self.ref_questions_decoded = [self.clevr_dataset.question_tokenizer.decode(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
         # initializing the state.

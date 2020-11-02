@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+from data_provider.tokenizer import Tokenizer
 from preprocessing.text_functions import decode, encode
 
 
@@ -21,7 +22,9 @@ class CLEVR_Dataset(Dataset):
         self.vocab_answers = self.get_vocab('answer_token_to_idx')
         self.len_vocab = len(self.vocab_questions)
         self.len_vocab_answer = len(self.vocab_answers)
-        self.idx_to_token = self.get_idx_to_token()
+        self.question_tokenizer=Tokenizer(self.vocab_questions)
+        self.answer_tokenizer=Tokenizer(self.vocab_answers)
+
         self.max_samples = max_samples
 
         # load feats in memory.
@@ -167,7 +170,7 @@ if __name__ == '__main__':
     ep_questions = clevr_dataset.get_questions_from_img_idx(int).data.numpy()
     print('questions subset', ep_questions.shape)
     ep_questions = [list(ep_questions[i, :]) for i in range(ep_questions.shape[0])]
-    decoded_questions = [clevr_dataset.idx2word(question, stop_at_end=True) for question in ep_questions]
+    decoded_questions = [clevr_dataset.question_tokenizer.decode(question, stop_at_end=True) for question in ep_questions]
     print('questions decoded :\n{}'.format("\n".join(decoded_questions)))
 
     # ---- test get length -----------------------------------------------------------------------------

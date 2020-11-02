@@ -65,7 +65,7 @@ if __name__ == '__main__':
     ###############################################################################
     input = test_dataset.get_vocab()["<SOS>"]
     input = torch.LongTensor([input]).view(1,1).to(device)
-    input_word = test_dataset.idx2word([input[0].item()], delim='')
+    input_word = test_dataset.question_tokenizer.decode([input[0].item()], delim='')
     for temp in args.temperature:
         logger.info("generating text with temperature: {}".format(temp))
         out_file_generate = os.path.join(args.out_path, 'generate_words_temp_{}.txt'.format(temp, args.seed))
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                     else:
                         word_idx = output.squeeze().argmax()
                     input.fill_(word_idx)
-                    word = test_dataset.idx2word(seq_idx=[word_idx.item()], delim='')
+                    word = test_dataset.question_tokenizer.decode([word_idx.item()], delim='')
                     f.write(word + ('\n' if i % 20 == 19 else ' '))
                     if i % log_interval == 0:
                         print('| Generated {}/{} words'.format(i, args.words))
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     idx_correct = np.where(correct_words != 0)
     correct_words = list(correct_words[list(idx_correct)])
     unique_correct_words = list(set(correct_words))
-    decoded_correct_words = test_dataset.idx2word(unique_correct_words, delim=',')
+    decoded_correct_words = test_dataset.question_tokenizer.decode(unique_correct_words, delim=',')
     logger.info('test accuracy:{}'.format(accuracy))
     logger.info('overconfidence rate for each threshold: {}'.format(over_confidence))
     logger.info('overconfidence rate for correct preds for each threshold: {}'.format(over_confidence_correct))
