@@ -7,7 +7,7 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     model = AutoModelWithLMHead.from_pretrained("gpt2")
     sequence = " <SOS> Hugging Face is based in DUMBO, New York City, and "
-    input_ids = tokenizer.encode(sequence, return_tensors="pt")
+    input_ids = tokenizer.encode(text=sequence, return_tensors="pt")
     # get logits of last hidden state
     next_token_logits = model(input_ids)[0][:, -1, :]
     # filter

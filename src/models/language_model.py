@@ -4,11 +4,15 @@ from transformers import BertGenerationConfig, BertGenerationEncoder, BertGenera
 
 
 class LanguageModel:
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
+    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=""):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = tokenizer
         self.language_model = pretrained_lm.to(self.device)
-        self.dataset = clevr_dataset
+        self.dataset = dataset
+        self.prefix_tokenizer = prefix_tokenizer
+        self.dataset_to_lm_trad = {value: self.tokenizer.encode(text=prefix_tokenizer + key)[0] for
+                                   key, value in self.dataset.vocab_questions.items() if
+                                   len(self.tokenizer.encode(text=prefix_tokenizer + key)) == 1}
 
     def forward(self, state):
         pass
@@ -35,35 +39,33 @@ class ClevrLanguageModel(LanguageModel):
 
 
 class GenericLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
-        LanguageModel.__init__(self, pretrained_lm, clevr_dataset, tokenizer)
-        self.clevr_to_lm_trad = {value: self.tokenizer.encode(" " + key)[0] for
-                                 key, value in self.dataset.vocab_questions.items() if
-                                 len(self.tokenizer.encode(" " + key)) == 1}
+    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" "):
+        LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=" ")
 
     def forward(self, state_text):
-        text = self.tokenizer.bos_token + " " + self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(),
-                                                                      stop_at_end=True)
+        text = self.tokenizer.bos_token + " " + self.dataset.question_tokenizer.decode(
+            text=state_text.cpu().numpy().ravel(), stop_at_end=True)
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
         origin_logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :]
         origin_log_probs_lm = F.log_softmax(origin_logits_lm, dim=-1)
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
-        logits[list(self.clevr_to_lm_trad.keys())] = origin_logits_lm[0][list(self.clevr_to_lm_trad.values())]
+        logits[list(self.dataset_to_lm_trad.keys())] = origin_logits_lm[0][list(self.dataset_to_lm_trad.values())]
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
         return log_probas, logits, origin_log_probs_lm
+
 
 class BertGeneration(LanguageModel):
     '''
     https://huggingface.co/transformers/model_doc/bertgeneration.html
     From: https://arxiv.org/pdf/1907.12461.pdf
     '''
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer):
 
+    def __init__(self, pretrained_lm, clevr_dataset, tokenizer):
         # ENCODER PART:
         tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
         model = BertGenerationEncoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                           return_dict=True)
+                                                      return_dict=True)
 
         inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
         outputs = model(**inputs)
@@ -74,7 +76,7 @@ class BertGeneration(LanguageModel):
         config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
         config.is_decoder = True
         model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                           config=config, return_dict=True)
+                                                      config=config, return_dict=True)
         inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
         outputs = model(**inputs)
         prediction_logits = outputs.logits

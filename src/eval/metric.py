@@ -85,10 +85,12 @@ class VAMetric(Metric):
         Metric.__init__(self, agent, train_test, "valid_actions", "text")
 
     def fill_(self, **kwargs):
-        state_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0], ignored=['<PAD>'])
+        state_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+                                                                     ignored=['<PAD>'])
         string = ""
         if kwargs["valid_actions"] is not None:
-            top_words_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["valid_actions"].cpu().numpy()[0])
+            top_words_decoded = self.clevr_dataset.question_tokenizer.decode(
+                text=kwargs["valid_actions"].cpu().numpy()[0])
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                              zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
@@ -158,13 +160,13 @@ class DialogMetric(Metric):
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            state_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].numpy()[0],
+            state_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
                                                                          ignored=[])
             if self.reward_type == 'vqa':
-                pred_answer_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["pred_answer"].numpy(),
+                pred_answer_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
                                                                                    decode_answers=True)
                 ref_answer_decoded = self.clevr_dataset.question_tokenizer.decode(
-                    [kwargs["ref_answer"].numpy().item()],
+                    text=[kwargs["ref_answer"].numpy().item()],
                     decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"]
                 string = ' IMG {} - question index {}:'.format(kwargs["img_idx"],
@@ -214,13 +216,14 @@ class DialogImageMetric(Metric):
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
                     kwargs["state"].text.cpu().view(-1))
-            state_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].numpy()[0],
+            state_decoded = self.clevr_dataset.question_tokenizer.decode(tex=kwargs["state"].text[:, 1:].numpy()[0],
                                                                          ignored=[])
             if self.env.reward_type == 'vqa':
-                pred_answer_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["pred_answer"].numpy(),
+                pred_answer_decoded = self.clevr_dataset.question_tokenizer.decode(tex=kwargs["pred_answer"].numpy(),
                                                                                    decode_answers=True)
-                ref_answer_decoded = self.clevr_dataset.question_tokenizer.decode([kwargs["ref_answer"].numpy().item()],
-                                                                                  decode_answers=True)
+                ref_answer_decoded = self.clevr_dataset.question_tokenizer.decode(
+                    tex=[kwargs["ref_answer"].numpy().item()],
+                    decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"][0]
 
                 values = [kwargs["img_idx"], kwargs["question_idx"], state_decoded, pred_answer_decoded,
@@ -284,7 +287,7 @@ class DialogImageMetric(Metric):
 
 class PPLMetric(Metric):
     """
-    Compute the ppl of the learning policy on the ref questions.
+    Compute the ppl of the language model on the ref questions.
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
 
@@ -295,8 +298,8 @@ class PPLMetric(Metric):
         if kwargs["done"]:
             with torch.no_grad():
                 sentence = kwargs["ref_questions_decoded"][0]
-                input_ids = self.language_model.tokenizer.encode(sentence, return_tensors="pt")
-                logits, _ = self.language_model.language_model(input_ids)
+                input_ids = self.language_model.tokenizer.encode(text=sentence, return_tensors="pt")
+                logits, _, _ = self.language_model.forward(input_ids.unsqueeze(dim=1))
                 origin_log_probs_lm = F.log_softmax(logits, dim=-1)
                 log_prob_actions = torch.gather(origin_log_probs_lm, -1, input_ids.unsqueeze(dim=-1))
                 self.measure.extend(log_prob_actions.squeeze())
@@ -342,7 +345,7 @@ class BleuMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            question_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+            question_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
                                                                             ignored=["<SOS>"],
                                                                             stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
@@ -409,9 +412,11 @@ class TrueWordRankLM(Metric):
 
     def fill_(self, **kwargs):
         true_action = kwargs["action"].numpy().item()
-        true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
+        true_action_decoded = self.clevr_dataset.question_tokenizer.decode(text=[true_action])
+        true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="gt")
+        # true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
         sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
-        rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
+        rank = int((indices.squeeze() == true_lm_action[0]).nonzero().squeeze().numpy())
         self.measure.append(rank)
 
     def compute_(self, **kwargs):
@@ -454,9 +459,10 @@ class PolicyMetric(Metric):
     def fill_(self, **kwargs):
         # compute top_k_words from the Policy:
         with torch.no_grad():
-            state_decoded = self.clevr_dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0], ignored=[])
+            state_decoded = self.clevr_dataset.question_tokenizer.decode(tex=kwargs["state"].text.numpy()[0],
+                                                                         ignored=[])
             top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, 5, sorted=True)
-            top_words_decoded = self.question_tokenizer.decode(top_k_indices.cpu().numpy()[0])
+            top_words_decoded = self.question_tokenizer.decode(tex=top_k_indices.cpu().numpy()[0])
             # get top_words from the language model:
             seq_len = kwargs["state"].text.size(1)
             log_probas, _ = self.language_model.forward(kwargs["state"].text.to(self.agent.device))
@@ -494,7 +500,7 @@ class LMVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            closest_question = self.question_tokenizer.decode(kwargs["closest_question"].split())
+            closest_question = self.question_tokenizer.decode(tex=kwargs["closest_question"].split())
             if len(closest_question) > self.idx_word:
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
