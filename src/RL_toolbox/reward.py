@@ -122,7 +122,7 @@ class VQAAnswer(Reward):
         return reward, "N/A", preds
 
 class VILBERT(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None, env=None): #TODO: add env here?
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.dataset = dataset
         self.task_id = 1
