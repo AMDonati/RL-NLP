@@ -164,7 +164,8 @@ def get_pretrained_lm(args, env):
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
-        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset)
+        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
+                                           tokenizer=env.clevr_dataset.question_tokenizer)
 
     return pretrained_lm
 
