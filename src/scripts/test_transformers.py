@@ -6,7 +6,7 @@ from torch.nn import functional as F
 if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     model = AutoModelWithLMHead.from_pretrained("gpt2")
-    sequence = f"Hugging Face is based in DUMBO, New York City, and "
+    sequence = " <SOS> Hugging Face is based in DUMBO, New York City, and "
     input_ids = tokenizer.encode(sequence, return_tensors="pt")
     # get logits of last hidden state
     next_token_logits = model(input_ids)[0][:, -1, :]
@@ -19,3 +19,5 @@ if __name__ == '__main__':
     resulting_string = tokenizer.decode(generated.tolist()[0])
     print("next_token: {}".format(tokenizer.decoder[int(next_token.numpy())]) )
     print(resulting_string)
+    ids=model.generate()
+    print(tokenizer.decode(ids))

@@ -10,9 +10,12 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
+from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
 
 # If modifying these scopes, delete the file token.pickle.
+from transformers import top_k_top_p_filtering
+
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 
@@ -286,13 +289,17 @@ class PPLMetric(Metric):
     """
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "scalar", "ppl")
+        Metric.__init__(self, agent, train_test, "ppl", "scalar")
 
     def fill_(self, **kwargs):
-        with torch.no_grad():
-            true_action = kwargs["ref_question"][:, kwargs["timestep"]]
-            prob = kwargs["dist"].probs[:, true_action].squeeze()
-            self.measure.append(torch.log(prob))
+        if kwargs["done"]:
+            with torch.no_grad():
+                sentence = kwargs["ref_questions_decoded"][0]
+                input_ids = self.language_model.tokenizer.encode(sentence, return_tensors="pt")
+                logits, _ = self.language_model.language_model(input_ids)
+                origin_log_probs_lm = F.log_softmax(logits, dim=-1)
+                log_prob_actions = torch.gather(origin_log_probs_lm, -1, input_ids.unsqueeze(dim=-1))
+                self.measure.extend(log_prob_actions.squeeze())
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
@@ -310,10 +317,9 @@ class PPLDialogfromLM(Metric):
             self.measure.append(kwargs["log_probas_lm"][:, kwargs["action"]])
 
     def compute_(self, **kwargs):
-        ppl = 0
         if len(self.measure) > 0:
             ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-        self.metric.append(ppl)
+            self.metric.append(ppl)
 
 
 class Return(Metric):
@@ -396,11 +402,12 @@ class TrueWordRankLM(Metric):
     """
     Compute the rank of the true word in the original lm logits
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test, "true_word_rank", "scalar")
 
     def fill_(self, **kwargs):
-        true_action = int(kwargs["ref_question"][:, kwargs["timestep"]].squeeze().cpu().numpy())
+        true_action = kwargs["action"].numpy().item()
         true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
         sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
         rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
