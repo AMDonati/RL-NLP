@@ -63,7 +63,7 @@ class BertGeneration(LanguageModel):
     From: https://arxiv.org/pdf/1907.12461.pdf
     '''
 
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer):
+    def __init__(self, pretrained_lm, dataset, tokenizer):
         # ENCODER PART:
         tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
         model = BertGenerationEncoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',

@@ -13,6 +13,8 @@ import torch
 from torch.utils.data import Dataset
 import pandas as pd
 from nltk.tokenize import word_tokenize
+import random
+from data_provider._image_features_reader import ImageFeaturesH5Reader
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -32,16 +34,6 @@ def _create_entry(question, answer):
         "answer": answer,
     }
     return entry
-
-def _filter_entry(question, answer, min_length=6, num_answer=1, filter_yes_no=True):
-    bool = False
-    len_question = len(question.split(' '))
-    num_answers = len(answer['labels'])
-    if len_question >=min_length and num_answers == num_answer:
-        bool = True
-        #if filter_yes_no:
-    return bool
-
 
 def _load_dataset(dataroot, name, clean_datasets):
     #TODO: Filter question with one answer, min_length = 6, yes/no answers, number of images.
@@ -138,14 +130,14 @@ class VQADataset(Dataset):
             task,  # TODO: remove this.
             dataroot,
             split,
-            # image_features_reader, #TODO: import image_features_reader from vilbert.
+            image_features_reader,
             lm_tokenizer,
             reward_tokenizer,
             clean_datasets,
             special_tokens,
             max_seq_length=16,  # TODO: look at statistics on the dataset.
             max_region_num=101,
-            filter_entries=False,
+            filter_entries=True,
             min_len_questions=6,
             num_answers=1,
             filter_yes_no = True,
@@ -161,7 +153,7 @@ class VQADataset(Dataset):
         self.num_labels = len(self.ans2label)
         self._max_region_num = max_region_num
         self._max_seq_length = max_seq_length
-        # self._image_features_reader = image_features_reader
+        self._image_features_reader = image_features_reader
         self.lm_tokenizer = lm_tokenizer
         self.reward_tokenizer = reward_tokenizer
         self.special_tokens = special_tokens
@@ -228,18 +220,18 @@ class VQADataset(Dataset):
 
     def save_true_vocab(self, vocab_out_path):
         vocab = dict(zip(self.true_vocab.keys(), range(len(self.true_vocab))))  # TODO: add EOS, UNK, SOS, PAD TOKENS.
-        self.vocab = vocab
+        self.vocab_questions = vocab
         with open(vocab_out_path, 'w') as f:
-            json.dump(self.vocab, f)
+            json.dump(self.vocab_questions, f)
 
     def set_traduction_dictionnaries(self):
-        self.dataset_to_lm_trad = {val: self.lm_tokenizer.encoder[key] for key, val in self.vocab.items() if
+        self.dataset_to_lm_trad = {val: self.lm_tokenizer.encoder[key] for key, val in self.vocab_questions.items() if
                                    key in self.lm_tokenizer.encoder.keys()}
         self.lm_to_dataset_trad = {v: k for k, v in self.dataset_to_lm_trad.items()}
 
     def load_true_vocab(self, vocab_out_path):
         with open(vocab_out_path, 'r') as f:
-            self.vocab = json.load(f)
+            self.vocab_questions = json.load(f)
 
     def idx2word(self, question_idx):
         lm_question_idx = self.translate_for_lm(question_idx)
@@ -262,8 +254,8 @@ class VQADataset(Dataset):
 
     def filter_entries(self, min_len_questions=6, num_answers=1, filter_yes_no=True, num_images=100):
         self.filtered_entries = []
-        yes_idx = vqa_dataset.ans2label["yes"]
-        no_idx = vqa_dataset.ans2label["no"]
+        yes_idx = self.ans2label["yes"]
+        no_idx = self.ans2label["no"]
         for entry in self.entries:
             len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
@@ -353,32 +345,37 @@ class VQADataset(Dataset):
                     entry["answer"]["scores"] = None
 
 
-    def __getitem__(self, index, sl=True):
+    def __getitem__(self, index, sl=True, mode="train"):
         if sl:
             entries = self.entries
         else:
-            entries = self.filtered_entries
+            if mode == "test_text":
+                entries = self.test_entries
+            else:
+                entries = self.filtered_entries
         entry = entries[index]
         image_id = entry["image_id"]
+        if len(self.entries) > len(self._image_features_reader) - 1:
+            image_id = int(random.choice(self._image_features_reader._image_ids))
         question_id = entry["question_id"]
 
         '''comment img part for now.'''
-        # features, num_boxes, boxes, _ = self._image_features_reader[image_id]
+        features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
-        # mix_num_boxes = min(int(num_boxes), self._max_region_num)
-        # mix_boxes_pad = np.zeros((self._max_region_num, 5))
-        # mix_features_pad = np.zeros((self._max_region_num, 2048))
+        mix_num_boxes = min(int(num_boxes), self._max_region_num)
+        mix_boxes_pad = np.zeros((self._max_region_num, 5))
+        mix_features_pad = np.zeros((self._max_region_num, 2048))
 
-        # image_mask = [1] * (int(mix_num_boxes))
-        # while len(image_mask) < self._max_region_num:
-        # image_mask.append(0)
+        image_mask = [1] * (int(mix_num_boxes))
+        while len(image_mask) < self._max_region_num:
+            image_mask.append(0)
 
-        # mix_boxes_pad[:mix_num_boxes] = boxes[:mix_num_boxes]
-        # mix_features_pad[:mix_num_boxes] = features[:mix_num_boxes]
+        mix_boxes_pad[:mix_num_boxes] = boxes[:mix_num_boxes]
+        mix_features_pad[:mix_num_boxes] = features[:mix_num_boxes]
 
-        # features = torch.tensor(mix_features_pad).float()
-        # image_mask = torch.tensor(image_mask).long()
-        # spatials = torch.tensor(mix_boxes_pad).float()
+        features = torch.tensor(mix_features_pad).float()
+        image_mask = torch.tensor(image_mask).long()
+        spatials = torch.tensor(mix_boxes_pad).float()
 
         question = entry["q_token"]
         input_mask = entry["q_input_mask"]
@@ -394,26 +391,28 @@ class VQADataset(Dataset):
             if labels is not None:
                 target.scatter_(0, labels, scores)
 
+        return (
+            features,
+            spatials,
+            image_mask,
+            question,
+            target,
+            labels,
+            input_mask,
+            segment_ids,
+            co_attention_mask,
+            question_id,
+            image_id
+        )
+
         # return (
-        #     features,
-        #     spatials,
-        #     image_mask,
         #     question,
         #     target,
         #     input_mask,
         #     segment_ids,
         #     co_attention_mask,
-        #     question_id,
+        #     question_id #TODO: add img_id here and answer_label ?
         # )
-
-        return (
-            question,
-            target,
-            input_mask,
-            segment_ids,
-            co_attention_mask,
-            question_id #TODO: add img_id here and answer_label ?
-        )
 
     def __len__(self):
         return len(self.entries) #TODO: replace by train_entries here ?
@@ -435,12 +434,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-    vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path, lm_tokenizer=lm_tokenizer,
-                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True)
 
-    vqa_dataset.filter_entries()
-    vqa_dataset.split_entries()
-    df = pd.DataFrame.from_records(vqa_dataset.filtered_entries)
+    features_h5path = "../../data/vqa-v2/reduced_coco_train.lmdb"
+    images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+
+    vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path, lm_tokenizer=lm_tokenizer, image_features_reader=images_feature_reader,
+                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=16, num_images=100)
 
     # test of translate functions:
     lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
@@ -454,7 +453,9 @@ if __name__ == '__main__':
     print('decoded question', vqa_dataset.idx2word(entry['q_token'].numpy()))
     print('question', entry["question"])
 
-    (q, target, input_mask, seqment_id, co_attention_mask, question_id) = vqa_dataset.__getitem__(1)
+
+    # test of get_items:
+    (features, spatials, image_mask, q, target, labels, input_mask, seqment_id, co_attention_mask, question_id, image_id) = vqa_dataset.__getitem__(1)
     print(q)
     print(vqa_dataset.idx2word(q.numpy()))
     print(target.shape) #3129 answers.

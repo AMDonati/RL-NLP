@@ -149,7 +149,7 @@ def get_pretrained_lm(args, env):
     if "gpt" == args.lm_path:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")  # TODO: use a config to change the vocabulary ?
-        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.clevr_dataset,
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                              tokenizer=tokenizer)
     elif "bert" == args.lm_path:
         tokenizer = BertGenerationTokenizer.from_pretrained(
@@ -159,13 +159,13 @@ def get_pretrained_lm(args, env):
         config.is_decoder = True
         lm_model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
                                                          config=config, return_dict=True)
-        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.clevr_dataset,
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                              tokenizer=tokenizer)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
-        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.clevr_dataset,
-                                           tokenizer=env.clevr_dataset.question_tokenizer)
+        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
+                                           tokenizer=env.dataset.question_tokenizer)
 
     return pretrained_lm
 
@@ -268,7 +268,7 @@ def run(args):
     models = {"lstm": PolicyLSTMBatch}
     # creating the policy model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy = models[args.model](env.clevr_dataset.len_vocab, args.word_emb_size, args.hidden_size,
+    policy = models[args.model](env.dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters,
                                 fusion=args.fusion, env=env,

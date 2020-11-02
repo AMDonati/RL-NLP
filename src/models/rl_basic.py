@@ -26,7 +26,7 @@ class PolicyLSTMBatch(nn.Module):
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
-        self.answer_embedding = nn.Embedding(env.clevr_dataset.len_vocab_answer, word_emb_size)
+        self.answer_embedding = nn.Embedding(env.dataset.len_vocab_answer, word_emb_size)
         self.fusion = fusion
         self.num_filters = word_emb_size if num_filters is None else num_filters
         self.stride = stride

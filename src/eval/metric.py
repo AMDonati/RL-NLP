@@ -25,7 +25,7 @@ class Metric:
         self.idx_step = 0
         self.idx_word = 0
         self.idx_write = 1
-        self.clevr_dataset = agent.env.clevr_dataset
+        self.dataset = agent.env.dataset
         self.out_path = agent.out_path
         self.writer = agent.writer
         self.language_model = agent.truncation.language_model
@@ -84,11 +84,11 @@ class VAMetric(Metric):
         Metric.__init__(self, agent, train_test, "valid_actions", "text")
 
     def fill_(self, **kwargs):
-        state_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+        state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
                                                                      ignored=['<PAD>'])
         string = ""
         if kwargs["valid_actions"] is not None:
-            top_words_decoded = self.clevr_dataset.question_tokenizer.decode(
+            top_words_decoded = self.dataset.question_tokenizer.decode(
                 text=kwargs["valid_actions"].cpu().numpy()[0])
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                              zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().numpy()[0])]
@@ -159,12 +159,12 @@ class DialogMetric(Metric):
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            state_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
+            state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
                                                                          ignored=[])
             if self.reward_type == 'vqa':
-                pred_answer_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
+                pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
                                                                                    decode_answers=True)
-                ref_answer_decoded = self.clevr_dataset.question_tokenizer.decode(
+                ref_answer_decoded = self.dataset.question_tokenizer.decode(
                     text=[kwargs["ref_answer"].numpy().item()],
                     decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"]
@@ -215,12 +215,12 @@ class DialogImageMetric(Metric):
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
                     kwargs["state"].text.cpu().view(-1))
-            state_decoded = self.clevr_dataset.question_tokenizer.decode(tex=kwargs["state"].text[:, 1:].numpy()[0],
+            state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text[:, 1:].numpy()[0],
                                                                          ignored=[])
             if self.env.reward_type == 'vqa':
-                pred_answer_decoded = self.clevr_dataset.question_tokenizer.decode(tex=kwargs["pred_answer"].numpy(),
+                pred_answer_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["pred_answer"].numpy(),
                                                                                    decode_answers=True)
-                ref_answer_decoded = self.clevr_dataset.question_tokenizer.decode(
+                ref_answer_decoded = self.dataset.question_tokenizer.decode(
                     tex=[kwargs["ref_answer"].numpy().item()],
                     decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"][0]
@@ -297,7 +297,7 @@ class PPLMetric(Metric):
         if kwargs["done"]:
             with torch.no_grad():
                 input_ids = kwargs["ref_question"].view(1, -1)
-                # input_ids = self.clevr_dataset.question_tokenizer.encode(text=sentence, return_tensors="pt")
+                # input_ids = self.dataset.question_tokenizer.encode(text=sentence, return_tensors="pt")
                 _, _, origin_log_probs_lm = self.language_model.forward(input_ids)
                 # origin_log_probs_lm = F.log_softmax(logits, dim=-1)
                 input_ids = input_ids.view(1, origin_log_probs_lm.size(1), - 1)
@@ -345,7 +345,7 @@ class BleuMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            question_decoded = self.clevr_dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+            question_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
                                                                             ignored=["<SOS>"],
                                                                             stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
@@ -412,7 +412,7 @@ class TrueWordRankLM(Metric):
 
     def fill_(self, **kwargs):
         true_action = kwargs["action"].numpy().item()
-        # true_action_decoded = self.clevr_dataset.question_tokenizer.decode(text=[true_action])
+        # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
         # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
         true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
         sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
@@ -459,7 +459,7 @@ class PolicyMetric(Metric):
     def fill_(self, **kwargs):
         # compute top_k_words from the Policy:
         with torch.no_grad():
-            state_decoded = self.clevr_dataset.question_tokenizer.decode(tex=kwargs["state"].text.numpy()[0],
+            state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text.numpy()[0],
                                                                          ignored=[])
             top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, 5, sorted=True)
             top_words_decoded = self.question_tokenizer.decode(tex=top_k_indices.cpu().numpy()[0])
