@@ -1,0 +1,30 @@
+import torch
+
+
+class VQATokenizer:
+    def __init__(self, lm_tokenizer, special_tokens):
+        self.allow_unk = True
+        self.lm_tokenizer = lm_tokenizer
+        self.special_tokens = special_tokens
+
+    def decode(self, question_idx):
+        lm_question_idx = self.translate_for_lm(question_idx)
+        question_decoded = self.lm_tokenizer.decode(lm_question_idx)
+        return question_decoded
+
+    def encode(self, question):
+        lm_question_idx = self.lm_tokenizer.encode(question)
+        question_idx = [self.lm_to_dataset_trad[idx] for idx in lm_question_idx]
+        return question_idx
+
+    def translate_for_lm(self, question_idx):
+        lm_question_idx = [self.dataset_to_lm_trad[idx] for idx in question_idx if idx not in self.special_tokens.values()]  # question_idx should not include special tokens.
+        return lm_question_idx
+
+    def set_vocab(self, vocab):
+        self.vocab = vocab
+        self.idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
+        self.dataset_to_lm_trad = {val: self.lm_tokenizer.encoder[key] for key, val in self.vocab.items() if
+                                   key in self.lm_tokenizer.encoder.keys()}
+        self.lm_to_dataset_trad = {v: k for k, v in self.dataset_to_lm_trad.items()}
+
