@@ -13,6 +13,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
 
 # If modifying these scopes, delete the file token.pickle.
+
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 
@@ -28,6 +29,7 @@ class Metric:
         self.out_path = agent.out_path
         self.writer = agent.writer
         self.language_model = agent.truncation.language_model
+        self.policy = agent.policy
         self.reward_type = agent.env.reward_type
         self.type = type
         self.key = key
@@ -83,10 +85,14 @@ class VAMetric(Metric):
         Metric.__init__(self, agent, train_test, "valid_actions", "text")
 
     def fill_(self, **kwargs):
+        state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+                                                               ignored=['<PAD>'])
         state_decoded = self.dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=['<PAD>'])
         string = ""
         if kwargs["valid_actions"] is not None:
             top_words_decoded = [self.dataset.idx2word([va]) for va in kwargs["valid_actions"].cpu().numpy()[0]]
+            top_words_decoded = self.dataset.question_tokenizer.decode(
+                text=kwargs["valid_actions"].cpu().numpy()[0])
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                              zip(top_words_decoded, kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
@@ -156,13 +162,14 @@ class DialogMetric(Metric):
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            state_decoded = self.dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
-                                                  ignored=[])
+            state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
+                                                                   ignored=[])
             if self.reward_type == 'vqa':
-                pred_answer_decoded = self.dataset.idx2word(kwargs["pred_answer"].numpy(),
-                                                            decode_answers=True)
-                ref_answer_decoded = self.dataset.idx2word([kwargs["ref_answer"].numpy().item()],
-                                                           decode_answers=True)
+                pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
+                                                                             decode_answers=True)
+                ref_answer_decoded = self.dataset.question_tokenizer.decode(
+                    text=[kwargs["ref_answer"].numpy().item()],
+                    decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"]
                 string = ' IMG {} - question index {}:'.format(kwargs["img_idx"],
                                                                kwargs["question_idx"]) \
@@ -211,13 +218,14 @@ class DialogImageMetric(Metric):
             else:
                 self.generated_dialog[self.train_test + '_' + self.key].append(
                     kwargs["state"].text.cpu().view(-1))
-            state_decoded = self.dataset.idx2word(kwargs["state"].text[:, 1:].numpy()[0],
-                                                  ignored=[])
+            state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text[:, 1:].numpy()[0],
+                                                                   ignored=[])
             if self.env.reward_type == 'vqa':
-                pred_answer_decoded = self.dataset.idx2word(kwargs["pred_answer"].numpy(),
-                                                            decode_answers=True)
-                ref_answer_decoded = self.dataset.idx2word([kwargs["ref_answer"].numpy().item()],
-                                                           decode_answers=True)
+                pred_answer_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["pred_answer"].numpy(),
+                                                                             decode_answers=True)
+                ref_answer_decoded = self.dataset.question_tokenizer.decode(
+                    tex=[kwargs["ref_answer"].numpy().item()],
+                    decode_answers=True)
                 ref_question_decoded = kwargs["ref_questions_decoded"][0]
 
                 values = [kwargs["img_idx"], kwargs["question_idx"], state_decoded, pred_answer_decoded,
@@ -289,10 +297,15 @@ class PPLMetric(Metric):
         Metric.__init__(self, agent, train_test, "ppl", "scalar")
 
     def fill_(self, **kwargs):
-        with torch.no_grad():
-            true_action = kwargs["ref_question"][:, kwargs["timestep"]]
-            prob = kwargs["dist"].probs[:, true_action].squeeze()
-            self.measure.append(torch.log(prob))
+        if kwargs["done"]:
+            with torch.no_grad():
+                input_ids = kwargs["ref_question"].view(1, -1)
+                state = kwargs["state"]
+                # getting the probs for the complete policy
+                policy_dist, _, _ = self.policy(state.text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
+                                                alpha=kwargs["alpha"])
+                log_prob_actions = torch.gather(policy_dist.probs, -1, input_ids)
+                self.measure.extend(log_prob_actions.view(-1))
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
@@ -310,13 +323,12 @@ class PPLDialogfromLM(Metric):
             self.measure.append(kwargs["log_probas_lm"][:, kwargs["action"]])
 
     def compute_(self, **kwargs):
-        ppl = 0
         if len(self.measure) > 0:
             ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-        self.metric.append(ppl)
+            self.metric.append(ppl)
 
 
-class Return(Metric): #TODO: normalized return for levenshtein.
+class Return(Metric):
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test, "return", "scalar")
 
@@ -336,8 +348,9 @@ class BleuMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            question_decoded = self.dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=["<SOS>"],
-                                                     stop_at_end=True)
+            question_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+                                                                      ignored=["<SOS>"],
+                                                                      stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
             ref_questions = [q.split() for q in ref_questions]
             question_tokens = question_decoded.split()
@@ -396,22 +409,21 @@ class TrueWordRankLM(Metric):
     """
     Compute the rank of the true word in the original lm logits
     """
+
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test, "true_word_rank", "scalar")
 
     def fill_(self, **kwargs):
-        if self.language_model.name == "generic":
-            true_action = int(kwargs["ref_question"][:, kwargs["timestep"]].squeeze().cpu().numpy())
-            true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
-            sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
-            rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
-            self.measure.append(rank)
-        else:
-            pass
+        true_action = kwargs["action"].numpy().item()
+        # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
+        # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
+        true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
+        sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
+        rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
+        self.measure.append(rank)
 
     def compute_(self, **kwargs):
-        if self.language_model.name == "generic":
-            self.metric.extend(self.measure)
+        self.metric.extend(self.measure)
 
 
 class UniqueWordsMetric(Metric):
@@ -450,9 +462,10 @@ class PolicyMetric(Metric):
     def fill_(self, **kwargs):
         # compute top_k_words from the Policy:
         with torch.no_grad():
-            state_decoded = self.dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=[])
+            state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text.numpy()[0],
+                                                                   ignored=[])
             top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, 5, sorted=True)
-            top_words_decoded = self.dataset.idx2word(top_k_indices.cpu().numpy()[0])
+            top_words_decoded = self.question_tokenizer.decode(tex=top_k_indices.cpu().numpy()[0])
             # get top_words from the language model:
             seq_len = kwargs["state"].text.size(1)
             log_probas, _ = self.language_model.forward(kwargs["state"].text.to(self.agent.device))
@@ -490,7 +503,7 @@ class LMVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            closest_question = self.dataset.word2idx(kwargs["closest_question"].split())
+            closest_question = self.question_tokenizer.decode(tex=kwargs["closest_question"].split())
             if len(closest_question) > self.idx_word:
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1

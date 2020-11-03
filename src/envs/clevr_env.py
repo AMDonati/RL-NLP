@@ -127,11 +127,10 @@ class ClevrEnv(GenericEnv):
         self.ref_answer = self.ref_answers[self.ref_question_idx]
 
         if self.condition_answer != "none":
-            self.ref_questions = self.ref_questions[
-                                 self.ref_question_idx:self.ref_question_idx + 1]  # TODO: why this is needed ?
+            self.ref_questions = self.ref_questions[self.ref_question_idx:self.ref_question_idx + 1] #TODO: why this is needed ?
             self.ref_answers = self.ref_answers[self.ref_question_idx:self.ref_question_idx + 1]
 
-        self.ref_questions_decoded = [self.dataset.idx2word(question, ignored=['<SOS>', '<PAD>'])
+        self.ref_questions_decoded = [self.dataset.question_tokenizer.decode(text=question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
         # initializing the state.

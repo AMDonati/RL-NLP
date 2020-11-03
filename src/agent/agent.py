@@ -167,7 +167,8 @@ class Agent:
                             closest_question=closest_question, new_state=new_state, log_probs=log_probs,
                             log_probs_truncated=log_probs_truncated, test_mode=test_mode, pred_answer=pred_answer,
                             i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm,
-                            log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm)
+                            log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm,
+                            alpha=self.alpha_logits_lm)
             state = new_state
             ep_reward += reward
 
@@ -230,7 +231,8 @@ class Agent:
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
         logging.info('Last reward: {:.2f}'.format(ep_reward))
-        logging.info('LAST DIALOG: {}'.format(self.env.dataset.idx2word(state.text[:, 1:].numpy()[0])))
+        logging.info('LAST DIALOG: {}'.format(
+            self.env.dataset.question_tokenizer.decode(text=state.text[:, 1:].numpy()[0])))
         logging.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.train_metrics.items():
             metric.log(valid_actions=valid_actions)

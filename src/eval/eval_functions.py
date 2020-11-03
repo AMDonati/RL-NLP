@@ -21,8 +21,8 @@ def generate_top_k_words(model, test_dataset, device, seq_len, samples, k):
     for index in range(len(samples)):
         input_idx = list(test_sample[index, :].data.numpy())
         top_k_idx = list(top_i[index, :])
-        top_k_tokens = test_dataset.idx2word(seq_idx=top_k_idx, delim=',')
-        input_tokens = test_dataset.idx2word(seq_idx=input_idx, delim=' ')
+        top_k_tokens = test_dataset.question_tokenizer.decode(seq_idx=top_k_idx, delim=',')
+        input_tokens = test_dataset.question_tokenizer.decode(seq_idx=input_idx, delim=' ')
         list_top_words.append(top_k_tokens)
         decoded_input_text.append(input_tokens)
     dict_top_words = dict(zip(decoded_input_text, list_top_words))

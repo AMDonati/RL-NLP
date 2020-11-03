@@ -75,7 +75,7 @@ if __name__ == '__main__':
     for index in indexes:
         img_feats = test_dataset.get_feats_from_img_idx(index).unsqueeze(0)
         input = torch.LongTensor([SOS_idx]).view(1,1).to(device)
-        input_word = test_dataset.idx2word([input[0].item()], delim='')
+        input_word = test_dataset.question_tokenizer.decode([input[0].item()], delim='')
         for temp in args.temperature:
             logger.info("generating text with temperature: {}".format(temp))
             out_file_generate = os.path.join(args.out_path, 'generate_words_temp_{}_img_{}.txt'.format(temp, index))
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                         else:
                             word_idx = output.squeeze().argmax()
                         input.fill_(word_idx)
-                        word = test_dataset.idx2word(seq_idx=[word_idx.item()], delim='')
+                        word = test_dataset.question_tokenizer.decode(seq_idx=[word_idx.item()], delim='')
                         f.write(word + ('\n' if i % 20 == 19 else ' '))
                         if i % log_interval == 0:
                             print('| Generated {}/{} words'.format(i, args.words))
