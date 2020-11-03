@@ -29,6 +29,7 @@ class Metric:
         self.out_path = agent.out_path
         self.writer = agent.writer
         self.language_model = agent.truncation.language_model
+        self.policy = agent.policy
         self.reward_type = agent.env.reward_type
         self.type = type
         self.key = key
@@ -85,7 +86,7 @@ class VAMetric(Metric):
 
     def fill_(self, **kwargs):
         state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
-                                                                     ignored=['<PAD>'])
+                                                               ignored=['<PAD>'])
         string = ""
         if kwargs["valid_actions"] is not None:
             top_words_decoded = self.dataset.question_tokenizer.decode(
@@ -160,10 +161,10 @@ class DialogMetric(Metric):
     def compute_(self, **kwargs):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
-                                                                         ignored=[])
+                                                                   ignored=[])
             if self.reward_type == 'vqa':
                 pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
-                                                                                   decode_answers=True)
+                                                                             decode_answers=True)
                 ref_answer_decoded = self.dataset.question_tokenizer.decode(
                     text=[kwargs["ref_answer"].numpy().item()],
                     decode_answers=True)
@@ -216,10 +217,10 @@ class DialogImageMetric(Metric):
                 self.generated_dialog[self.train_test + '_' + self.key].append(
                     kwargs["state"].text.cpu().view(-1))
             state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text[:, 1:].numpy()[0],
-                                                                         ignored=[])
+                                                                   ignored=[])
             if self.env.reward_type == 'vqa':
                 pred_answer_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["pred_answer"].numpy(),
-                                                                                   decode_answers=True)
+                                                                             decode_answers=True)
                 ref_answer_decoded = self.dataset.question_tokenizer.decode(
                     tex=[kwargs["ref_answer"].numpy().item()],
                     decode_answers=True)
@@ -286,7 +287,7 @@ class DialogImageMetric(Metric):
 
 class PPLMetric(Metric):
     """
-    Compute the ppl of the language model on the ref questions.
+    Compute the ppl of the learning policy on the ref questions.
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
 
@@ -297,11 +298,11 @@ class PPLMetric(Metric):
         if kwargs["done"]:
             with torch.no_grad():
                 input_ids = kwargs["ref_question"].view(1, -1)
-                # input_ids = self.dataset.question_tokenizer.encode(text=sentence, return_tensors="pt")
-                _, _, origin_log_probs_lm = self.language_model.forward(input_ids)
-                # origin_log_probs_lm = F.log_softmax(logits, dim=-1)
-                input_ids = input_ids.view(1, origin_log_probs_lm.size(1), - 1)
-                log_prob_actions = torch.gather(origin_log_probs_lm, -1, input_ids)
+                state = kwargs["state"]
+                # getting the probs for the complete policy
+                policy_dist, _, _ = self.policy(state.text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
+                                                alpha=kwargs["alpha"])
+                log_prob_actions = torch.gather(policy_dist.probs, -1, input_ids)
                 self.measure.extend(log_prob_actions.view(-1))
 
     def compute_(self, **kwargs):
@@ -346,8 +347,8 @@ class BleuMetric(Metric):
     def fill_(self, **kwargs):
         if kwargs["done"]:
             question_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
-                                                                            ignored=["<SOS>"],
-                                                                            stop_at_end=True)
+                                                                      ignored=["<SOS>"],
+                                                                      stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
             ref_questions = [q.split() for q in ref_questions]
             question_tokens = question_decoded.split()
@@ -460,7 +461,7 @@ class PolicyMetric(Metric):
         # compute top_k_words from the Policy:
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text.numpy()[0],
-                                                                         ignored=[])
+                                                                   ignored=[])
             top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, 5, sorted=True)
             top_words_decoded = self.question_tokenizer.decode(tex=top_k_indices.cpu().numpy()[0])
             # get top_words from the language model:
