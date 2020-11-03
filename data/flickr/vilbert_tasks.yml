@@ -1,3 +1,22 @@
+TASK1:
+  name: VQA
+  type: VL-classifier
+  loss: BCEWithLogitLoss
+  process: normal
+  task_id: 1
+  dataroot: data/vqa-v2/
+  features_h5path1: data/vqa-v2/reduced_coco_train.lmdb
+  features_h5path2: ''
+  train_annotations_jsonpath: ''
+  val_annotations_jsonpath: ''
+  max_seq_length: 23
+  max_region_num: 101
+  batch_size: 128
+  eval_batch_size: 1024
+  train_split: trainval
+  val_split: minval
+  lr: 0.00004
+  num_epoch: 20
 TASK8:
   name: RetrievalFlickr30k
   type: VL-logit
