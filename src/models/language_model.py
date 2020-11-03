@@ -1,7 +1,5 @@
-import torch
 import torch.nn.functional as F
-from transformers import BertGenerationConfig, BertGenerationEncoder, BertGenerationDecoder, BertGenerationTokenizer
-
+import torch
 
 class LanguageModel:
     def __init__(self, pretrained_lm, clevr_dataset):
@@ -16,6 +14,7 @@ class LanguageModel:
 class ClevrLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
         LanguageModel.__init__(self, pretrained_lm, clevr_dataset)
+        self.name = "trained_on_dataset"
 
     def forward(self, state_text):
         seq_len = state_text.size(1)
@@ -31,44 +30,49 @@ class GenericLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, clevr_dataset, tokenizer=None):
         LanguageModel.__init__(self, pretrained_lm, clevr_dataset)
         self.tokenizer = tokenizer
-        self.clevr_to_lm_trad = {value: self.tokenizer.encode(" " + key)[0] for
+        self.name = "generic"
+        self.clevr_to_lm_trad = {value: self.tokenizer.encoder[key] for
                                  key, value in self.dataset.vocab_questions.items() if
-                                 len(self.tokenizer.encode(" " + key)) == 1}
+                                 key in self.tokenizer.encoder.keys()}
+        self.bos_token = self.tokenizer.bos_token
+        self.bos_token = "."
 
     def forward(self, state_text):
-        text = self.tokenizer.bos_token + " " + self.dataset.idx2word(state_text.cpu().numpy().ravel(),
+        #text = self.tokenizer.bos_token + " " + self.dataset.idx2word(state_text.cpu().numpy().ravel(),
+                                                                      #stop_at_end=True)
+        text = self.tokenizer.bos_token + self.dataset.idx2word(state_text.cpu().numpy().ravel(),
                                                                       stop_at_end=True)
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
         origin_logits_lm = self.language_model(input_ids.to(self.device))[0][:, -1, :]
         origin_log_probs_lm = F.log_softmax(origin_logits_lm, dim=-1)
-        logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
+        logits = (-torch.ones(self.dataset.len_vocab) * 1e32).to(self.device)
         logits[list(self.clevr_to_lm_trad.keys())] = origin_logits_lm[0][list(self.clevr_to_lm_trad.values())]
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
         return log_probas, logits, origin_log_probs_lm
 
-class BertGeneration(LanguageModel):
-    '''
-    https://huggingface.co/transformers/model_doc/bertgeneration.html
-    From: https://arxiv.org/pdf/1907.12461.pdf
-    '''
-    def __init__(self, pretrained_lm, clevr_dataset, tokenizer):
+if __name__ == '__main__':
+    from transformers import AutoModelWithLMHead, AutoTokenizer, BertTokenizer
+    from data_provider.vqa_dataset import *
+    print("test of generic language model...")
+    vqa_data_path = '../../data/vqa-v2'
+    lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+    features_h5path = "../../data/vqa-v2/reduced_coco_train.lmdb"
+    images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+    SPECIAL_TOKENS = {
+        '<PAD>': 0,
+        '<SOS>': 1,
+        '<EOS>': 2,
+        '<UNK>': 3,
+    }
+    vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=vqa_data_path, lm_tokenizer=tokenizer,
+                             image_features_reader=images_feature_reader,
+                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True,
+                             max_seq_length=16, num_images=20)
+    pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=vqa_dataset,
+                                         tokenizer=tokenizer)
+    print("length intersection vocab", len(pretrained_lm.clevr_to_lm_trad))
+    print("total length vocab", vqa_dataset.len_vocab) # should be intersection vocab - 4 (special tokens).
 
-        # ENCODER PART:
-        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
-        model = BertGenerationEncoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                           return_dict=True)
-
-        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-        outputs = model(**inputs)
-        last_hidden_states = outputs.last_hidden_state
-
-        # DECODER PART:
-        tokenizer = BertGenerationTokenizer.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder')
-        config = BertGenerationConfig.from_pretrained("google/bert_for_seq_generation_L-24_bbc_encoder")
-        config.is_decoder = True
-        model = BertGenerationDecoder.from_pretrained('google/bert_for_seq_generation_L-24_bbc_encoder',
-                                                           config=config, return_dict=True)
-        inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")
-        outputs = model(**inputs)
-        prediction_logits = outputs.logits

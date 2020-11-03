@@ -68,7 +68,7 @@ class Metric:
 
     def post_treatment(self):
         serie = pd.Series(self.metric_history)
-        serie.to_csv(self.out_csv_file, index=False)
+        #serie.to_csv(self.out_csv_file, index=False)
         if self.type == "scalar":
             self.stats = [serie.mean(), serie.std(), serie.size]
             pd.Series(self.stats).to_csv(self.stats_path)
@@ -86,9 +86,9 @@ class VAMetric(Metric):
         state_decoded = self.dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=['<PAD>'])
         string = ""
         if kwargs["valid_actions"] is not None:
-            top_words_decoded = self.dataset.idx2word(kwargs["valid_actions"].cpu().numpy()[0])
+            top_words_decoded = [self.dataset.idx2word([va]) for va in kwargs["valid_actions"].cpu().numpy()[0]]
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                             zip(top_words_decoded.split(), kwargs["actions_probs"].cpu().detach().numpy()[0])]
+                             zip(top_words_decoded, kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
         self.measure.append(string)
 
@@ -286,7 +286,7 @@ class PPLMetric(Metric):
     """
 
     def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "scalar", "ppl")
+        Metric.__init__(self, agent, train_test, "ppl", "scalar")
 
     def fill_(self, **kwargs):
         with torch.no_grad():
@@ -316,7 +316,7 @@ class PPLDialogfromLM(Metric):
         self.metric.append(ppl)
 
 
-class Return(Metric):
+class Return(Metric): #TODO: normalized return for levenshtein.
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test, "return", "scalar")
 
@@ -400,14 +400,18 @@ class TrueWordRankLM(Metric):
         Metric.__init__(self, agent, train_test, "true_word_rank", "scalar")
 
     def fill_(self, **kwargs):
-        true_action = int(kwargs["ref_question"][:, kwargs["timestep"]].squeeze().cpu().numpy())
-        true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
-        sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
-        rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
-        self.measure.append(rank)
+        if self.language_model.name == "generic":
+            true_action = int(kwargs["ref_question"][:, kwargs["timestep"]].squeeze().cpu().numpy())
+            true_lm_action = self.language_model.clevr_to_lm_trad[true_action]
+            sorted, indices = torch.sort(kwargs["origin_log_probs_lm"], descending=True)
+            rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
+            self.measure.append(rank)
+        else:
+            pass
 
     def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
+        if self.language_model.name == "generic":
+            self.metric.extend(self.measure)
 
 
 class UniqueWordsMetric(Metric):

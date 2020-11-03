@@ -230,7 +230,7 @@ class Agent:
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
         logging.info('Last reward: {:.2f}'.format(ep_reward))
-        logging.info('LAST DIALOG: {}'.format(self.env.clevr_dataset.idx2word(state.text[:, 1:].numpy()[0])))
+        logging.info('LAST DIALOG: {}'.format(self.env.dataset.idx2word(state.text[:, 1:].numpy()[0])))
         logging.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.train_metrics.items():
             metric.log(valid_actions=valid_actions)

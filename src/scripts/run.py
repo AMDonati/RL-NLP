@@ -125,7 +125,7 @@ def get_parser():
                         default=["running_return", "size_valid_actions",
                                  "valid_actions", "ppl",
                                  "dialog", "eps_truncation",
-                                 "ttr_question", "sum_probs", "true_word_rank"], help="train metrics")
+                                 "ttr_question", "sum_probs"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs"],
@@ -150,8 +150,8 @@ def create_config_file(conf_file, args):
 def get_pretrained_lm(args, env):
     if "gpt" == args.lm_path:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        tokenizer = AutoTokenizer.from_pretrained("gpt2")  # TODO: use a config to change the vocabulary ?
-        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.clevr_dataset,
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.dataset,
                                              tokenizer=tokenizer)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
@@ -180,7 +180,7 @@ def get_output_path(args):
     if float(args.alpha_logits) != 0:
         out_folder = out_folder + '_' + 'alpha-logits{}'.format(args.alpha_logits)
 
-    if args.lm_path is None:
+    if "gpt" in args.lm_path:
         out_folder = out_folder + '_gpt-2'
 
     if args.resume_training is not None:
@@ -208,10 +208,10 @@ def log_hparams(logger, args):
     logger.info("RL from {} ...".format(pre_trained))
     if args.truncate_mode is not None:
         logger.info("with truncation...")
-        if args.lm_path is not None:
-            logger.info("with CLEVR Language Model...")
-        else:
+        if "gpt" in args.lm_path:
             logger.info("with GPT-2 Language Model...")
+        else:
+            logger.info("with Dataset Language Model...")
         logger.info("Truncation mode: {}".format(args.truncate_mode))
         if args.truncate_mode == 'top_k' or args.truncate_mode == 'sample_va':
             logger.info("num_truncated:{}".format(args.num_truncated))
@@ -240,14 +240,13 @@ def get_rl_env(args):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
-        #env = VQAEnv(data_path=args.data_path, mode="minval", max_seq_length=16, debug="0,20")
-        env = VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode="minval", max_seq_length=16, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+        env = VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
         test_modes = ["test_images", "test_text"]
-        #test_envs = [VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=16, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       #reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-                     #for mode in test_modes]
-        test_envs = [env, env]
+        test_envs = [VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                     for mode in test_modes]
+        #test_envs = [env, env]
     return env, test_envs
 
 
@@ -270,7 +269,6 @@ def run(args):
 
     # upload env & pretrained lm, policy network.
     env, test_envs = get_rl_env(args)
-    #env = VQAEnv(data_path=args.data_path, mode="minval", max_seq_length=16, debug="0,20")
     pretrained_lm = get_pretrained_lm(args, env)
 
     models = {"lstm": PolicyLSTMBatch}

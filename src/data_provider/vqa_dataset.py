@@ -134,7 +134,7 @@ class VQADataset(Dataset):
             reward_tokenizer,
             clean_datasets,
             special_tokens,
-            max_seq_length=16,  # TODO: look at statistics on the dataset.
+            max_seq_length=23,
             max_region_num=101,
             filter_entries=True,
             min_len_questions=6,
@@ -144,10 +144,7 @@ class VQADataset(Dataset):
     ):
         super().__init__()
         self.split = split
-        ans2label_path = os.path.join(dataroot, "cache", "trainval_ans2label.pkl")
-        self.ans2label = cPickle.load(open(ans2label_path, "rb"))
-        self.label2ans = {v: k for k, v in self.ans2label.items()}
-        self.num_labels = len(self.ans2label)
+        self.get_answers_vocab(dataroot)
         self._max_region_num = max_region_num
         self._max_seq_length = max_seq_length
         self._image_features_reader = image_features_reader
@@ -194,7 +191,6 @@ class VQADataset(Dataset):
         # filter entries if needed:
         self.len_vocab = len(self.vocab_questions)
         logger.info("vocab size: {}".format(self.len_vocab))
-        self.len_vocab_answer = len(self.ans2label)
         logger.info("number of answers: {}".format(self.len_vocab_answer))
         if filter_entries:
             self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers, filter_yes_no=filter_yes_no,
@@ -230,11 +226,18 @@ class VQADataset(Dataset):
                                    key in self.lm_tokenizer.encoder.keys()}
         self.lm_to_dataset_trad = {v: k for k, v in self.dataset_to_lm_trad.items()}
 
+    def get_answers_vocab(self, dataroot):
+        ans2label_path = os.path.join(dataroot, "cache", "trainval_ans2label.pkl")
+        self.ans2label = cPickle.load(open(ans2label_path, "rb"))
+        self.ans2label = {k: v for k, v in sorted(self.ans2label.items(), key=lambda item: item[1])}
+        self.label2ans = {v: k for k, v in self.ans2label.items()}
+        self.len_vocab_answer = len(self.ans2label)
+
     def load_true_vocab(self, vocab_out_path):
         with open(vocab_out_path, 'r') as f:
             self.vocab_questions = json.load(f)
 
-    def idx2word(self, question_idx, stop_at_end=True):
+    def idx2word(self, question_idx, stop_at_end=True, ignored=['<PAD>']):
         lm_question_idx = self.translate_for_lm(question_idx)
         question_decoded = self.lm_tokenizer.decode(lm_question_idx)
         return question_decoded
@@ -383,7 +386,7 @@ class VQADataset(Dataset):
         segment_ids = entry["q_segment_ids"]
 
         co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
-        target = torch.zeros(self.num_labels)
+        target = torch.zeros(self.len_vocab_answer)
 
         if "test" not in self.split:
             answer = entry["answer"]
@@ -440,7 +443,13 @@ if __name__ == '__main__':
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
     vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path, lm_tokenizer=lm_tokenizer, image_features_reader=images_feature_reader,
-                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=16, num_images=20)
+                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True, max_seq_length=23, num_images=20)
+
+    # test of answers vocab:
+    answers_ids = list(vqa_dataset.ans2label.values())
+    print("first id", answers_ids[0])
+    print("last id", answers_ids[-1])
+    print("len vocab answers", vqa_dataset.len_vocab_answer)
 
     # test of translate functions:
     lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')

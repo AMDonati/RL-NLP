@@ -199,6 +199,7 @@ class VQAEnv(GenericEnv):
         self.entry = entries[self.env_idx]
         self.ref_question_idx = question_id
         self.ref_question = q
+        self.ref_questions = self.ref_question.view(1, q.size(0))
         self.ref_question_decoded = self.entry["question"]
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
@@ -215,38 +216,40 @@ class VQAEnv(GenericEnv):
         return self.state
 
 
-
-
 if __name__ == '__main__':
     print("Testing Clevr Env...")
     env = ClevrEnv(data_path="../../data", max_len=20, max_samples=20, debug='0,20', mode="test_images")
     seed = 123
     seed = np.random.randint(100000)
-    state = env.reset(seed)
-    print('Img Idx', env.img_idx)
+    state_clevr = env.reset(seed)
+    print('Img Idx', env.img_idx) # scalar
     print('Question Idx', env.ref_question_idx)
     print('Ref questions', env.ref_questions_decoded)
-    print('Ref Answers', env.ref_answers)
-    print('Ref Answer', env.ref_answer)
-    print('Ref Question', env.ref_question)
+    print('Ref Answers', env.ref_answers) # shape (1)
+    print('Ref Answer', env.ref_answer) # scalar
+    print('Ref Question', env.ref_question) # shape (S)
+    print("State - text part", state_clevr.text) # shape (1,S)
 
     print("Testing VQA Env...")
     vqa_data_path = '../../data/vqa-v2'
-    env = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20")
+    env_vqa = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20")
     print(len(env.dataset.vocab_questions))
-    state = env.reset()
-    print("State idx", env.env_idx)
-    print('Img Idx', env.img_idx)
-    print('Question Idx', env.ref_question_idx)
-    print('Ref question', env.ref_question)
-    print("Ref Question decoded", env.ref_question_decoded)
-    print('Ref Answer', env.ref_answer)
-    print("entry", env.entry)
+    state = env_vqa.reset()
+    print("State idx", env_vqa.env_idx)
+    print('Img Idx', env_vqa.img_idx)
+    print('Question Idx', env_vqa.ref_question_idx)
+    print('Ref question', env_vqa.ref_question)
+    print("Ref Question decoded", env_vqa.ref_question_decoded) #TODO: no blank space between the last word and ?
+    print('Ref Answer', env_vqa.ref_answer)
+    print("entry", env_vqa.entry)
 
     print("checking step function for VQA env...")
-    state, (reward, closest_question, pred_answer), done, _ = env.step(np.array(6))
-    print("state", state)
-    print("state decoded", env.dataset.idx2word(state.text.numpy().ravel()))
+    state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(6))
+    state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(8))
+    state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(9))
+    state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(7))
+    print("state - text part", state.text) # shape (1,S).
+    print("state decoded", env_vqa.dataset.idx2word(state.text.numpy().ravel()))
     print("reward", reward)
     print("closest_question", closest_question)
     print("pred answer", pred_answer)
