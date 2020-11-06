@@ -345,7 +345,7 @@ class BleuMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
@@ -411,13 +411,14 @@ class TrueWordRankLM(Metric):
         Metric.__init__(self, agent, train_test, "true_word_rank", "scalar")
 
     def fill_(self, **kwargs):
-        true_action = kwargs["action"].numpy().item()
-        # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
-        # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
-        true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
-        sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
-        rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
-        self.measure.append(rank)
+        if kwargs["origin_log_probs_lm"] is not None:
+            true_action = kwargs["action"].numpy().item()
+            # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
+            # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
+            true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
+            sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
+            rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
+            self.measure.append(rank)
 
     def compute_(self, **kwargs):
         self.metric.extend(self.measure)

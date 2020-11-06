@@ -7,14 +7,14 @@ class Tokenizer:
         self.allow_unk = True
         self.idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
 
-    def encode(self, **kwargs):
-        code = self.encode_(seq_tokens=kwargs["text"], token_to_idx=self.vocab, allow_unk=self.allow_unk)
+    def encode(self, text, **kwargs):
+        code = self.encode_(text, token_to_idx=self.vocab, allow_unk=self.allow_unk)
         if type(code) != torch.tensor and "return_tensors" in kwargs and kwargs["return_tensors"] == "pt":
             code = torch.tensor(code)
         return code
 
-    def decode(self, **kwargs):
-        decode = self.decode_(seq_idx=kwargs["text"], idx_to_token=self.idx_to_token, stop_at_end=True, delim=' ',
+    def decode(self, text, **kwargs):
+        decode = self.decode_(text, idx_to_token=self.idx_to_token, stop_at_end=True, delim=' ',
                               ignored=["<SOS>", "<PAD>"])
         if type(decode) != torch.tensor and "return_tensors" in kwargs and kwargs["return_tensors"] == "pt":
             decode = torch.tensor(decode)

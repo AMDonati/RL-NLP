@@ -38,12 +38,13 @@ class ClevrLanguageModel(LanguageModel):
 
 class GenericLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" "):
-        LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=" ")
+        LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=prefix_tokenizer)
         self.tokenizer = tokenizer
         self.name = "generic"
-        self.clevr_to_lm_trad = {value: self.tokenizer.encoder[key] for
+        self.dataset_to_lm_trad = {value: self.tokenizer.encoder[key] for
                                  key, value in self.dataset.vocab_questions.items() if
                                  key in self.tokenizer.encoder.keys()}
+
         self.bos_token = self.tokenizer.bos_token
         self.bos_token = "."
 

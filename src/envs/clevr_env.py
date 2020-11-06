@@ -1,7 +1,6 @@
 import os
 import random
 from collections import namedtuple
-
 import gym
 import numpy as np
 import torch
@@ -131,7 +130,7 @@ class ClevrEnv(GenericEnv):
             self.ref_questions = self.ref_questions[self.ref_question_idx:self.ref_question_idx + 1] #TODO: why this is needed ?
             self.ref_answers = self.ref_answers[self.ref_question_idx:self.ref_question_idx + 1]
 
-        self.ref_questions_decoded = [self.dataset.question_tokenizer.decode(text=question, ignored=['<SOS>', '<PAD>'])
+        self.ref_questions_decoded = [self.dataset.question_tokenizer.decode(question, ignored=['<SOS>', '<PAD>'])
                                       for question in self.ref_questions.numpy()]
 
         # initializing the state.
@@ -209,7 +208,7 @@ class VQAEnv(GenericEnv):
         self.img_feats = features
 
         # initializing the state.
-        state_question = [self.special_tokens.SOS_idx]
+        state_question = [self.special_tokens.SOS_idx] #TODO: initialize with specific conditionnement.
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
                                 self.img_feats.unsqueeze(0), self.ref_answer)
         self.step_idx = 0

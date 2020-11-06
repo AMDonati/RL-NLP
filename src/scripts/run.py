@@ -114,7 +114,7 @@ def get_parser():
     parser.add_argument('-is_loss_correction', type=int, default=1,
                         help="adding the importance sampling ratio correction in the rl loss.")
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=2000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=200, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
@@ -156,7 +156,8 @@ def get_pretrained_lm(args, env):
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
-        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset)
+        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
+                                           tokenizer=env.dataset.question_tokenizer)
 
     return pretrained_lm
 
@@ -171,7 +172,7 @@ def get_output_path(args):
     elif args.truncate_mode == "top_p":
         algo = "{}{}".format(args.truncate_mode, args.top_p)
 
-    out_folder = '{}'.format(args.reward)
+    out_folder = '{}_{}'.format(args.env, args.reward)
     if args.policy_path is not None:
         out_folder = out_folder + '_' + "pretrain"
     out_folder = out_folder + '_' + algo

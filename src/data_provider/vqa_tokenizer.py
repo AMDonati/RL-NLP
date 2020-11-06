@@ -8,13 +8,13 @@ class VQATokenizer:
         self.lm_tokenizer = lm_tokenizer
         self.special_tokens = special_tokens
 
-    def decode(self, question_idx, ignored=['<PAD>'], decode_answers=True, stop_at_end=True):
-        lm_question_idx = self.translate_for_lm(question_idx)
+    def decode(self, text, ignored=['<PAD>'], decode_answers=True, stop_at_end=True):
+        lm_question_idx = self.translate_for_lm(text)
         question_decoded = self.lm_tokenizer.decode(lm_question_idx)
         return question_decoded
 
-    def encode(self, question):
-        lm_question_idx = self.lm_tokenizer.encode(question)
+    def encode(self, text):
+        lm_question_idx = self.lm_tokenizer.encode(text)
         question_idx = [self.lm_to_dataset_trad[idx] for idx in lm_question_idx]
         return question_idx
 
