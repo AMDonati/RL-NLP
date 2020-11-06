@@ -48,7 +48,7 @@ class GenericLanguageModel(LanguageModel):
         self.bos_token = "."
 
     def forward(self, state_text):
-        text = self.dataset.question_tokenizer.decode(text=state_text.cpu().numpy().ravel(), stop_at_end=True)
+        text = self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(), stop_at_end=True)
         if text == "":
             text = self.tokenizer.bos_token
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
@@ -57,8 +57,6 @@ class GenericLanguageModel(LanguageModel):
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
         logits[list(self.dataset_to_lm_trad.keys())] = origin_logits_lm[:, -1, :][0][
             list(self.dataset_to_lm_trad.values())]
-        logits = (-torch.ones(self.dataset.len_vocab) * 1e32).to(self.device)
-        logits[list(self.clevr_to_lm_trad.keys())] = origin_logits_lm[0][list(self.clevr_to_lm_trad.values())]
         logits = logits.unsqueeze(dim=0)
         log_probas = F.log_softmax(logits, dim=-1)
         return log_probas, logits, origin_log_probs_lm.view(input_ids.size(0), input_ids.size(1), -1)

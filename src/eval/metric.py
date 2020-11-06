@@ -85,14 +85,11 @@ class VAMetric(Metric):
         Metric.__init__(self, agent, train_test, "valid_actions", "text")
 
     def fill_(self, **kwargs):
-        state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text.numpy()[0],
+        state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
                                                                ignored=['<PAD>'])
-        state_decoded = self.dataset.idx2word(kwargs["state"].text.numpy()[0], ignored=['<PAD>'])
         string = ""
         if kwargs["valid_actions"] is not None:
-            top_words_decoded = [self.dataset.idx2word([va]) for va in kwargs["valid_actions"].cpu().numpy()[0]]
-            top_words_decoded = self.dataset.question_tokenizer.decode(
-                text=kwargs["valid_actions"].cpu().numpy()[0])
+            top_words_decoded = [self.dataset.question_tokenizer.decode([va]) for va in kwargs["valid_actions"].cpu().numpy()[0]]
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                              zip(top_words_decoded, kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
@@ -162,10 +159,10 @@ class DialogMetric(Metric):
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
+            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].numpy()[0],
                                                                    ignored=[])
             if self.reward_type == 'vqa':
-                pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
+                pred_answer_decoded = self.dataset.question_tokenizer.decode(kwargs["pred_answer"].numpy(),
                                                                              decode_answers=True)
                 ref_answer_decoded = self.dataset.question_tokenizer.decode(
                     text=[kwargs["ref_answer"].numpy().item()],

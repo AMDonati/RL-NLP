@@ -232,7 +232,7 @@ class Agent:
         logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
         logging.info('Last reward: {:.2f}'.format(ep_reward))
         logging.info('LAST DIALOG: {}'.format(
-            self.env.dataset.question_tokenizer.decode(text=state.text[:, 1:].numpy()[0])))
+            self.env.dataset.question_tokenizer.decode(state.text[:, 1:].numpy()[0])))
         logging.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.train_metrics.items():
             metric.log(valid_actions=valid_actions)

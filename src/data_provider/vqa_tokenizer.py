@@ -1,4 +1,5 @@
 import torch
+import time
 
 
 class VQATokenizer:
@@ -7,7 +8,7 @@ class VQATokenizer:
         self.lm_tokenizer = lm_tokenizer
         self.special_tokens = special_tokens
 
-    def decode(self, question_idx):
+    def decode(self, question_idx, ignored=['<PAD>'], decode_answers=True, stop_at_end=True):
         lm_question_idx = self.translate_for_lm(question_idx)
         question_decoded = self.lm_tokenizer.decode(lm_question_idx)
         return question_decoded
@@ -27,4 +28,3 @@ class VQATokenizer:
         self.dataset_to_lm_trad = {val: self.lm_tokenizer.encoder[key] for key, val in self.vocab.items() if
                                    key in self.lm_tokenizer.encoder.keys()}
         self.lm_to_dataset_trad = {v: k for k, v in self.dataset_to_lm_trad.items()}
-

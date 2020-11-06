@@ -8,7 +8,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from vr.utils import load_execution_engine, load_program_generator
-from vilbert.vilbert import VILBertForVLTasks, BertConfig
+#from vilbert.vilbert import VILBertForVLTasks, BertConfig
 
 
 def get_vocab(key, vocab_path):

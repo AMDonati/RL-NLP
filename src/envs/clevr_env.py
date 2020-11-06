@@ -8,6 +8,7 @@ import torch
 
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
+from data_provider.vqa_tokenizer import VQATokenizer
 from data_provider.vqa_dataset import *
 from transformers import BertTokenizer, GPT2Tokenizer
 
@@ -54,7 +55,7 @@ class GenericEnv(gym.Env):
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
         done = self.check_if_done(action)
         question_tokens = self.state.text.numpy().ravel()
-        question = self.dataset.idx2word(question_tokens, stop_at_end=True)  # remove the EOS token if needed.
+        question = self.dataset.question_tokenizer.decode(question_tokens)  # remove the EOS token if needed.
         reward, closest_question, pred_answer = self.reward_func.get(question=question,
                                                                      ep_questions_decoded=self.ref_questions_decoded,
                                                                      step_idx=self.step_idx, done=done,
@@ -176,14 +177,16 @@ class VQAEnv(GenericEnv):
         if self.mode == "test_images":
             num_images = None
         lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer, special_tokens=SPECIAL_TOKENS)
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
         modes = {"train": "train", "test_images": "val", "test_text": "train", "minval": "minval"}
+
         self.dataset = VQADataset(task="1_gpt", split=modes[self.mode], dataroot=data_path,
-                                  image_features_reader=images_feature_reader, lm_tokenizer=lm_tokenizer,
-                                  reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True,
+                                  image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
+                                  reward_tokenizer=reward_tokenizer, clean_datasets=True,
                                   max_seq_length=max_seq_length, min_len_questions=min_len_questions,
-                                  num_answers=num_answers, num_images=num_images, filter_entries=True)
+                                  num_answers=num_answers, num_images=num_images, filter_entries=True, vocab_path='../../data/vqa-v2/cache/vocab.json')
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
@@ -193,7 +196,7 @@ class VQAEnv(GenericEnv):
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
         self.env_idx = np.random.randint(0, len(entries))
-        (features, spatials, image_mask, q, target, labels, input_mask, seqment_id, co_attention_mask, question_id,
+        (features, spatials, image_mask, q, q_vil, target, labels, input_mask, seqment_id, co_attention_mask, question_id,
          image_id) = self.dataset.__getitem__(self.env_idx, sl=False, mode=self.mode)
         self.entry = entries[self.env_idx]
         self.ref_question_idx = question_id
@@ -248,7 +251,7 @@ if __name__ == '__main__':
     state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(9))
     state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(7))
     print("state - text part", state.text) # shape (1,S).
-    print("state decoded", env_vqa.dataset.idx2word(state.text.numpy().ravel()))
+    print("state decoded", env_vqa.dataset.question_tokenizer.decode(state.text.numpy().ravel()))
     print("reward", reward)
     print("closest_question", closest_question)
     print("pred answer", pred_answer)

@@ -151,12 +151,12 @@ def get_pretrained_lm(args, env):
     if "gpt" == args.lm_path:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
-        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.dataset,
+        pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                              tokenizer=tokenizer)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
-        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, clevr_dataset=env.dataset)
+        pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset)
 
     return pretrained_lm
 
@@ -240,13 +240,13 @@ def get_rl_env(args):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
-        env = VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+        env = VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode="minval", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
         test_modes = ["test_images", "test_text"]
-        test_envs = [VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-                     for mode in test_modes]
-        #test_envs = [env, env]
+        #test_envs = [VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                       #reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                     #for mode in test_modes]
+        test_envs = [env, env]
     return env, test_envs
 
 
