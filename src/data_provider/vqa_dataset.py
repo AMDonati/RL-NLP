@@ -36,6 +36,13 @@ def _create_entry(question, answer):
     }
     return entry
 
+def clean_key(key, tokens_to_remove):
+    bool = False
+    for tok in tokens_to_remove:
+        if tok in key:
+            bool = True
+    return bool
+
 
 def clean_dict_keys(dic, tokens_to_remove):
     keys_to_remove = []
@@ -142,7 +149,6 @@ def _load_dataset(dataroot, name, clean_datasets):
 class VQADataset(Dataset):
     def __init__(
             self,
-            task,  # TODO: remove this.
             dataroot,
             split,
             image_features_reader,
@@ -171,20 +177,11 @@ class VQADataset(Dataset):
         self.special_tokens = question_tokenizer.special_tokens
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
         '''
-        Should have: 
-        GPT-2 tokenizer
-        the "True" vocab: 
-        The traduction dictionnary between the GPT-2 vocab & the true vocab. 
-        Methods: 
-           - idx2word
-           - word2idx
         '''
-
-        clean_train = "_cleaned" if clean_datasets else ""
         cache_path = os.path.join(
             dataroot,
             "cache",
-            task + "_" + split + "_" + str(max_seq_length) + clean_train + ".pkl")
+            split + "_" + "entries.pkl")
 
         if vocab_path is None:
             print("Building vocab...")
@@ -192,7 +189,7 @@ class VQADataset(Dataset):
             vocab_path_ = os.path.join(
                 dataroot,
                 "cache",
-                task + "_" + split + "_" + str(max_seq_length) + clean_train + "_" "vocab.json")
+                "vocab.json")
             self.build_true_vocab(vocab_path_)
             print("Vocab built...")
         else:
@@ -232,12 +229,12 @@ class VQADataset(Dataset):
             tokens = self.lm_tokenizer.encode(entry["question"])
             for i, token in enumerate(tokens):
                 key = self.lm_tokenizer.decoder[token]
-                if key not in true_vocab.keys():
+                if key not in true_vocab.keys() and not clean_key(key, tokens_to_remove):
                     true_vocab[key] = token
                 if i == 0 and key not in first_words:
                     first_words.append(key)
         vocab = dict(zip(true_vocab.keys(), range(len(true_vocab))))
-        vocab = clean_dict_keys(dic=vocab, tokens_to_remove=tokens_to_remove)
+        print("Number of words in vocab:{}".format(len(vocab)))
         self.vocab_questions = vocab
         first_words_path = vocab_out_path.split(".")[0] + '_first_words.json'
         with open(vocab_out_path, 'w') as f:
@@ -337,10 +334,9 @@ class VQADataset(Dataset):
             if tok in self.lm_to_dataset_trad.keys():
                 tokens.append(self.lm_to_dataset_trad[tok])
             else:
-                if tok in self.special_tokens.values():
+                if tok in self.special_tokens:
                     tokens.append(tok)
-                else:
-                    tokens.append(self.special_tokens["<UNK>"])
+
         if len(tokens) < self._max_seq_length:
             padding = [self._padding_index] * (self._max_seq_length - len(tokens))
             tokens = tokens + padding
@@ -399,7 +395,7 @@ class VQADataset(Dataset):
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
             image_id = int(random.choice(self._image_features_reader._image_ids))
-        question_id = entry["question_id"]
+        #question_id = entry["question_id"]
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -418,10 +414,10 @@ class VQADataset(Dataset):
         image_mask = torch.tensor(image_mask).long()
         spatials = torch.tensor(mix_boxes_pad).float()
 
-        question = entry["q_token"]
-        question_vil = entry["q_token_vilbert"]
-        input_mask = entry["q_input_mask"]
-        segment_ids = entry["q_segment_ids"]
+        #question = entry["q_token"]
+        #question_vil = entry["q_token_vilbert"]
+        #input_mask = entry["q_input_mask"]
+        #segment_ids = entry["q_segment_ids"]
 
         co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
         target = torch.zeros(self.len_vocab_answer)
@@ -437,83 +433,85 @@ class VQADataset(Dataset):
             features,
             spatials,
             image_mask,
-            question,
-            question_vil,
+            co_attention_mask,
             target,
             labels,
-            input_mask,
-            segment_ids,
-            co_attention_mask,
-            question_id,
-            image_id
+            entry
         )
 
     def __len__(self):
-        return len(self.entries)  # TODO: replace by train_entries here ?
+        return len(self.entries)
 
 
 if __name__ == '__main__':
     from transformers import BertTokenizer, GPT2Tokenizer
     import argparse
     from data_provider.vqa_tokenizer import VQATokenizer
+    import numpy as np
 
-    SPECIAL_TOKENS = {
-        '<PAD>': 0,
-        '<SOS>': 1,
-        '<EOS>': 2,
-        '<UNK>': 3,
-    }
     parser = argparse.ArgumentParser()
     parser.add_argument("-data_path", type=str, default='../../data/vqa-v2',
                         help="data folder containing questions embeddings and img features")
+    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/reduced_coco_train.lmdb",
+                        help="data folder containing questions embeddings and img features")
+    parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
+
     lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-
-    features_h5path = "../../data/vqa-v2/reduced_coco_train.lmdb"
+    features_h5path = args.features_path
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+    question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
-    question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer, special_tokens=SPECIAL_TOKENS)
-
-    vqa_dataset = VQADataset(task="1_gpt", split="trainval", dataroot=args.data_path,
+    vqa_dataset = VQADataset(split="trainval", dataroot=args.data_path,
                              question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                              reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, tokenize=False)
 
-    # vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path,
+    # vqa_dataset = VQADataset(split="minval", dataroot=args.data_path,
     #                          question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
     #                          reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path='../../data/vqa-v2/cache/vocab.json')
 
-    #tokens_dict = vqa_dataset.compute_vocab_stats()
+    if args.test:
+        vocab = vqa_dataset.vocab_questions
+        new_d = {}
+        for k in sorted(vocab, key=len):
+            new_d[k] = vocab[k]
 
-    vocab = vqa_dataset.vocab_questions
-    new_d = {}
-    for k in sorted(vocab, key=len):
-        new_d[k] = vocab[k]
+        # test of answers vocab:
+        answers_ids = list(vqa_dataset.ans2label.values())
+        print("first id", answers_ids[0])
+        print("last id", answers_ids[-1])
+        print("len vocab answers", vqa_dataset.len_vocab_answer)
 
-    tokens_to_remove = ["-", ".", "/", "(", ")", "`", "#", "^", ":"]
+        # test of translate functions:
+        print("Test of reward tokenizer...")
+        print('Is there a pizza?')
+        lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
+        input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
+        reward_idx = vqa_dataset.translate_for_reward(input_idx)
+        question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
+        print('question decoded', question_decoded)
 
-    # test of answers vocab:
-    answers_ids = list(vqa_dataset.ans2label.values())
-    print("first id", answers_ids[0])
-    print("last id", answers_ids[-1])
-    print("len vocab answers", vqa_dataset.len_vocab_answer)
+        print("Test of lm_to_dataset_function ...")
+        idx = np.random.randint(vqa_dataset.len_vocab)
+        token_idx = list(vqa_dataset.lm_to_dataset_trad.keys())[idx]
+        print("word from lm_tokenizer")
+        print(vqa_dataset.lm_tokenizer.decoder[token_idx])
+        trad_token_idx = vqa_dataset.lm_to_dataset_trad[token_idx]
+        print("word from dataset vocab")
+        print(vqa_dataset.question_tokenizer.decode([trad_token_idx]))
 
-    # test of translate functions:
-    print('Is there a pizza?')
-    lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
-    input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
-    reward_idx = vqa_dataset.translate_for_reward(input_idx)
-    question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
-    print('question decoded', question_decoded)
-
-    # test of idx2word:
-    entry = vqa_dataset.entries[0]
-    print('decoded question', vqa_dataset.question_tokenizer.decode(entry['q_token'].numpy()))
-    print('question', entry["question"])
-
-    # test of get_items:
-    (features, spatials, image_mask, q, q_vil, target, labels, input_mask, seqment_id, co_attention_mask, question_id,
-     image_id) = vqa_dataset.__getitem__(1)
-    print(q)
-    print(vqa_dataset.question_tokenizer.decode(q.numpy()))
-    print(target.shape)  # 3129 answers.
+        print("print test of decode function...")
+        # test of get_items:
+        (features,
+            spatials,
+            image_mask,
+            co_attention_mask,
+            target,
+            labels,
+            entry) = vqa_dataset.__getitem__(1)
+        print("true question:{}".format(entry["question"]))
+        print("question decoded - question_tokenizer: {}".format(vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
+        print("question decoded - lm_tokenizer: {}".format(
+            vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
+        print(target.shape)  # 3129 answers.

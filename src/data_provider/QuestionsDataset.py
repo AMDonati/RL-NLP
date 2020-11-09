@@ -21,9 +21,9 @@ class QuestionsDataset(Dataset):
         self.vocab_path = vocab_path
         self.range_samples = range_samples
         self.inp_questions, self.target_questions = self.get_questions()
-        self.vocab = self.get_vocab()
+        self.vocab_questions = self.get_vocab()
         self.idx_to_token = self.get_idx_to_token()
-        self.vocab_len = len(self.vocab)
+        self.len_vocab = len(self.vocab_questions)
         self.seq_len = self.inp_questions.size(1)
 
     def get_vocab(self):
@@ -32,7 +32,7 @@ class QuestionsDataset(Dataset):
         return vocab
 
     def get_idx_to_token(self):
-        idx_to_token = dict(zip(list(self.vocab.values()), list(self.vocab.keys())))
+        idx_to_token = dict(zip(list(self.vocab_questions.values()), list(self.vocab_questions.keys())))
         return idx_to_token
 
     def idx2word(self, seq_idx, delim=' ', stop_at_end=False):
@@ -82,6 +82,6 @@ if __name__ == '__main__':
         if batch == 0:
             print('input', inp.shape)
             print('target', tar.shape)
-    vocab = train_dataset.vocab
+    vocab = train_dataset.vocab_questions
     idx_to_token = train_dataset.idx_to_token
     assert len(vocab) == len(idx_to_token)

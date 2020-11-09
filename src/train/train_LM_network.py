@@ -10,8 +10,11 @@ import torch
 from torch.utils.data import DataLoader
 
 from data_provider.QuestionsDataset import QuestionsDataset
+from data_provider.vqa_dataset import *
+from data_provider.vqa_tokenizer import VQATokenizer
+from transformers import BertTokenizer, GPT2Tokenizer
 from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
-from train.train_functions import train_one_epoch, evaluate
+from train.train_functions import *
 from utils.utils_train import create_logger, write_to_csv
 
 '''
@@ -57,19 +60,47 @@ if __name__ == '__main__':
     # Load data
     ###############################################################################
 
-    train_questions_path = os.path.join(args.data_path, "train_questions.h5")
-    val_questions_path = os.path.join(args.data_path, "val_questions.h5")
-    test_questions_path = os.path.join(args.data_path, "test_questions.h5")
-    vocab_path = os.path.join(args.data_path, "vocab.json")
+    def get_datasets(args):
+        if args.dataset == "clevr":
+            train_questions_path = os.path.join(args.data_path, "train_questions.h5")
+            val_questions_path = os.path.join(args.data_path, "val_questions.h5")
+            test_questions_path = os.path.join(args.data_path, "test_questions.h5")
+            vocab_path = os.path.join(args.data_path, "vocab.json")
 
-    train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path,
-                                     range_samples=args.range_samples)
-    val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
-    test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
+            train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path,
+                                             range_samples=args.range_samples)
+            val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
+            test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
+        elif args.dataset == "vqa":
+            lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+            reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
 
-    num_tokens = train_dataset.vocab_len
+            features_h5path = os.path.join(args.data_path, "reduced_coco_train.lmdb")
+            images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+
+            question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
+            train_dataset = VQADataset(task="1_gpt", split="train", dataroot=args.data_path,
+                                     question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
+                                     reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
+            val_dataset = VQADataset(task="1_gpt", split="val", dataroot=args.data_path,
+                                       question_tokenizer=question_tokenizer,
+                                       image_features_reader=images_feature_reader,
+                                       reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                                       num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
+            test_dataset = VQADataset(task="1_gpt", split="val", dataroot=args.data_path,
+                                     question_tokenizer=question_tokenizer,
+                                     image_features_reader=images_feature_reader,
+                                     reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                                     num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
+
+
+        return train_dataset, val_dataset, test_dataset
+
+    train_dataset, val_dataset, test_dataset = get_datasets(args)
+
+    num_tokens = train_dataset.len_vocab
     BATCH_SIZE = args.bs
-    PAD_IDX = train_dataset.get_vocab()["<PAD>"]
+    PAD_IDX = train_dataset.vocab_questions["<PAD>"]
 
     train_generator = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, drop_last=True,
                                  num_workers=args.num_workers)
@@ -144,7 +175,11 @@ if __name__ == '__main__':
     train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
     logger.info('checking shape of and values of a sample of the train dataset...')
     idxs = list(np.random.randint(0, train_dataset.__len__(), size=2))
-    temp_inp, temp_tar = train_dataset.__getitem__(idxs)
+    if args.dataset == "clevr":
+        temp_inp, temp_tar = train_dataset.__getitem__(idxs)
+    elif args.dataset == "vqa":
+        elements = train_dataset.__getitem__(idxs)
+        temp_inp, temp_tar = get_inputs_targets_vqa(elements)
     logger.info('samples of input questions: {}'.format(temp_inp.data.numpy()))
     logger.info('samples of target questions: {}'.format(temp_tar.data.numpy()))
     logger.info('train dataset length: {}'.format(train_dataset.__len__()))
@@ -152,7 +187,8 @@ if __name__ == '__main__':
     best_val_loss = None
     for epoch in range(EPOCHS):
         logger.info('epoch {}/{}'.format(epoch + 1, EPOCHS))
-        train_loss, elapsed = train_one_epoch(model=model,
+        train_function = train_one_epoch_vqa if args.dataset == "vqa" else train_one_epoch
+        train_loss, elapsed = train_function(model=model,
                                               train_generator=train_generator,
                                               optimizer=optimizer,
                                               criterion=criterion,
@@ -161,7 +197,8 @@ if __name__ == '__main__':
                                               print_interval=print_interval)
         logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
         logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-        val_loss = evaluate(model=model, val_generator=val_generator, criterion=criterion, device=device)
+        eval_function = evaluate_vqa if args.dataset == "vqa" else evaluate
+        val_loss = eval_function(model=model, val_generator=val_generator, criterion=criterion, device=device)
         logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
         # saving loss and metrics information.

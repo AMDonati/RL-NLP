@@ -51,7 +51,7 @@ if __name__ == '__main__':
     # TODO: add a model.flatten_parameters() ?
     test_dataset = QuestionsDataset(h5_questions_path=os.path.join(args.data_path, 'test_questions.h5'),
                                     vocab_path=os.path.join(args.data_path, 'vocab.json'))
-    num_tokens = test_dataset.vocab_len
+    num_tokens = test_dataset.len_vocab
     test_loader = DataLoader(dataset=test_dataset, batch_size=len(test_dataset), drop_last=True,
                              num_workers=args.num_workers)
     out_file_top_k_words = os.path.join(args.out_path,

@@ -38,7 +38,7 @@ class GenericEnv(gym.Env):
     def set_special_tokens(self):
         SOS_idx = self.dataset.vocab_questions["<SOS>"]
         EOS_idx = self.dataset.vocab_questions["<EOS>"]
-        question_mark_idx = self.dataset.vocab_questions["?"]  # TODO: why this is needed?
+        question_mark_idx = self.dataset.vocab_questions["?"]
         Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx"))
         self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx)
 
@@ -165,23 +165,17 @@ class VQAEnv(GenericEnv):
                                      condition_answer=condition_answer, reward_vocab=reward_vocab,
                                      mask_answers=mask_answers)
 
-        SPECIAL_TOKENS = {
-            '<PAD>': 0,
-            '<SOS>': 1,
-            '<EOS>': 2,
-            '<UNK>': 3,
-        }
         # Loading VQA Dataset.
         num_images = int(self.debug[1]) if self.debug is not None else self.debug
         if self.mode == "test_images":
             num_images = None
         lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer, special_tokens=SPECIAL_TOKENS)
+        question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
         modes = {"train": "train", "test_images": "val", "test_text": "train", "minval": "minval"}
 
-        self.dataset = VQADataset(task="1_gpt", split=modes[self.mode], dataroot=data_path,
+        self.dataset = VQADataset(split=modes[self.mode], dataroot=data_path,
                                   image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
                                   reward_tokenizer=reward_tokenizer, clean_datasets=True,
                                   max_seq_length=max_seq_length, min_len_questions=min_len_questions,
@@ -195,16 +189,21 @@ class VQAEnv(GenericEnv):
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
         self.env_idx = np.random.randint(0, len(entries))
-        (features, spatials, image_mask, q, q_vil, target, labels, input_mask, seqment_id, co_attention_mask, question_id,
-         image_id) = self.dataset.__getitem__(self.env_idx, sl=False, mode=self.mode)
-        self.entry = entries[self.env_idx]
-        self.ref_question_idx = question_id
-        self.ref_question = q
-        self.ref_questions = self.ref_question.view(1, q.size(0))
+        (features,
+            spatials,
+            image_mask,
+            co_attention_mask,
+            target,
+            labels,
+            entry) = self.dataset.__getitem__(self.env_idx, sl=False, mode=self.mode)
+        self.entry = entry
+        self.ref_question_idx = entry["question_id"]
+        self.ref_question = entry["q_token"]
+        self.ref_questions = self.ref_question.view(1, entry["q_token"].size(0))
         self.ref_question_decoded = self.entry["question"]
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
-        self.img_idx = image_id
+        self.img_idx = self.entry["image_id"]
         self.img_feats = features
 
         # initializing the state.
