@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("-dataset", type=str, default="clevr", help="dataset: clevr ou vqa datasets.")
     parser.add_argument("-model", type=str, default="gru", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-emb_size", type=int, required=True, help="dimension of the embedding layer")

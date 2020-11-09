@@ -1,12 +1,10 @@
-import torch
-import time
-
 
 class VQATokenizer:
     def __init__(self, lm_tokenizer, special_tokens):
-        self.allow_unk = True
+        self.allow_unk = False
         self.lm_tokenizer = lm_tokenizer
-        self.special_tokens = special_tokens
+        self.special_tokens = {self.lm_tokenizer.bos_token: self.lm_tokenizer.bos_token_id,
+                               '<PAD>': 0}
 
     def decode(self, text, ignored=['<PAD>'], decode_answers=True, stop_at_end=True):
         lm_question_idx = self.translate_for_lm(text)

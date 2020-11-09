@@ -37,6 +37,20 @@ def _create_entry(question, answer):
     return entry
 
 
+def clean_dict_keys(dic, tokens_to_remove):
+    keys_to_remove = []
+    for key in dic.keys():
+        for tok in tokens_to_remove:
+            if tok in key:
+                keys_to_remove.append(key)
+    keys_to_remove = list(set(keys_to_remove))
+    for entry in keys_to_remove:
+        if entry in dic.keys():
+            del dic[entry]
+
+    return dic
+
+
 def _load_dataset(dataroot, name, clean_datasets):
     """Load entries
     dataroot: root path of dataset
@@ -142,7 +156,8 @@ class VQADataset(Dataset):
             num_answers=1,
             filter_yes_no=True,
             num_images=None,
-            vocab_path=None
+            vocab_path=None,
+            tokenize=True,
     ):
         super().__init__()
         self.split = split
@@ -155,8 +170,6 @@ class VQADataset(Dataset):
         self.reward_tokenizer = reward_tokenizer
         self.special_tokens = question_tokenizer.special_tokens
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
-        self.true_vocab = self.special_tokens
-        self.first_words = []
         '''
         Should have: 
         GPT-2 tokenizer
@@ -173,68 +186,66 @@ class VQADataset(Dataset):
             "cache",
             task + "_" + split + "_" + str(max_seq_length) + clean_train + ".pkl")
 
-        if vocab_path is not None:
-            print("Loading vocab...")
-            self.load_true_vocab(vocab_path)
-        else:
+        if vocab_path is None:
+            print("Building vocab...")
             self.entries = _load_dataset(dataroot, split, clean_datasets)
             vocab_path_ = os.path.join(
                 dataroot,
                 "cache",
                 task + "_" + split + "_" + str(max_seq_length) + clean_train + "_" "vocab.json")
             self.build_true_vocab(vocab_path_)
-            print("vocab built...")
+            print("Vocab built...")
+        else:
+            print("Loading vocab...")
+            self.load_vocab(vocab_path)
 
         # tokenize with vocab & tensorize
         self.question_tokenizer.set_vocab(self.vocab_questions)
         self.set_traduction_dictionnaries()
 
-        if not os.path.exists(cache_path):
-            self.entries = _load_dataset(dataroot, split, clean_datasets)
-            self.tokenize()
-            self.tensorize()
-            cPickle.dump(self.entries, open(cache_path, "wb"))
-        else:
-            logger.info("Loading from %s" % cache_path)
-            self.entries = cPickle.load(open(cache_path, "rb"))
+        if tokenize:
+            if not os.path.exists(cache_path):
+                self.entries = _load_dataset(dataroot, split, clean_datasets)
+                self.tokenize()
+                self.tensorize()
+                cPickle.dump(self.entries, open(cache_path, "wb"))
+            else:
+                logger.info("Loading from %s" % cache_path)
+                self.entries = cPickle.load(open(cache_path, "rb"))
 
-        self.len_vocab = len(self.vocab_questions)
-        logger.info("vocab size: {}".format(self.len_vocab))
-        logger.info("number of answers: {}".format(self.len_vocab_answer))
+            self.len_vocab = len(self.vocab_questions)
+            logger.info("vocab size: {}".format(self.len_vocab))
+            logger.info("number of answers: {}".format(self.len_vocab_answer))
 
-        # filter entries if needed.
-        if filter_entries:
-            self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
-                                filter_yes_no=filter_yes_no,
-                                num_images=num_images)
-            if self.split == 'train':
-                self.split_entries()
+            # filter entries if needed.
+            if filter_entries:
+                self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
+                                    filter_yes_no=filter_yes_no,
+                                    num_images=num_images)
+                if self.split == 'train':
+                    self.split_entries()
 
-    def build_true_vocab(self, vocab_out_path):
+    def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"], save_first_words=False):
+        true_vocab = self.special_tokens
+        first_words = []
         for entry in self.entries:
             tokens = self.lm_tokenizer.encode(entry["question"])
             for i, token in enumerate(tokens):
                 key = self.lm_tokenizer.decoder[token]
-                if key not in self.true_vocab.keys():
-                    self.true_vocab[key] = token
-                if i == 0 and key not in self.first_words:
-                    self.first_words.append(key)
-        vocab = dict(zip(self.true_vocab.keys(), range(len(self.true_vocab))))
+                if key not in true_vocab.keys():
+                    true_vocab[key] = token
+                if i == 0 and key not in first_words:
+                    first_words.append(key)
+        vocab = dict(zip(true_vocab.keys(), range(len(true_vocab))))
+        vocab = clean_dict_keys(dic=vocab, tokens_to_remove=tokens_to_remove)
         self.vocab_questions = vocab
         first_words_path = vocab_out_path.split(".")[0] + '_first_words.json'
         with open(vocab_out_path, 'w') as f:
             json.dump(self.vocab_questions, f)
-        with open(first_words_path, 'w') as f:
-            json.dump(self.first_words, f)
+        if save_first_words:
+            with open(first_words_path, 'w') as f:
+                json.dump(first_words, f)
 
-    # def save_true_vocab(self, vocab_out_path):
-    #     vocab = dict(zip(self.true_vocab.keys(), range(len(self.true_vocab))))
-    #     self.vocab_questions = vocab
-    #     first_words_path = vocab_out_path.split(".")[0] + '_first_words.json'
-    #     with open(vocab_out_path, 'w') as f:
-    #         json.dump(self.vocab_questions, f)
-    #     with open(first_words_path, 'w') as f:
-    #         json.dump(self.first_words, f)
 
     def set_traduction_dictionnaries(self):
         self.dataset_to_lm_trad = self.question_tokenizer.dataset_to_lm_trad
@@ -247,7 +258,7 @@ class VQADataset(Dataset):
         self.label2ans = {v: k for k, v in self.ans2label.items()}
         self.len_vocab_answer = len(self.ans2label)
 
-    def load_true_vocab(self, vocab_out_path):
+    def load_vocab(self, vocab_out_path):
         with open(vocab_out_path, 'r') as f:
             self.vocab_questions = json.load(f)
         print("loading {} words vocab".format(len(self.vocab_questions)))
@@ -301,9 +312,8 @@ class VQADataset(Dataset):
                 entry["question"])
             tokens_lm = self.lm_tokenizer.encode(
                 entry["question"])
-            #tokens_lm = tokens_lm[: self._max_seq_length - 2]
-            tokens_vil = tokens_vil[: self._max_seq_length - 2]  # TODO: understand this max_length - 2.
 
+            tokens_vil = tokens_vil[: self._max_seq_length - 2]
             segment_ids = [0] * len(tokens_vil)
             input_mask = [1] * len(tokens_vil)
 
@@ -314,13 +324,7 @@ class VQADataset(Dataset):
                 input_mask += padding
                 segment_ids += padding
 
-            # if len(tokens) < self._max_seq_length:
-            # Note here we pad in front of the sentence
-            # padding = [self._padding_index] * (self._max_seq_length - len(tokens))
-            # tokens = tokens + padding
-
             assert_eq(len(tokens_vil), self._max_seq_length)
-            # assert_eq(len(tokens), self._max_seq_length)
             entry["q_token_vilbert"] = tokens_vil
             entry["q_token_lm"] = tokens_lm
             entry["q_token"] = self.tokenize_with_vocab(tokens_lm)
@@ -471,11 +475,22 @@ if __name__ == '__main__':
 
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer, special_tokens=SPECIAL_TOKENS)
 
-    vqa_dataset = VQADataset(task="1_gpt", split="train", dataroot=args.data_path,
+    vqa_dataset = VQADataset(task="1_gpt", split="trainval", dataroot=args.data_path,
                              question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
-                             reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path='../../data/vqa-v2/cache/vocab.json')
+                             reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, tokenize=False)
 
-    tokens_dict = vqa_dataset.compute_vocab_stats()
+    # vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=args.data_path,
+    #                          question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
+    #                          reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path='../../data/vqa-v2/cache/vocab.json')
+
+    #tokens_dict = vqa_dataset.compute_vocab_stats()
+
+    vocab = vqa_dataset.vocab_questions
+    new_d = {}
+    for k in sorted(vocab, key=len):
+        new_d[k] = vocab[k]
+
+    tokens_to_remove = ["-", ".", "/", "(", ")", "`", "#", "^", ":"]
 
     # test of answers vocab:
     answers_ids = list(vqa_dataset.ans2label.values())
