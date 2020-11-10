@@ -19,12 +19,13 @@ To download the dataset directly via the shell, you can run the following comman
 * And activate it: `conda activate rl-nlp`
 * The required library can be installed via the file requirements.txt: `pip install -r requirements.txt`
 * The code relies on the CLOSURE github: you need to install it with: `python -m pip install git+https://github.com/gqkc/CLOSURE.git --upgrade`
-* And on the VILBERT multi-task github: `python -m pip install git+https://github.com/gqkc/vilbert-multi-task.git`
+* And on the VILBERT multi-task github: `python -m pip install git+https://github.com/gqkc/vilbert-multi-task.git --upgrade`
 
 ## Data preprocessing
+### CLEVR
 * To run all the scripts from the origin repo (RL-NLP), run first the following command line: `export PYTHONPATH=src:${PYTHONPATH}`
 
-### Preprocessing the dataset questions
+#### Preprocessing the dataset questions
 To preprocess the questions of the three datasets, run the scripts src/sh/preprocess_questions or the 3 following command lines (in this order): 
 
 * `python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/questions/CLEVR_train_questions.json" \`
@@ -35,6 +36,13 @@ To preprocess the questions of the three datasets, run the scripts src/sh/prepro
 
 * `python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/questions/CLEVR_test_questions.json" \`
 `-out_vocab_path "data/vocab.json" -out_h5_path "data/test_questions.h5" -min_token_count 1`
+
+### VQA
+1. First, extract the vocab:
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_h5_path "data/vqa-v2/reduced_coco_train.lmdb"
+> This creates a file "vocab.json" with the vocab.
+2. Once the vocab is extracted, you can create the preprocessed pkl file for each dataset:
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_h5_path "data/vqa-v2/reduced_coco_train.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -test 1
 
 ### Extracting the image features
 To extract the image features, run the script src/sh/extract_features.py or the 3 following command lines (batch size arg must be tuned depending on memory availability): 
