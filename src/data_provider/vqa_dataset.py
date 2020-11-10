@@ -36,6 +36,7 @@ def _create_entry(question, answer):
     }
     return entry
 
+
 def clean_key(key, tokens_to_remove):
     bool = False
     for tok in tokens_to_remove:
@@ -222,7 +223,8 @@ class VQADataset(Dataset):
                 if self.split == 'train':
                     self.split_entries()
 
-    def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"], save_first_words=False):
+    def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
+                         save_first_words=False):
         true_vocab = self.special_tokens
         first_words = []
         for entry in self.entries:
@@ -242,7 +244,6 @@ class VQADataset(Dataset):
         if save_first_words:
             with open(first_words_path, 'w') as f:
                 json.dump(first_words, f)
-
 
     def set_traduction_dictionnaries(self):
         self.dataset_to_lm_trad = self.question_tokenizer.dataset_to_lm_trad
@@ -395,7 +396,6 @@ class VQADataset(Dataset):
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
             image_id = int(random.choice(self._image_features_reader._image_ids))
-        #question_id = entry["question_id"]
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -413,11 +413,6 @@ class VQADataset(Dataset):
         features = torch.tensor(mix_features_pad).float()
         image_mask = torch.tensor(image_mask).long()
         spatials = torch.tensor(mix_boxes_pad).float()
-
-        #question = entry["q_token"]
-        #question_vil = entry["q_token_vilbert"]
-        #input_mask = entry["q_input_mask"]
-        #segment_ids = entry["q_segment_ids"]
 
         co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
         target = torch.zeros(self.len_vocab_answer)
@@ -454,6 +449,8 @@ if __name__ == '__main__':
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/reduced_coco_train.lmdb",
                         help="data folder containing questions embeddings and img features")
+    parser.add_argument("-vocab_path", type=str)
+    parser.add_argument("-split", type=str, default="minval")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
 
@@ -463,13 +460,18 @@ if __name__ == '__main__':
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
-    vqa_dataset = VQADataset(split="trainval", dataroot=args.data_path,
-                             question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
-                             reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, tokenize=False)
+    if args.vocab_path is None:
+        vqa_dataset = VQADataset(split="trainval", dataroot=args.data_path,
+                                 question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
+                                 reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                                 num_images=20, tokenize=False)
 
-    # vqa_dataset = VQADataset(split="minval", dataroot=args.data_path,
-    #                          question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
-    #                          reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path='../../data/vqa-v2/cache/vocab.json')
+    else:
+        print("Building {} dataset...".format(args.split))
+        vqa_dataset = VQADataset(split=args.split, dataroot=args.data_path,
+                                 question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
+                                 reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                                 num_images=20, vocab_path=args.vocab_path)
 
     if args.test:
         vocab = vqa_dataset.vocab_questions
@@ -504,14 +506,15 @@ if __name__ == '__main__':
         print("print test of decode function...")
         # test of get_items:
         (features,
-            spatials,
-            image_mask,
-            co_attention_mask,
-            target,
-            labels,
-            entry) = vqa_dataset.__getitem__(1)
+         spatials,
+         image_mask,
+         co_attention_mask,
+         target,
+         labels,
+         entry) = vqa_dataset.__getitem__(1)
         print("true question:{}".format(entry["question"]))
-        print("question decoded - question_tokenizer: {}".format(vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
+        print("question decoded - question_tokenizer: {}".format(
+            vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
         print(target.shape)  # 3129 answers.

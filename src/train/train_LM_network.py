@@ -47,8 +47,8 @@ if __name__ == '__main__':
     parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-bs", type=int, default=512, help="batch size")
     parser.add_argument("-ep", type=int, default=30, help="number of epochs")
-    parser.add_argument("-data_path", type=str, required=True, default='../../data')
-    parser.add_argument("-out_path", type=str, required=True, default='../../output')
+    parser.add_argument("-data_path", type=str, default='../../data')
+    parser.add_argument("-out_path", type=str, default='../../output')
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
@@ -79,20 +79,19 @@ if __name__ == '__main__':
             images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
             question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
-            train_dataset = VQADataset(task="1_gpt", split="train", dataroot=args.data_path,
+            train_dataset = VQADataset(split="train", dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
-            val_dataset = VQADataset(task="1_gpt", split="val", dataroot=args.data_path,
+            val_dataset = VQADataset(split="val", dataroot=args.data_path,
                                        question_tokenizer=question_tokenizer,
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                        num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
-            test_dataset = VQADataset(task="1_gpt", split="val", dataroot=args.data_path,
+            test_dataset = VQADataset(split="val", dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                      num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
-
 
         return train_dataset, val_dataset, test_dataset
 
