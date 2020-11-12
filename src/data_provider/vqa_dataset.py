@@ -208,6 +208,7 @@ class VQADataset(Dataset):
         if tokenize:
             if not os.path.exists(cache_path):
                 self.entries = _load_dataset(dataroot, split, clean_datasets)
+                print("tokenizing")
                 self.tokenize()
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
@@ -400,6 +401,7 @@ class VQADataset(Dataset):
         entry = entries[index]
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
+            print("getting random image")
             image_id = int(random.choice(self._image_features_reader._image_ids[:-1]))
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
