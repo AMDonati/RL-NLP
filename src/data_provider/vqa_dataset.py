@@ -276,9 +276,8 @@ class VQADataset(Dataset):
         no_idx = self.ans2label["no"]
         for entry in self.entries:
             print(entry["question"])
-            len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
-            if len_q >= min_len_questions and number_of_answers == num_answers:
+            if number_of_answers == num_answers:
                 if filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
