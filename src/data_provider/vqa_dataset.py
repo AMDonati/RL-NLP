@@ -6,7 +6,7 @@
 from nltk.probability import FreqDist
 import os
 import json
-import _pickle as cPickle
+import cPickle
 import logging
 
 import numpy as np
