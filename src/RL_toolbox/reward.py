@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from vilbert.vilbert import VILBertForVLTasks, BertConfig
+from models.vilbert import VILBertForVLTasks, BertConfig
 from vr.utils import load_execution_engine, load_program_generator
 
 
@@ -163,7 +163,7 @@ class VILBERT(Reward):
         )
         reward=torch.argmax(vil_prediction) == torch.argmax(target)
         reward=int(reward)
-        return reward.cpu().numpy(), "N/A", None
+        return reward, "N/A", None
 
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu, "vilbert": VILBERT}
