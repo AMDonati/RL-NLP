@@ -187,7 +187,7 @@ class VQAEnv(GenericEnv):
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
         self.env_idx = np.random.randint(0, len(entries))
-        (features, spatials, image_mask, co_attention_mask, question, target, input_mask, segment_ids, labels,
+        (features, spatials, image_mask, co_attention_mask, question,question_vil, target, input_mask, segment_ids, labels,
          entry) = self.dataset.__getitem__(self.env_idx, sl=False, mode=self.mode)
         self.entry = entry
         self.ref_question_idx = entry["question_id"]

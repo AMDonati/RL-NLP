@@ -1,4 +1,5 @@
 import json
+import time
 
 import nltk
 import numpy as np
@@ -132,23 +133,23 @@ class VILBERT(Reward):
         self.env = env
         config = BertConfig.from_json_file(vocab)  # TODO: find the json file from vilbert-mt github config folder.
         self.model = VILBertForVLTasks.from_pretrained( path, config=config, num_labels=1)
-        print(self.model)
+        #print(self.model)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
-        (features, spatials, image_mask, co_attention_mask, real_question, target, input_mask, segment_ids,
+        (features, spatials, image_mask, co_attention_mask, real_question,real_question_vil, target, input_mask, segment_ids,
          labels, entry) = self.dataset.last_entry
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
-            list(real_question[real_question != 0].numpy()))
+            list(real_question_vil[real_question_vil != 0].numpy()))
         if type(encoded_question) != torch.tensor:
             encoded_question = torch.tensor(encoded_question).view(-1)
         encoded_question = F.pad(input=encoded_question, pad=(0, real_question.size(0) - encoded_question.size(0)),
                                  mode='constant', value=0)
         task_tokens = encoded_question.new().resize_(encoded_question.size(0), 1).fill_(int(self.task_id))
-
+        start_time = time.time()
         vil_prediction, vil_prediction_gqa, vil_logit, vil_binary_prediction, vil_tri_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, _ = self.model(
             encoded_question.unsqueeze(dim=0),
             features.unsqueeze(dim=0),
@@ -159,6 +160,7 @@ class VILBERT(Reward):
             co_attention_mask.unsqueeze(dim=0),
             task_tokens
         )
+        print("--- %s seconds ---" % (time.time() - start_time))
         reward = torch.argmax(vil_prediction) == torch.argmax(target)
         reward = int(reward)
         print(reward)

@@ -319,6 +319,7 @@ class VQADataset(Dataset):
                 entry["question"])
 
             tokens_vil = tokens_vil[: self._max_seq_length - 2]
+            tokens_vil=self.reward_tokenizer.add_special_tokens_single_sentence(tokens_vil)
             segment_ids = [0] * len(tokens_vil)
             input_mask = [1] * len(tokens_vil)
 
@@ -329,19 +330,12 @@ class VQADataset(Dataset):
                 input_mask += padding
                 segment_ids += padding
 
-
             assert_eq(len(tokens_vil), self._max_seq_length)
             entry["q_token_vilbert"] = tokens_vil
             entry["q_token_lm"] = tokens_lm
-            #entry["q_token"] = self.tokenize_with_vocab(tokens_lm)
+            entry["q_token"] = self.tokenize_with_vocab(tokens_lm)
             entry["q_input_mask"] = input_mask
             entry["q_segment_ids"] = segment_ids
-
-            tokens = self.reward_tokenizer.encode(entry["question"])
-            tokens = tokens[: 23 - 2]
-            tokens = self.reward_tokenizer.add_special_tokens_single_sentence(tokens)
-            entry["q_token"] = tokens
-
 
     def tokenize_with_vocab(self, tokens_lm):
         tokens = []
@@ -429,7 +423,7 @@ class VQADataset(Dataset):
         image_mask = torch.tensor(image_mask).long()
         spatials = torch.tensor(mix_boxes_pad).float()
 
-        question = entry["q_token_vilbert"]
+        question = entry["q_token"]
         input_mask = entry["q_input_mask"]
         segment_ids = entry["q_segment_ids"]
 
@@ -448,6 +442,7 @@ class VQADataset(Dataset):
             image_mask,
             co_attention_mask,
             question,
+            entry["q_token_vilbert"],
             target,
             input_mask,
             segment_ids,
