@@ -29,9 +29,9 @@ class VQATokenizer:
         self.idx_to_token = dict(zip(list(vocab.values()), list(vocab.keys())))
         self.dataset_to_lm_trad = {val: self.lm_tokenizer.encoder[key] for key, val in self.vocab.items() if
                                    key in self.lm_tokenizer.encoder.keys()}
-        self.dataset_to_lm_trad[self.special_tokens['<PAD>']] = self.lm_tokenizer.pad_token_id
-        self.dataset_to_lm_trad[self.special_tokens['<SOS>']] = self.lm_tokenizer.bos_token_id
-        self.dataset_to_lm_trad[self.special_tokens['<EOS>']] = self.lm_tokenizer.eos_token_id
-        self.dataset_to_lm_trad[self.special_tokens['<UNK>']] = self.lm_tokenizer.unk_token_id
+        #self.dataset_to_lm_trad[self.special_tokens['<PAD>']] = self.lm_tokenizer.pad_token_id
+        #self.dataset_to_lm_trad[self.special_tokens['<SOS>']] = self.lm_tokenizer.bos_token_id
+        #self.dataset_to_lm_trad[self.special_tokens['<EOS>']] = self.lm_tokenizer.eos_token_id
+        #self.dataset_to_lm_trad[self.special_tokens['<UNK>']] = self.lm_tokenizer.unk_token_id
         self.lm_to_dataset_trad = {v: k for k, v in self.dataset_to_lm_trad.items()}
-        assert len(self.dataset_to_lm_trad)==len(vocab), "error when setting vocab"
+        #assert len(self.dataset_to_lm_trad)==len(vocab), "error when setting vocab"

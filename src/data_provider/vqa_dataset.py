@@ -3,19 +3,22 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from nltk.probability import FreqDist
-import os
-import json
 import _pickle as cPickle
+import json
 import logging
-
-import numpy as np
-import torch
-from torch.utils.data import Dataset
-import pandas as pd
-from nltk.tokenize import word_tokenize
+import os
 import random
+
+import pandas as pd
+import torch
+from nltk.probability import FreqDist
+from nltk.tokenize import word_tokenize
+from torch.utils.data import Dataset
+import numpy as np
 from data_provider._image_features_reader import ImageFeaturesH5Reader
+from pytorch_transformers import BertTokenizer, GPT2Tokenizer
+import argparse
+from data_provider.vqa_tokenizer import VQATokenizer
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -177,6 +180,7 @@ class VQADataset(Dataset):
         self.reward_tokenizer = reward_tokenizer
         self.special_tokens = question_tokenizer.special_tokens
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
+        self.last_entry=None
         '''
         '''
         cache_path = os.path.join(
@@ -204,7 +208,7 @@ class VQADataset(Dataset):
         if tokenize:
             if not os.path.exists(cache_path):
                 self.entries = _load_dataset(dataroot, split, clean_datasets)
-                self.tokenize()
+                self.tokenize(max_seq_length)
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
@@ -300,12 +304,41 @@ class VQADataset(Dataset):
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
 
-    def tokenize(self):
+
+    def tokenize(self, max_length=16):
+        """Tokenizes the questions.
+
+        This will add q_token in each entry of the dataset.
+        -1 represent nil, and should be treated as padding_index in embedding
+        """
+        for entry in self.entries:
+            tokens = self.reward_tokenizer.encode(entry["question"])
+            tokens = tokens[: max_length - 2]
+            tokens = self.reward_tokenizer.add_special_tokens_single_sentence(tokens)
+
+            segment_ids = [0] * len(tokens)
+            input_mask = [1] * len(tokens)
+
+            if len(tokens) < max_length:
+                # Note here we pad in front of the sentence
+                padding = [self._padding_index] * (max_length - len(tokens))
+                tokens = tokens + padding
+                input_mask += padding
+                segment_ids += padding
+
+            assert_eq(len(tokens), max_length)
+            entry["q_token"] = tokens
+            entry["q_input_mask"] = input_mask
+            entry["q_segment_ids"] = segment_ids
+
+
+    def tokenize_old(self):
         """Tokenizes the questions.
         This will add q_token in each entry of the dataset.
         -1 represent nil, and should be treated as padding_index in embedding
         """
         for entry in self.entries:
+
             tokens_vil = self.reward_tokenizer.encode(
                 entry["question"])
             tokens_lm = self.lm_tokenizer.encode(
@@ -395,7 +428,7 @@ class VQADataset(Dataset):
         entry = entries[index]
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
-            image_id = int(random.choice(self._image_features_reader._image_ids))
+            image_id = int(random.choice(self._image_features_reader._image_ids[:-1]))
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -414,6 +447,10 @@ class VQADataset(Dataset):
         image_mask = torch.tensor(image_mask).long()
         spatials = torch.tensor(mix_boxes_pad).float()
 
+        question = entry["q_token"]
+        input_mask = entry["q_input_mask"]
+        segment_ids = entry["q_segment_ids"]
+
         co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
         target = torch.zeros(self.len_vocab_answer)
 
@@ -423,26 +460,26 @@ class VQADataset(Dataset):
             scores = answer["scores"]
             if labels is not None:
                 target.scatter_(0, labels, scores)
-
-        return (
+        self.last_entry = (
             features,
             spatials,
             image_mask,
             co_attention_mask,
+            question,
             target,
+            input_mask,
+            segment_ids,
             labels,
             entry
         )
+        return self.last_entry
 
     def __len__(self):
         return len(self.entries)
 
 
 if __name__ == '__main__':
-    from transformers import BertTokenizer, GPT2Tokenizer
-    import argparse
-    from data_provider.vqa_tokenizer import VQATokenizer
-    import numpy as np
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-data_path", type=str, default='../../data/vqa-v2',

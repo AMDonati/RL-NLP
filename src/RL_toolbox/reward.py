@@ -4,11 +4,12 @@ import nltk
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from vilbert.vilbert import VILBertForVLTasks, BertConfig
 from vr.utils import load_execution_engine, load_program_generator
-#from vilbert.vilbert import VILBertForVLTasks, BertConfig
 
 
 def get_vocab(key, vocab_path):
@@ -41,6 +42,7 @@ class Cosine(Reward):
         S = cosine_similarity(X[0:1], X[1:])
         rew = max(S[0])
         return rew
+
 
 class Levenshtein_(Reward):
     def __init__(self, path=None, vocab=None, dataset=None):
@@ -121,43 +123,46 @@ class VQAAnswer(Reward):
             reward = (preds == real_answer).sum().item()
         return reward, "N/A", preds
 
+
 class VILBERT(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.dataset = dataset
         self.task_id = 1
         self.env = env
-        config = BertConfig.from_json_file(path) #TODO: find the json file from vilbert-mt github config folder.
+        config = BertConfig.from_json_file(vocab)  # TODO: find the json file from vilbert-mt github config folder.
         self.model = VILBertForVLTasks.from_pretrained(
-            "bert-base-uncased",
+            path,
             config=config,
-            num_labels=self.env.dataset.num_labels)
+            num_labels=1)
 
-    def get(self, question, ep_questions_decoded):
-        (features, spatials, image_mask, q, target, labels, input_mask, segment_ids, co_attention_mask, question_id,
-         image_id) = self.env.dataset.__getitem__(self.env.env_idx, sl=False, mode=self.env.mode)
-        task_tokens = question.new().resize_(question.size(0), 1).fill_(int(self.task_id[4:])) #TODO: understand this line.
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
+        if not done:
+            return 0, "N/A", None
+        (features, spatials, image_mask, co_attention_mask, real_question, target, input_mask, segment_ids,
+         labels, entry) = self.dataset.last_entry
+        encoded_question = self.dataset.reward_tokenizer.encode(question)
 
-        #TODO: trad question...
+        if type(encoded_question) != torch.tensor:
+            encoded_question = torch.tensor(encoded_question).view(-1)
+        encoded_question = F.pad(input=encoded_question, pad=(0, real_question.size(0) - encoded_question.size(0)),
+                                 mode='constant', value=0)
+        task_tokens = encoded_question.new().resize_(encoded_question.size(0), 1).fill_(int(self.task_id))
 
         vil_prediction, vil_prediction_gqa, vil_logit, vil_binary_prediction, vil_tri_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, _ = self.model(
-            question,
-            features,
-            spatials,
-            segment_ids,
-            input_mask,
-            image_mask,
-            co_attention_mask,
+            encoded_question.unsqueeze(dim=0),
+            features.unsqueeze(dim=0),
+            spatials.unsqueeze(dim=0),
+            segment_ids.unsqueeze(dim=0),
+            input_mask.unsqueeze(dim=0),
+            image_mask.unsqueeze(dim=0),
+            co_attention_mask.unsqueeze(dim=0),
             task_tokens
         )
-
-        # if task_cfg[task_id]["type"] == "VL-classifier":
-        #     loss = task_losses[task_id](vil_prediction, target)
-        #     loss = loss.mean() * target.size(1)
-        #     batch_score = compute_score_with_logits(vil_prediction, target).sum()
+        return torch.argmax(vil_prediction) == torch.argmax(target),"N/A", None
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu, "vilbert": VILBERT}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
@@ -262,4 +267,3 @@ if __name__ == '__main__':
     print('ref_questions', ref_questions)
     print('reward w/o vocab', reward_func.get(str, ref_questions))
     print('rew with vocab', reward_func_vocab.get(str, ref_questions))
-
