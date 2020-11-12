@@ -6,10 +6,10 @@
 from nltk.probability import FreqDist
 import os
 import json
-import cPickle
+import _pickle as cPickle
 import logging
-
 import numpy as np
+
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
@@ -112,6 +112,20 @@ def _load_dataset(dataroot, name, clean_datasets):
         answers_val = sorted(answers_val, key=lambda x: x["question_id"])
         questions = questions_val[-3000:]
         answers = answers_val[-3000:]
+
+    elif name == "mintrain":
+        question_path_val = os.path.join(
+            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % "train"
+        )
+        questions_val = sorted(
+            json.load(open(question_path_val))["questions"],
+            key=lambda x: x["image_id"],
+        )
+        answer_path_val = os.path.join(dataroot, "cache", "%s_target.pkl" % "train")
+        answers_val = cPickle.load(open(answer_path_val, "rb"))
+        answers_val = sorted(answers_val, key=lambda x: x["image_id"])
+        questions = questions_val[70000:80000]
+        answers = answers_val[70000:80000]
 
     elif name == "test":
         question_path_test = os.path.join(
@@ -389,7 +403,8 @@ class VQADataset(Dataset):
     def get_img_data(self, entry):
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
-            image_id = int(random.choice(self._image_features_reader._image_ids))
+            image_id = 100012
+            #image_id = int(random.choice(self._image_features_reader._image_ids))
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -478,10 +493,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-data_path", type=str, default='../../data/vqa-v2',
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/reduced_coco_train.lmdb",
+    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
-    parser.add_argument("-split", type=str, default="minval")
+    parser.add_argument("-split", type=str, default="mintrain")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
 

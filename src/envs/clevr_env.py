@@ -173,7 +173,7 @@ class VQAEnv(GenericEnv):
         question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
-        modes = {"train": "train", "test_images": "val", "test_text": "train", "minval": "minval"}
+        modes = {"train": "train", "test_images": "val", "test_text": "train", "minval": "minval", "mintrain": "mintrain"}
 
         self.dataset = VQADataset(split=modes[self.mode], dataroot=data_path,
                                   image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
@@ -189,6 +189,7 @@ class VQAEnv(GenericEnv):
         if seed is not None:
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
+        entries = [entry for entry in entries if entry["image_id"] == 100012]
         self.env_idx = np.random.randint(0, len(entries))
         self.entry = entries[self.env_idx]
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)

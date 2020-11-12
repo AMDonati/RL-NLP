@@ -57,9 +57,10 @@ class GenericLanguageModel(LanguageModel):
             example_questions = [s["question"] for s in samples]
             example_questions = " ".join(example_questions)
             self.init_text = init_text + example_questions
-            print("init text for GPT-2 pre-conditioning...", self.init_text)
         else:
             self.init_text = init_text
+        if self.init_text is not None:
+            print("init text for GPT-2 pre-conditioning...", self.init_text)
 
 
     def forward(self, state_text):

@@ -116,7 +116,7 @@ def get_parser():
     parser.add_argument('-init_text', type=str)
     parser.add_argument('-custom_init', type=int, default=0)
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=200, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=300, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
@@ -242,13 +242,13 @@ def get_rl_env(args):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
-        env = VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+        env = VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
         test_modes = ["test_images", "test_text"]
-        test_envs = [VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-                     for mode in test_modes]
-        #test_envs = [env, env]
+        # test_envs = [VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+        #                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+        #              for mode in test_modes]
+        test_envs = [env, env]
     return env, test_envs
 
 
