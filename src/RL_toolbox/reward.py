@@ -143,7 +143,7 @@ class VILBERT(Reward):
          labels, entry) = self.dataset.last_entry
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
-        encoded_question=self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
+        encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
             list(real_question[real_question != 0].numpy()))
         if type(encoded_question) != torch.tensor:
             encoded_question = torch.tensor(encoded_question).view(-1)
@@ -161,8 +161,9 @@ class VILBERT(Reward):
             co_attention_mask.unsqueeze(dim=0),
             task_tokens
         )
-        reward=torch.argmax(vil_prediction) == torch.argmax(target)
-        reward=int(reward)
+        reward = torch.argmax(vil_prediction) == torch.argmax(target)
+        reward = int(reward)
+        print(reward)
         return reward, "N/A", None
 
 
