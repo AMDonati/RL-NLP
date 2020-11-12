@@ -304,35 +304,7 @@ class VQADataset(Dataset):
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
 
-
-    def tokenize(self, max_length=16):
-        """Tokenizes the questions.
-
-        This will add q_token in each entry of the dataset.
-        -1 represent nil, and should be treated as padding_index in embedding
-        """
-        for entry in self.entries:
-            tokens = self.reward_tokenizer.encode(entry["question"])
-            tokens = tokens[: max_length - 2]
-            tokens = self.reward_tokenizer.add_special_tokens_single_sentence(tokens)
-
-            segment_ids = [0] * len(tokens)
-            input_mask = [1] * len(tokens)
-
-            if len(tokens) < max_length:
-                # Note here we pad in front of the sentence
-                padding = [self._padding_index] * (max_length - len(tokens))
-                tokens = tokens + padding
-                input_mask += padding
-                segment_ids += padding
-
-            assert_eq(len(tokens), max_length)
-            entry["q_token"] = tokens
-            entry["q_input_mask"] = input_mask
-            entry["q_segment_ids"] = segment_ids
-
-
-    def tokenize_old(self):
+    def tokenize(self):
         """Tokenizes the questions.
         This will add q_token in each entry of the dataset.
         -1 represent nil, and should be treated as padding_index in embedding

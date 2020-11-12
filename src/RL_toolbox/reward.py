@@ -142,7 +142,9 @@ class VILBERT(Reward):
         (features, spatials, image_mask, co_attention_mask, real_question, target, input_mask, segment_ids,
          labels, entry) = self.dataset.last_entry
         encoded_question = self.dataset.reward_tokenizer.encode(question)
-
+        encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
+        encoded_question=self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
+            list(real_question[real_question != 0].numpy()))
         if type(encoded_question) != torch.tensor:
             encoded_question = torch.tensor(encoded_question).view(-1)
         encoded_question = F.pad(input=encoded_question, pad=(0, real_question.size(0) - encoded_question.size(0)),
@@ -159,7 +161,9 @@ class VILBERT(Reward):
             co_attention_mask.unsqueeze(dim=0),
             task_tokens
         )
-        return torch.argmax(vil_prediction) == torch.argmax(target),"N/A", None
+        reward=torch.argmax(vil_prediction) == torch.argmax(target)
+        reward=int(reward)
+        return reward.cpu().numpy(), "N/A", None
 
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu, "vilbert": VILBERT}
