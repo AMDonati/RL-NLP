@@ -165,6 +165,7 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=None,
             tokenize=True,
+            max_samples = 10
     ):
         super().__init__()
         self.split = split
@@ -177,6 +178,7 @@ class VQADataset(Dataset):
         self.reward_tokenizer = reward_tokenizer
         self.special_tokens = question_tokenizer.special_tokens
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
+        self.max_samples = max_samples
         '''
         '''
         cache_path = os.path.join(
@@ -384,15 +386,7 @@ class VQADataset(Dataset):
         tok_dist = FreqDist(sum_tokens)
         return tok_dist
 
-    def __getitem__(self, index, sl=True, mode="train"):
-        if sl:
-            entries = self.entries
-        else:
-            if mode == "test_text":
-                entries = self.test_entries
-            else:
-                entries = self.filtered_entries
-        entry = entries[index]
+    def get_img_data(self, entry):
         image_id = entry["image_id"]
         if len(self.entries) > len(self._image_features_reader) - 1:
             image_id = int(random.choice(self._image_features_reader._image_ids))
@@ -414,29 +408,66 @@ class VQADataset(Dataset):
         image_mask = torch.tensor(image_mask).long()
         spatials = torch.tensor(mix_boxes_pad).float()
 
-        co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
-        target = torch.zeros(self.len_vocab_answer)
+        return features, image_mask, spatials
 
+    def get_answer_data(self, entry):
+        target = torch.zeros(self.len_vocab_answer)
         if "test" not in self.split:
             answer = entry["answer"]
             labels = answer["labels"]
             scores = answer["scores"]
             if labels is not None:
                 target.scatter_(0, labels, scores)
+        return labels, target
+
+    def __getitem__(self, index):
+        entries = self.filtered_entries
+        entry = entries[index]
+
+        features, image_mask, spatials = self.get_img_data(entry)
+        labels, _ = self.get_answer_data(entry)
+
+        question = entry["q_token"]
+
+        inputs = question[:-1]
+        targets = question[1:]
+
+        return (inputs, targets), labels, (features, image_mask, spatials)
+        #return inputs, targets
+
+    def get_data_for_ViLBERT(self, index, mode="train"):
+        if mode == "test_text":
+            entries = self.test_entries
+        else:
+            entries = self.filtered_entries
+
+        entry = entries[index]
+
+        features, image_mask, spatials = self.get_img_data(entry)
+        _, target = self.get_answer_data(entry)
+        co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
+        question = entry["q_token_vilbert"]
+        input_mask = entry["q_input_mask"]
+        segment_ids = entry["q_segment_ids"]
+        question_id = entry["question_id"]
 
         return (
             features,
             spatials,
             image_mask,
-            co_attention_mask,
+            question,
             target,
-            labels,
-            entry
+            input_mask,
+            segment_ids,
+            co_attention_mask,
+            question_id
         )
 
     def __len__(self):
-        #return len(self.entries)
-        return min(len(self._image_features_reader), len(self.entries))
+        if self.max_samples is not None:
+            return min(self.max_samples, len(self._image_features_reader), len(self.entries))
+        else:
+            return min(len(self._image_features_reader), len(self.entries))
 
 
 if __name__ == '__main__':
@@ -504,17 +535,26 @@ if __name__ == '__main__':
         print("word from dataset vocab")
         print(vqa_dataset.question_tokenizer.decode([trad_token_idx]))
 
+        print("test of get_item function...")
+        (inputs, targets), labels, (features, image_mask, spatials) = vqa_dataset.__getitem__(1)
+        print("inputs", inputs)
+        print("targets", targets)
+        print("answer labels", labels.shape)
+        print("features", features.shape)
+        print("image_mask", image_mask.shape)
+        print("spatials", spatials.shape)
+
+        print("test of get_data_for_VILBERT function...")
+        features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
+            index=0)
+        print("question", question)
+        print("target", target.shape) # 3129 answers.
+
         print("print test of decode function...")
-        # test of get_items:
-        (features,
-         spatials,
-         image_mask,
-         co_attention_mask,
-         target,
-         labels, entry) = vqa_dataset.__getitem__(1)
+        entry = vqa_dataset.filtered_entries[0]
         print("true question:{}".format(entry["question"]))
         print("question decoded - question_tokenizer: {}".format(
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
-        print(target.shape)  # 3129 answers.
+

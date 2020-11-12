@@ -85,19 +85,19 @@ if __name__ == '__main__':
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                        num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
-                                       filter_entries=False)
+                                       filter_entries=True)
             val_dataset = VQADataset(split="minval", dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                      num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
-                                     filter_entries=False)
+                                     filter_entries=True)
             test_dataset = VQADataset(split="minval", dataroot=args.data_path,
                                       question_tokenizer=question_tokenizer,
                                       image_features_reader=images_feature_reader,
                                       reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                       num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
-                                      filter_entries=False)
+                                      filter_entries=True)
 
         return train_dataset, val_dataset, test_dataset
 
@@ -140,7 +140,8 @@ if __name__ == '__main__':
     EPOCHS = args.ep
 
     num_batches = int(len(train_dataset) / args.bs)
-    print_interval = int(num_batches / 10)
+    #print_interval = int(num_batches / 10)
+    print_interval = 10
 
     ###############################################################################
     # Create logger, output_path and config file.
@@ -181,13 +182,7 @@ if __name__ == '__main__':
     train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
     logger.info('checking shape of and values of a sample of the train dataset...')
     idxs = np.random.randint(0, train_dataset.__len__())
-    if args.dataset == "clevr":
-        temp_inp, temp_tar = train_dataset.__getitem__(idxs)
-    elif args.dataset == "vqa":
-        elements = train_dataset.__getitem__(idxs)
-        temp_inp, temp_tar = get_inputs_targets_vqa(elements)
-    logger.info('samples of input questions: {}'.format(temp_inp.data.numpy()))
-    logger.info('samples of target questions: {}'.format(temp_tar.data.numpy()))
+    #(temp_inp, temp_tar), _, _ = train_dataset.__getitem__(idxs)
     logger.info('train dataset length: {}'.format(train_dataset.__len__()))
     logger.info('number of tokens: {}'.format(num_tokens))
     best_val_loss = None

@@ -7,8 +7,8 @@ import torch
 
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from data_provider.vqa_tokenizer import VQATokenizer
 from data_provider.vqa_dataset import *
+from data_provider.vqa_tokenizer import VQATokenizer
 from transformers import BertTokenizer, GPT2Tokenizer
 
 
@@ -189,22 +189,18 @@ class VQAEnv(GenericEnv):
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
         self.env_idx = np.random.randint(0, len(entries))
-        (features,
-            spatials,
-            image_mask,
-            co_attention_mask,
-            target,
-            labels,
-            entry) = self.dataset.__getitem__(self.env_idx, sl=False, mode=self.mode)
-        self.entry = entry
-        self.ref_question_idx = entry["question_id"]
-        self.ref_question = entry["q_token"]
-        self.ref_questions = self.ref_question.view(1, entry["q_token"].size(0))
+        self.entry = entries[self.env_idx]
+        (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)
+        labels, _ = self.dataset.get_answer_data(self.entry)
+        self.ref_question_idx = self.entry["question_id"]
+        self.ref_question = self.entry["q_token"]
+        self.ref_questions = self.ref_question.view(1, -1)
         self.ref_question_decoded = self.entry["question"]
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
         self.img_idx = self.entry["image_id"]
         self.img_feats = features
+        self.img = (features, image_mask, spatials)
 
         # initializing the state.
         state_question = [self.special_tokens.SOS_idx] #TODO: initialize with specific conditionnement.
