@@ -266,7 +266,7 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, min_len_questions=6, num_answers=1, filter_yes_no=True, num_images=100):
+    def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=100):
         self.filtered_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
@@ -435,7 +435,8 @@ class VQADataset(Dataset):
         )
 
     def __len__(self):
-        return len(self.entries)
+        #return len(self.entries)
+        return min(len(self._image_features_reader), len(self.entries))
 
 
 if __name__ == '__main__':
@@ -449,7 +450,7 @@ if __name__ == '__main__':
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/reduced_coco_train.lmdb",
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-vocab_path", type=str)
+    parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
     parser.add_argument("-split", type=str, default="minval")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
@@ -510,8 +511,7 @@ if __name__ == '__main__':
          image_mask,
          co_attention_mask,
          target,
-         labels,
-         entry) = vqa_dataset.__getitem__(1)
+         labels, entry) = vqa_dataset.__getitem__(1)
         print("true question:{}".format(entry["question"]))
         print("question decoded - question_tokenizer: {}".format(
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
