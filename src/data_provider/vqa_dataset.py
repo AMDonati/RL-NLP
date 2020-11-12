@@ -208,7 +208,7 @@ class VQADataset(Dataset):
         if tokenize:
             if not os.path.exists(cache_path):
                 self.entries = _load_dataset(dataroot, split, clean_datasets)
-                self.tokenize(max_seq_length)
+                self.tokenize()
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
