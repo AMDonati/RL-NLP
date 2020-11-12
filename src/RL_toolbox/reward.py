@@ -131,10 +131,8 @@ class VILBERT(Reward):
         self.task_id = 1
         self.env = env
         config = BertConfig.from_json_file(vocab)  # TODO: find the json file from vilbert-mt github config folder.
-        self.model = VILBertForVLTasks.from_pretrained(
-            path,
-            config=config,
-            num_labels=1)
+        self.model = VILBertForVLTasks.from_pretrained( path, config=config, num_labels=1)
+        print(self.model)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
