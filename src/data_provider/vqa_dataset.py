@@ -275,6 +275,7 @@ class VQADataset(Dataset):
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
         for entry in self.entries:
+            print(entry["question"])
             len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
             if len_q >= min_len_questions and number_of_answers == num_answers:
