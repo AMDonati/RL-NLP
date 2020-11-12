@@ -1,5 +1,6 @@
 import torch.nn.functional as F
 import torch
+import numpy as np
 
 class LanguageModel:
     def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=""):
@@ -37,7 +38,7 @@ class ClevrLanguageModel(LanguageModel):
 
 
 class GenericLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" "):
+    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0):
         LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=prefix_tokenizer)
         self.tokenizer = tokenizer
         self.name = "generic"
@@ -46,10 +47,26 @@ class GenericLanguageModel(LanguageModel):
                                  key in self.tokenizer.encoder.keys()}
 
         self.bos_token = self.tokenizer.bos_token
-        self.bos_token = "."
+        self.get_init_text(init_text, custom_init)
+
+    def get_init_text(self, init_text, custom_init, seed=1234):
+        if custom_init > 0:
+            np.random.seed(seed)
+            idxs = np.random.randint(0,len(self.dataset),size=custom_init)
+            samples = np.array(self.dataset.filtered_entries)[list(set(idxs))]
+            example_questions = [s["question"] for s in samples]
+            example_questions = " ".join(example_questions)
+            self.init_text = init_text + example_questions
+            print("init text for GPT-2 pre-conditioning...", self.init_text)
+        else:
+            self.init_text = init_text
+
 
     def forward(self, state_text):
         text = self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(), stop_at_end=True)
+        if self.init_text is not None:
+            text = self.init_text + text
+            #print(text)
         if text == "":
             text = self.tokenizer.bos_token
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
@@ -64,27 +81,36 @@ class GenericLanguageModel(LanguageModel):
 
 
 if __name__ == '__main__':
-    from transformers import AutoModelWithLMHead, AutoTokenizer, BertTokenizer
+    from transformers import AutoModelWithLMHead, GPT2Tokenizer, BertTokenizer
     from data_provider.vqa_dataset import *
+    from data_provider.vqa_tokenizer import VQATokenizer
     print("test of generic language model...")
     vqa_data_path = '../../data/vqa-v2'
-    lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-    features_h5path = "../../data/vqa-v2/reduced_coco_train.lmdb"
-    images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
-    SPECIAL_TOKENS = {
-        '<PAD>': 0,
-        '<SOS>': 1,
-        '<EOS>': 2,
-        '<UNK>': 3,
-    }
-    vqa_dataset = VQADataset(task="1_gpt", split="minval", dataroot=vqa_data_path, lm_tokenizer=tokenizer,
-                             image_features_reader=images_feature_reader,
-                             reward_tokenizer=reward_tokenizer, special_tokens=SPECIAL_TOKENS, clean_datasets=True,
-                             max_seq_length=16, num_images=20)
-    pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, clevr_dataset=vqa_dataset,
-                                         tokenizer=tokenizer)
-    print("length intersection vocab", len(pretrained_lm.clevr_to_lm_trad))
-    print("total length vocab", vqa_dataset.len_vocab) # should be intersection vocab - 4 (special tokens).
 
+    init_string = "The question is:"
+    init_string = "Please generate a question. Here are a few examples:"
+
+    lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+
+    features_h5path = os.path.join(vqa_data_path, "reduced_coco_train.lmdb")
+    images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+
+    question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
+    train_dataset = VQADataset(split="minval", dataroot=vqa_data_path,
+                               question_tokenizer=question_tokenizer,
+                               image_features_reader=images_feature_reader,
+                               reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                               num_images=20, vocab_path=os.path.join(vqa_data_path, 'cache/vocab.json'),
+                               filter_entries=True)
+    lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
+    pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=train_dataset,
+                                         tokenizer=lm_tokenizer, init_text=init_string, custom_init=2)
+
+    print("Test of Language Model forward pass...")
+    state_text = torch.tensor([[4,5,6]])
+    log_probs, logits, _ = pretrained_lm.forward(state_text)
+    print("log_probs", log_probs.shape)
+
+    #print("length intersection vocab", len(pretrained_lm.clevr_to_lm_trad))
+    #print("total length vocab", train_dataset.len_vocab)  # should be intersection vocab - 4 (special tokens).

@@ -184,6 +184,7 @@ class VQAEnv(GenericEnv):
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
 
+
     def reset(self, seed=None):
         if seed is not None:
             np.random.seed(seed)
@@ -203,7 +204,7 @@ class VQAEnv(GenericEnv):
         self.img = (features, image_mask, spatials)
 
         # initializing the state.
-        state_question = [self.special_tokens.SOS_idx] #TODO: initialize with specific conditionnement.
+        state_question = [self.special_tokens.SOS_idx]
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
                                 self.img_feats.unsqueeze(0), self.ref_answer)
         self.step_idx = 0
@@ -235,7 +236,7 @@ if __name__ == '__main__':
     print('Img Idx', env_vqa.img_idx)
     print('Question Idx', env_vqa.ref_question_idx)
     print('Ref question', env_vqa.ref_question)
-    print("Ref Question decoded", env_vqa.ref_question_decoded) #TODO: no blank space between the last word and ?
+    print("Ref Question decoded", env_vqa.ref_question_decoded)
     print('Ref Answer', env_vqa.ref_answer)
     print("entry", env_vqa.entry)
 
@@ -249,3 +250,9 @@ if __name__ == '__main__':
     print("reward", reward)
     print("closest_question", closest_question)
     print("pred answer", pred_answer)
+
+    print("Testing init state  - GPT conditionment...")
+    init_string = "The question is:"
+    env_vqa = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20", init_string=init_string)
+    env_vqa.reset()
+    print("initial state", env_vqa.initial_state)

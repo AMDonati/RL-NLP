@@ -165,7 +165,7 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=None,
             tokenize=True,
-            max_samples = 10
+            max_samples=None
     ):
         super().__init__()
         self.split = split
@@ -433,7 +433,6 @@ class VQADataset(Dataset):
         targets = question[1:]
 
         return (inputs, targets), labels, (features, image_mask, spatials)
-        #return inputs, targets
 
     def get_data_for_ViLBERT(self, index, mode="train"):
         if mode == "test_text":
