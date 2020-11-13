@@ -52,11 +52,12 @@ class GenericLanguageModel(LanguageModel):
     def get_init_text(self, init_text, custom_init, seed=1234):
         if custom_init > 0:
             np.random.seed(seed)
-            idxs = np.random.randint(0,len(self.dataset),size=custom_init)
-            samples = np.array(self.dataset.filtered_entries)[list(set(idxs))]
+            idxs = np.random.randint(0,len(self.dataset.remaining_entries),size=custom_init)
+            samples = np.array(self.dataset.remaining_entries)[list(set(idxs))]
             example_questions = [s["question"] for s in samples]
-            example_questions = " ".join(example_questions)
-            self.init_text = init_text + example_questions
+            example_questions_text = " ".join(example_questions)
+            self.init_text = init_text + example_questions_text
+            self.init_text_short = init_text + " ".join(example_questions[:min(len(example_questions),2)]) + "..."
         else:
             self.init_text = init_text
         if self.init_text is not None:
@@ -67,7 +68,6 @@ class GenericLanguageModel(LanguageModel):
         text = self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(), stop_at_end=True)
         if self.init_text is not None:
             text = self.init_text + text
-            #print(text)
         if text == "":
             text = self.tokenizer.bos_token
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
 
-    features_h5path = os.path.join(vqa_data_path, "reduced_coco_train.lmdb")
+    features_h5path = os.path.join(vqa_data_path, "coco_trainval.lmdb")
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)

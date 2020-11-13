@@ -88,7 +88,7 @@ class VAMetric(Metric):
         state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
                                                                ignored=['<PAD>'])
         if self.language_model.init_text is not None:
-            state_decoded = self.language_model.init_text + " " + state_decoded
+            state_decoded = self.language_model.init_text_short + "\n" + state_decoded
         string = ""
         if kwargs["valid_actions"] is not None:
             top_words_decoded = [self.dataset.question_tokenizer.decode([va]) for va in kwargs["valid_actions"].cpu().numpy()[0]]

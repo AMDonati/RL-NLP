@@ -284,6 +284,7 @@ class VQADataset(Dataset):
 
     def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=100):
         self.filtered_entries = []
+        self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
         for entry in self.entries:
@@ -295,12 +296,15 @@ class VQADataset(Dataset):
                         self.filtered_entries.append(entry)
                 else:
                     self.filtered_entries.append(entry)
+            else:
+                self.remaining_entries.append(entry)
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = np.sort(df.image_id.unique())
             self.images_idx = images_idx[:num_images]
             self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in images_idx]
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
+        self.entries.clear()
 
     def split_entries(self):
         train_entries, test_entries = [], []
@@ -402,9 +406,11 @@ class VQADataset(Dataset):
 
     def get_img_data(self, entry):
         image_id = entry["image_id"]
-        if len(self.entries) > len(self._image_features_reader) - 1:
-            image_id = 100012
-            #image_id = int(random.choice(self._image_features_reader._image_ids))
+        if len(self.filtered_entries) > len(self._image_features_reader) - 1:
+            if self.split == "mintrain":
+                image_id = 100012
+            else:
+                image_id = int(random.choice(self._image_features_reader._image_ids))
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -496,7 +502,7 @@ if __name__ == '__main__':
     parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
-    parser.add_argument("-split", type=str, default="mintrain")
+    parser.add_argument("-split", type=str, default="minval")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
 
