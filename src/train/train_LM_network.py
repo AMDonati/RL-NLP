@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
+    parser.add_argument("-log_interval", type=int, default=10, help="interval logging.")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     # Load data
     ###############################################################################
 
-    def get_datasets(args):
+    def get_datasets(args, device):
         if args.dataset == "clevr":
             train_questions_path = os.path.join(args.data_path, "train_questions.h5")
             val_questions_path = os.path.join(args.data_path, "val_questions.h5")
@@ -80,24 +81,21 @@ if __name__ == '__main__':
             images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
             question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
-            train_dataset = VQADataset(split="minval", dataroot=args.data_path,
+            train_split = "mintrain" if device.type == "cpu" else "train"
+            val_split = "minval" if device.type == "cpu" else "val"
+            train_dataset = VQADataset(split=train_split, dataroot=args.data_path,
                                        question_tokenizer=question_tokenizer,
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                        num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
                                        filter_entries=True)
-            val_dataset = VQADataset(split="minval", dataroot=args.data_path,
+            val_dataset = VQADataset(split=val_split, dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                      num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
                                      filter_entries=True)
-            test_dataset = VQADataset(split="minval", dataroot=args.data_path,
-                                      question_tokenizer=question_tokenizer,
-                                      image_features_reader=images_feature_reader,
-                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                      num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
-                                      filter_entries=True)
+            test_dataset = val_dataset
 
         return train_dataset, val_dataset, test_dataset
 
@@ -160,25 +158,15 @@ if __name__ == '__main__':
     model_path = os.path.join(out_path, 'model.pt')
     config_path = os.path.join(out_path, 'config.json')
 
-    hparams = {}
-    hparams["model"] = args.model
-    hparams["emb_size"] = args.emb_size
-    hparams["hidden_size"] = args.hidden_size
-    hparams["p_drop"] = args.p_drop
-    hparams["grad_clip"] = args.grad_clip
-    hparams["BATCH_SIZE"] = BATCH_SIZE
-    hparams["learning_rate"] = learning_rate
-    config = {"hparams": hparams}
-
     with open(config_path, mode='w') as f:
-        json.dump(config, f)
+        json.dump(args, f)
 
     ################################################################################################################################################
     # Train the model
     ################################################################################################################################################
 
     logger.info("start training...")
-    logger.info("hparams: {}".format(hparams))
+    logger.info("hparams: {}".format(args))
     train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
     logger.info('checking shape of and values of a sample of the train dataset...')
     idxs = np.random.randint(0, train_dataset.__len__())

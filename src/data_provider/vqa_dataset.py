@@ -304,7 +304,7 @@ class VQADataset(Dataset):
             self.images_idx = images_idx[:num_images]
             self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in images_idx]
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
-        self.entries.clear()
+        del self.entries
 
     def split_entries(self):
         train_entries, test_entries = [], []
@@ -485,9 +485,9 @@ class VQADataset(Dataset):
 
     def __len__(self):
         if self.max_samples is not None:
-            return min(self.max_samples, len(self._image_features_reader), len(self.entries))
+            return min(self.max_samples, len(self._image_features_reader), len(self.filtered_entries))
         else:
-            return min(len(self._image_features_reader), len(self.entries))
+            return min(len(self._image_features_reader), len(self.filtered_entries))
 
 
 if __name__ == '__main__':

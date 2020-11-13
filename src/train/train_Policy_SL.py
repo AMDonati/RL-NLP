@@ -94,13 +94,6 @@ if __name__ == '__main__':
     ###############################################################################
     # Build the model
     ###############################################################################
-    # policy_network = PolicyLSTM(num_tokens=num_tokens,
-    #                                 word_emb_size=args.word_emb_size,
-    #                                 emb_size=args.word_emb_size + args.word_emb_size * 7 * 7,
-    #                                 hidden_size=args.hidden_size,
-    #                                 num_layers=args.num_layers,
-    #                                 p_drop=args.p_drop,
-    #                                 rl=False).to(device)
 
     policy_network = PolicyLSTMBatch_SL(num_tokens=num_tokens,
                                         word_emb_size=args.word_emb_size,
