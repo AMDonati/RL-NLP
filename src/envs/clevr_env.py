@@ -5,7 +5,8 @@ import gym
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from data_provider.vqa_dataset import *
-from pytorch_transformers import BertTokenizer, GPT2Tokenizer
+from pytorch_transformers import BertTokenizer
+from transformers import GPT2Tokenizer
 from data_provider.vqa_tokenizer import VQATokenizer
 
 
