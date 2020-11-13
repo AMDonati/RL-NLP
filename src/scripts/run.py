@@ -113,8 +113,10 @@ def get_parser():
                         help="number of training iterations before epsilon truncated set to 1")
     parser.add_argument('-is_loss_correction', type=int, default=1,
                         help="adding the importance sampling ratio correction in the rl loss.")
+    parser.add_argument('-init_text', type=str)
+    parser.add_argument('-custom_init', type=int, default=0)
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=200, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=300, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
@@ -152,13 +154,12 @@ def get_pretrained_lm(args, env):
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
-                                             tokenizer=tokenizer)
+                                             tokenizer=tokenizer, init_text=args.init_text, custom_init=args.custom_init)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
         pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                            tokenizer=env.dataset.question_tokenizer)
-
     return pretrained_lm
 
 
@@ -229,7 +230,7 @@ def log_hparams(logger, args):
     logger.info("Number of TRAINING EPISODES: {}".format(args.num_episodes_train))
     logger.info("Number of TEST EPISODES: {}".format(args.num_episodes_test))
 
-def get_rl_env(args):
+def get_rl_env(args, device):
     # upload env.
     if args.env == "clevr":
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
@@ -241,13 +242,20 @@ def get_rl_env(args):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
-        env = VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode="minval", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+        if device.type == "cpu":
+            env = VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+            test_envs = [env, env]
+        else:
+            env = VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"),
+                         max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
+                         debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+            test_modes = ["test_images", "test_text"]
+            test_envs = [VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-        test_modes = ["test_images", "test_text"]
-        #test_envs = [VQAEnv(args.data_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       #reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-                     #for mode in test_modes]
-        test_envs = [env, env]
+                     for mode in test_modes]
+
     return env, test_envs
 
 
@@ -265,16 +273,17 @@ def run(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     writer = SummaryWriter(log_dir=os.path.join(output_path, "runs"))
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     # log hparams:
     log_hparams(logger, args)
 
     # upload env & pretrained lm, policy network.
-    env, test_envs = get_rl_env(args)
+    env, test_envs = get_rl_env(args, device)
     pretrained_lm = get_pretrained_lm(args, env)
 
     models = {"lstm": PolicyLSTMBatch}
     # creating the policy model.
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy = models[args.model](env.dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters,
@@ -285,7 +294,7 @@ def run(args):
 
     agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_=args)
 
-    eval_mode = ['sampling', 'greedy']  # TODO: put it as a parser arg.
+    eval_mode = ['sampling', 'greedy']
 
     # start training
     if args.resume_training is not None:
