@@ -131,19 +131,20 @@ class VILBERT(Reward):
         self.dataset = dataset
         self.task_id = 1
         self.env = env
-        config = BertConfig.from_json_file(vocab)  # TODO: find the json file from vilbert-mt github config folder.
-        self.model = VILBertForVLTasks.from_pretrained( path, config=config, num_labels=1)
-        #print(self.model)
+        config = BertConfig.from_json_file(vocab)
+        self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
+        # print(self.model)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
-        (features, spatials, image_mask, co_attention_mask, real_question,real_question_vil, target, input_mask, segment_ids,
+        (features, spatials, image_mask, co_attention_mask, real_question, real_question_vil, target, input_mask,
+         segment_ids,
          labels, entry) = self.dataset.last_entry
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
-        #encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
-         #   list(real_question_vil[real_question_vil != 0].numpy()))
+        encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
+           list(real_question_vil[real_question_vil != 0].numpy()))
         if type(encoded_question) != torch.tensor:
             encoded_question = torch.tensor(encoded_question).view(-1)
         encoded_question = F.pad(input=encoded_question, pad=(0, real_question.size(0) - encoded_question.size(0)),
@@ -161,9 +162,13 @@ class VILBERT(Reward):
             task_tokens
         )
         print("--- %s seconds ---" % (time.time() - start_time))
+        _, sorted_indices = torch.sort(vil_prediction, descending=True)
+        rank = (sorted_indices.view(-1) == torch.argmax(target)).nonzero().item()
         reward = torch.argmax(vil_prediction) == torch.argmax(target)
         reward = int(reward)
-        print(reward)
+        print("reward {}".format(reward))
+        print("rank {}".format(rank))
+        print("number of target {}".format((target == 1).nonzero().numpy()))
         return reward, "N/A", None
 
 
