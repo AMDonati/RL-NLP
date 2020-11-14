@@ -60,6 +60,7 @@ class GenericLanguageModel(LanguageModel):
             self.init_text_short = init_text + " ".join(example_questions[:min(len(example_questions),2)]) + "..."
         else:
             self.init_text = init_text
+            self.init_text_short = init_text
         if self.init_text is not None:
             print("init text for GPT-2 pre-conditioning...", self.init_text)
 
