@@ -303,7 +303,7 @@ class PPLMetric(Metric):
                 # getting the probs for the complete policy
                 policy_dist, _, _ = self.policy(state.text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
                                                 alpha=kwargs["alpha"])
-                log_prob_actions = torch.gather(policy_dist.probs, -1, input_ids)
+                log_prob_actions = torch.gather(policy_dist.probs.detach().cpu(), -1, input_ids.cpu())
                 self.measure.extend(log_prob_actions.view(-1))
 
     def compute_(self, **kwargs):
