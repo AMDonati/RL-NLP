@@ -60,6 +60,8 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-data_path", type=str,
                         help="data folder containing questions embeddings and img features")
+    parser.add_argument("-features_path", type=str,
+                        help="data folder containing img features (VQA task)", default="data/vqa-v2/coco_trainval.lmdb")
     parser.add_argument("-out_path", type=str, help="out folder")
     # model args
     parser.add_argument('-model', type=str, default="lstm", help="model")
@@ -84,7 +86,7 @@ def get_parser():
     parser.add_argument("-env", type=str, default="clevr", help="choice of the RL Task. Possible values: clevr or vqa.")
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
-    parser.add_argument('-reward', type=str, default="levenshtein", help="type of reward function")
+    parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
@@ -117,7 +119,7 @@ def get_parser():
     parser.add_argument('-custom_init', type=int, default=0)
     parser.add_argument('-add_answers', type=int, default=0)
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=300, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
@@ -125,12 +127,12 @@ def get_parser():
     parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
-                        default=["running_return", "size_valid_actions",
+                        default=["return", "size_valid_actions",
                                  "valid_actions", "ppl",
                                  "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs", "true_word_rank"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["reward", "dialog", "bleu", "ppl", "ppl_dialog_lm",
+                        default=["return", "dialog", "bleu", "ppl", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs"],
                         help="test metrics")
     # misc.
@@ -244,16 +246,16 @@ def get_rl_env(args, device):
                      for mode in test_modes]
     elif args.env == "vqa":
         if device.type == "cpu":
-            env = VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+            env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                            reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
             test_envs = [env, env]
         else:
-            env = VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"),
+            env = VQAEnv(args.data_path, features_h5path=args.features_path,
                          max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
                          debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
             test_modes = ["test_images", "test_text"]
-            test_envs = [VQAEnv(args.data_path, features_h5path=os.path.join(args.data_path, "coco_trainval.lmdb"), max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+            test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode=mode, max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
 

@@ -42,6 +42,23 @@ class Cosine(Reward):
         rew = max(S[0])
         return rew
 
+class LevenshteinNorm(Reward):
+    def __init__(self, correct_vocab=False, path=None, vocab=None, dataset=None):
+        Reward.__init__(self, path)
+        self.correct_vocab = correct_vocab
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+        if question is None:
+            return 0., "N/A", None
+        else:
+            distances = np.array([nltk.edit_distance(question.split(), true_question.split()) for true_question in
+                              ep_questions_decoded])
+            distance = min(distances)
+            closest_question = ep_questions_decoded[distances.argmin()]
+            distance_norm = distance / (max(len(question.split()), len(closest_question.split())))
+            reward = -distance_norm if done else 0
+            return reward, closest_question, None
+
 class Levenshtein_(Reward):
     def __init__(self, path=None, vocab=None, dataset=None):
         Reward.__init__(self, path)
@@ -157,7 +174,7 @@ class VILBERT(Reward):
         #     batch_score = compute_score_with_logits(vil_prediction, target).sum()
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")

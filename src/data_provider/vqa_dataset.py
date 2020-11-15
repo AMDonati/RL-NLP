@@ -14,6 +14,8 @@ import torch
 from torch.utils.data import Dataset
 import pandas as pd
 from nltk.tokenize import word_tokenize
+import nltk
+nltk.download('punkt')
 import random
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
