@@ -130,7 +130,7 @@ def get_parser():
                         default=["return", "size_valid_actions",
                                  "valid_actions", "ppl",
                                  "dialog", "eps_truncation",
-                                 "ttr_question", "sum_probs", "true_word_rank"], help="train metrics")
+                                 "ttr_question", "sum_probs"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs"],
