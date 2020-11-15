@@ -414,7 +414,7 @@ class TrueWordRankLM(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["origin_log_probs_lm"] is not None:
-            true_action = kwargs["action"].numpy().item()
+            true_action = kwargs["action"].cpu().numpy().item()
             # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
             # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
             true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
