@@ -38,7 +38,7 @@ class ClevrLanguageModel(LanguageModel):
 
 
 class GenericLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0):
+    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0):
         LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=prefix_tokenizer)
         self.tokenizer = tokenizer
         self.name = "generic"
@@ -47,14 +47,18 @@ class GenericLanguageModel(LanguageModel):
                                  key in self.tokenizer.encoder.keys()}
 
         self.bos_token = self.tokenizer.bos_token
-        self.get_init_text(init_text, custom_init)
+        self.get_init_text(init_text, custom_init, add_answers)
 
-    def get_init_text(self, init_text, custom_init, seed=1234):
+    def get_init_text(self, init_text, custom_init, add_answers, seed=1234):
         if custom_init > 0:
             np.random.seed(seed)
             idxs = np.random.randint(0,len(self.dataset.remaining_entries),size=custom_init)
             samples = np.array(self.dataset.remaining_entries)[list(set(idxs))]
             example_questions = [s["question"] for s in samples]
+            if bool(add_answers):
+                example_answers = [s["answer"]["labels"][np.argmax(s["answer"]["scores"].numpy())].item() for s in samples]
+                example_answers = [self.dataset.label2ans[a] for a in example_answers]
+                example_questions = [q+ " " + a.capitalize() + "." for (q,a) in zip(example_questions, example_answers)]
             example_questions_text = " ".join(example_questions)
             self.init_text = init_text + example_questions_text
             self.init_text_short = init_text + " ".join(example_questions[:min(len(example_questions),2)]) + "..."

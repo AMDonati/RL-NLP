@@ -115,6 +115,7 @@ def get_parser():
                         help="adding the importance sampling ratio correction in the rl loss.")
     parser.add_argument('-init_text', type=str)
     parser.add_argument('-custom_init', type=int, default=0)
+    parser.add_argument('-add_answers', type=int, default=0)
     # train / test pipeline:
     parser.add_argument("-num_episodes_train", type=int, default=300, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
@@ -154,7 +155,7 @@ def get_pretrained_lm(args, env):
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
-                                             tokenizer=tokenizer, init_text=args.init_text, custom_init=args.custom_init)
+                                             tokenizer=tokenizer, init_text=args.init_text, custom_init=args.custom_init, add_answers=args.add_answers)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
