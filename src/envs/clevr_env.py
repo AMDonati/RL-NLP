@@ -179,7 +179,7 @@ class VQAEnv(GenericEnv):
                                   image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
                                   reward_tokenizer=reward_tokenizer, clean_datasets=True,
                                   max_seq_length=max_seq_length, min_len_questions=min_len_questions,
-                                  num_answers=num_answers, num_images=num_images, filter_entries=True, vocab_path='../../data/vqa-v2/cache/vocab.json')
+                                  num_answers=num_answers, num_images=num_images, filter_entries=True, vocab_path=os.path.join(data_path, 'cache/vocab.json'))
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
