@@ -39,10 +39,10 @@ To preprocess the questions of the three datasets, run the scripts src/sh/prepro
 
 ### VQA
 1. First, extract the vocab:
-* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_h5_path "data/vqa-v2/reduced_coco_train.lmdb"
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb"
 > This creates a file "vocab.json" with the vocab.
 2. Once the vocab is extracted, you can create the preprocessed pkl file for each dataset:
-* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_h5_path "data/vqa-v2/reduced_coco_train.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -test 1
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -test 1
 
 ### Extracting the image features
 To extract the image features, run the script src/sh/extract_features.py or the 3 following command lines (batch size arg must be tuned depending on memory availability): 

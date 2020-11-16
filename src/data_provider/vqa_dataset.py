@@ -3,22 +3,19 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import _pickle as cPickle
-import json
-import logging
-import os
-import random
-
-import pandas as pd
-import torch
 from nltk.probability import FreqDist
-from nltk.tokenize import word_tokenize
-from torch.utils.data import Dataset
+import os
+import json
+import _pickle as cPickle
+import logging
 import numpy as np
+
+import torch
+from torch.utils.data import Dataset
+import pandas as pd
+from nltk.tokenize import word_tokenize
+import random
 from data_provider._image_features_reader import ImageFeaturesH5Reader
-from pytorch_transformers import BertTokenizer, GPT2Tokenizer
-import argparse
-from data_provider.vqa_tokenizer import VQATokenizer
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
@@ -116,6 +113,20 @@ def _load_dataset(dataroot, name, clean_datasets):
         questions = questions_val[-3000:]
         answers = answers_val[-3000:]
 
+    elif name == "mintrain":
+        question_path_val = os.path.join(
+            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % "train"
+        )
+        questions_val = sorted(
+            json.load(open(question_path_val))["questions"],
+            key=lambda x: x["image_id"],
+        )
+        answer_path_val = os.path.join(dataroot, "cache", "%s_target.pkl" % "train")
+        answers_val = cPickle.load(open(answer_path_val, "rb"))
+        answers_val = sorted(answers_val, key=lambda x: x["image_id"])
+        questions = questions_val[70000:80000]
+        answers = answers_val[70000:80000]
+
     elif name == "test":
         question_path_test = os.path.join(
             dataroot, "v2_OpenEnded_mscoco_%s2015_questions.json" % "test"
@@ -168,6 +179,7 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=None,
             tokenize=True,
+            max_samples=None
     ):
         super().__init__()
         self.split = split
@@ -180,7 +192,7 @@ class VQADataset(Dataset):
         self.reward_tokenizer = reward_tokenizer
         self.special_tokens = question_tokenizer.special_tokens
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
-        self.last_entry=None
+        self.max_samples = max_samples
         '''
         '''
         cache_path = os.path.join(
@@ -188,13 +200,13 @@ class VQADataset(Dataset):
             "cache",
             split + "_" + "entries.pkl")
 
-        if vocab_path is None:
+        vocab_path_ = os.path.join(
+            dataroot,
+            "cache",
+            "vocab.json")
+        if not os.path.isfile(vocab_path_):
             print("Building vocab...")
             self.entries = _load_dataset(dataroot, split, clean_datasets)
-            vocab_path_ = os.path.join(
-                dataroot,
-                "cache",
-                "vocab.json")
             self.build_true_vocab(vocab_path_)
             print("Vocab built...")
         else:
@@ -208,12 +220,10 @@ class VQADataset(Dataset):
         if tokenize:
             if not os.path.exists(cache_path):
                 self.entries = _load_dataset(dataroot, split, clean_datasets)
-                print("tokenizing")
                 self.tokenize()
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
-                print("tokenizing just loading")
                 logger.info("Loading from %s" % cache_path)
                 self.entries = cPickle.load(open(cache_path, "rb"))
 
@@ -272,25 +282,29 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, min_len_questions=6, num_answers=1, filter_yes_no=True, num_images=100):
+    def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=100):
         self.filtered_entries = []
+        self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
         for entry in self.entries:
-            #print(entry["question"])
+            len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
-            if number_of_answers == num_answers:
+            if len_q >= min_len_questions and number_of_answers == num_answers:
                 if filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
                 else:
                     self.filtered_entries.append(entry)
+            else:
+                self.remaining_entries.append(entry)
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = np.sort(df.image_id.unique())
             self.images_idx = images_idx[:num_images]
             self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in images_idx]
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
+        self.entries.clear()
 
     def split_entries(self):
         train_entries, test_entries = [], []
@@ -312,14 +326,12 @@ class VQADataset(Dataset):
         -1 represent nil, and should be treated as padding_index in embedding
         """
         for entry in self.entries:
-
             tokens_vil = self.reward_tokenizer.encode(
                 entry["question"])
             tokens_lm = self.lm_tokenizer.encode(
                 entry["question"])
 
             tokens_vil = tokens_vil[: self._max_seq_length - 2]
-            tokens_vil=self.reward_tokenizer.add_special_tokens_single_sentence(tokens_vil)
             segment_ids = [0] * len(tokens_vil)
             input_mask = [1] * len(tokens_vil)
 
@@ -392,19 +404,13 @@ class VQADataset(Dataset):
         tok_dist = FreqDist(sum_tokens)
         return tok_dist
 
-    def __getitem__(self, index, sl=True, mode="train"):
-        if sl:
-            entries = self.entries
-        else:
-            if mode == "test_text":
-                entries = self.test_entries
-            else:
-                entries = self.filtered_entries
-        entry = entries[index]
+    def get_img_data(self, entry):
         image_id = entry["image_id"]
-        if len(self.entries) > len(self._image_features_reader) - 1:
-            print("getting random image")
-            image_id = int(random.choice(self._image_features_reader._image_ids[:-1]))
+        if len(self.filtered_entries) > len(self._image_features_reader) - 1:
+            if self.split == "mintrain":
+                image_id = 100012
+            else:
+                image_id = int(random.choice(self._image_features_reader._image_ids))
 
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -423,47 +429,79 @@ class VQADataset(Dataset):
         image_mask = torch.tensor(image_mask).long()
         spatials = torch.tensor(mix_boxes_pad).float()
 
-        question = entry["q_token"]
-        input_mask = entry["q_input_mask"]
-        segment_ids = entry["q_segment_ids"]
+        return features, image_mask, spatials
 
-        co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
+    def get_answer_data(self, entry):
         target = torch.zeros(self.len_vocab_answer)
-
         if "test" not in self.split:
             answer = entry["answer"]
             labels = answer["labels"]
             scores = answer["scores"]
             if labels is not None:
                 target.scatter_(0, labels, scores)
-        self.last_entry = (
+        return labels, target
+
+    def __getitem__(self, index):
+        entries = self.filtered_entries
+        entry = entries[index]
+
+        features, image_mask, spatials = self.get_img_data(entry)
+        labels, _ = self.get_answer_data(entry)
+
+        question = entry["q_token"]
+
+        inputs = question[:-1]
+        targets = question[1:]
+
+        return (inputs, targets), labels, (features, image_mask, spatials)
+
+    def get_data_for_ViLBERT(self, index, mode="train"):
+        if mode == "test_text":
+            entries = self.test_entries
+        else:
+            entries = self.filtered_entries
+
+        entry = entries[index]
+
+        features, image_mask, spatials = self.get_img_data(entry)
+        _, target = self.get_answer_data(entry)
+        co_attention_mask = torch.zeros((self._max_region_num, self._max_seq_length))
+        question = entry["q_token_vilbert"]
+        input_mask = entry["q_input_mask"]
+        segment_ids = entry["q_segment_ids"]
+        question_id = entry["question_id"]
+
+        return (
             features,
             spatials,
             image_mask,
-            co_attention_mask,
             question,
-            entry["q_token_vilbert"],
             target,
             input_mask,
             segment_ids,
-            labels,
-            entry
+            co_attention_mask,
+            question_id
         )
-        return self.last_entry
 
     def __len__(self):
-        return len(self.entries)
+        if self.max_samples is not None:
+            return min(self.max_samples, len(self._image_features_reader), len(self.entries))
+        else:
+            return min(len(self._image_features_reader), len(self.entries))
 
 
 if __name__ == '__main__':
-
+    from transformers import BertTokenizer, GPT2Tokenizer
+    import argparse
+    from data_provider.vqa_tokenizer import VQATokenizer
+    import numpy as np
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-data_path", type=str, default='../../data/vqa-v2',
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/reduced_coco_train.lmdb",
+    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-vocab_path", type=str)
+    parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
     parser.add_argument("-split", type=str, default="minval")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
@@ -517,18 +555,26 @@ if __name__ == '__main__':
         print("word from dataset vocab")
         print(vqa_dataset.question_tokenizer.decode([trad_token_idx]))
 
+        print("test of get_item function...")
+        (inputs, targets), labels, (features, image_mask, spatials) = vqa_dataset.__getitem__(1)
+        print("inputs", inputs)
+        print("targets", targets)
+        print("answer labels", labels.shape)
+        print("features", features.shape)
+        print("image_mask", image_mask.shape)
+        print("spatials", spatials.shape)
+
+        print("test of get_data_for_VILBERT function...")
+        features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
+            index=0)
+        print("question", question)
+        print("target", target.shape) # 3129 answers.
+
         print("print test of decode function...")
-        # test of get_items:
-        (features,
-         spatials,
-         image_mask,
-         co_attention_mask,
-         target,
-         labels,
-         entry) = vqa_dataset.__getitem__(1)
+        entry = vqa_dataset.filtered_entries[0]
         print("true question:{}".format(entry["question"]))
         print("question decoded - question_tokenizer: {}".format(
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
-        print(target.shape)  # 3129 answers.
+

@@ -37,24 +37,25 @@ if __name__ == '__main__':
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-dataset", type=str, default="clevr", help="dataset: clevr ou vqa datasets.")
-    parser.add_argument("-model", type=str, default="gru", help="rnn model")
+    parser.add_argument("-dataset", type=str, default="vqa", help="dataset: clevr ou vqa datasets.")
+    parser.add_argument("-model", type=str, default="lstm", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
-    parser.add_argument("-emb_size", type=int, required=True, help="dimension of the embedding layer")
-    parser.add_argument("-hidden_size", type=int, required=True, help="dimension of the hidden state")
-    parser.add_argument("-p_drop", type=float, required=True, help="dropout rate")
+    parser.add_argument("-emb_size", type=int, default=512, help="dimension of the embedding layer")
+    parser.add_argument("-hidden_size", type=int, default=512, help="dimension of the hidden state")
+    parser.add_argument("-p_drop", type=float, default=0., help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
     parser.add_argument("-lr", type=float, default=0.001)
-    parser.add_argument("-bs", type=int, default=512, help="batch size")
+    parser.add_argument("-bs", type=int, default=1, help="batch size")
     parser.add_argument("-ep", type=int, default=30, help="number of epochs")
-    parser.add_argument("-data_path", type=str, default='../../data')
-    parser.add_argument("-out_path", type=str, default='../../output')
+    parser.add_argument("-data_path", type=str, default='../../data/vqa-v2')
+    parser.add_argument("-out_path", type=str, default='../../output/temp')
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
     ###############################################################################
     # Load data
@@ -79,21 +80,27 @@ if __name__ == '__main__':
             images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
 
             question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
-            train_dataset = VQADataset(split="train", dataroot=args.data_path,
-                                     question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
-                                     reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23, num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
-            val_dataset = VQADataset(split="val", dataroot=args.data_path,
+            train_dataset = VQADataset(split="minval", dataroot=args.data_path,
                                        question_tokenizer=question_tokenizer,
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                       num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
-            test_dataset = VQADataset(split="val", dataroot=args.data_path,
+                                       num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                       filter_entries=True)
+            val_dataset = VQADataset(split="minval", dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                     num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'))
+                                     num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                     filter_entries=True)
+            test_dataset = VQADataset(split="minval", dataroot=args.data_path,
+                                      question_tokenizer=question_tokenizer,
+                                      image_features_reader=images_feature_reader,
+                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                                      num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                      filter_entries=True)
 
         return train_dataset, val_dataset, test_dataset
+
 
     train_dataset, val_dataset, test_dataset = get_datasets(args)
 
@@ -133,7 +140,8 @@ if __name__ == '__main__':
     EPOCHS = args.ep
 
     num_batches = int(len(train_dataset) / args.bs)
-    print_interval = int(num_batches / 10)
+    #print_interval = int(num_batches / 10)
+    print_interval = 10
 
     ###############################################################################
     # Create logger, output_path and config file.
@@ -173,14 +181,8 @@ if __name__ == '__main__':
     logger.info("hparams: {}".format(hparams))
     train_loss_history, train_ppl_history, val_loss_history, val_ppl_history = [], [], [], []
     logger.info('checking shape of and values of a sample of the train dataset...')
-    idxs = list(np.random.randint(0, train_dataset.__len__(), size=2))
-    if args.dataset == "clevr":
-        temp_inp, temp_tar = train_dataset.__getitem__(idxs)
-    elif args.dataset == "vqa":
-        elements = train_dataset.__getitem__(idxs)
-        temp_inp, temp_tar = get_inputs_targets_vqa(elements)
-    logger.info('samples of input questions: {}'.format(temp_inp.data.numpy()))
-    logger.info('samples of target questions: {}'.format(temp_tar.data.numpy()))
+    idxs = np.random.randint(0, train_dataset.__len__())
+    #(temp_inp, temp_tar), _, _ = train_dataset.__getitem__(idxs)
     logger.info('train dataset length: {}'.format(train_dataset.__len__()))
     logger.info('number of tokens: {}'.format(num_tokens))
     best_val_loss = None
@@ -188,12 +190,12 @@ if __name__ == '__main__':
         logger.info('epoch {}/{}'.format(epoch + 1, EPOCHS))
         train_function = train_one_epoch_vqa if args.dataset == "vqa" else train_one_epoch
         train_loss, elapsed = train_function(model=model,
-                                              train_generator=train_generator,
-                                              optimizer=optimizer,
-                                              criterion=criterion,
-                                              device=device,
-                                              args=args,
-                                              print_interval=print_interval)
+                                             train_generator=train_generator,
+                                             optimizer=optimizer,
+                                             criterion=criterion,
+                                             device=device,
+                                             args=args,
+                                             print_interval=print_interval)
         logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
         logger.info('time for one epoch...{:5.2f}'.format(elapsed))
         eval_function = evaluate_vqa if args.dataset == "vqa" else evaluate
