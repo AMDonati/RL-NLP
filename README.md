@@ -68,18 +68,13 @@ To extract the image features, run the script src/sh/extract_features.py or the 
   * Pretrained Policy [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing)
 ### Training the Language Model on the Dataset of Questions
 #### CLEVR
-`python src/train/launch_train.py -task "lm" -dataset "clevr" -model "lstm" -num_layers 1 -emb_size 512  \`
-`-hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data" \`
-`-out_path "output" -bs 512 -ep 20 -num_workers 6`
+`python src/train/launch_train.py -task "lm" -dataset "clevr" -model "lstm" -num_layers 1 -emb_size 512 -hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data" -out_path "output" -bs 512 -ep 20 -num_workers 6`
 #### VQA
-`python src/train/launch_train.py -task "lm" -dataset "vqa" -model "lstm" -num_layers 1 -emb_size 512  \`
-`-hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" \`
-`-out_path "output" -bs 512 -ep 50 -num_workers 6`
+`python src/train/launch_train.py -task "lm" -dataset "vqa" -model "lstm" -num_layers 1 -emb_size 512 -hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -out_path "output" -bs 512 -ep 50 -num_workers 6`
 
 ### Pre-training of the Policy with Supervised Learning 
 #### CLEVR
-`python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 \
- -bs 512 -ep 50 -num_workers 0 -max_samples 21`  
+`python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 -bs 512 -ep 50 -num_workers 0 -max_samples 21`  
  N.B: When training only on a CPU, the max_samples args is required to train only on a subset of the dataset. 
  
 ### Training the RL Agent 
