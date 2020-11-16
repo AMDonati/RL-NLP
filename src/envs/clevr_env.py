@@ -190,7 +190,7 @@ class VQAEnv(GenericEnv):
         if seed is not None:
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
-        entries = [entry for entry in entries if entry["image_id"] == 100012]
+        #entries = [entry for entry in entries if entry["image_id"] == 100012]
         self.env_idx = np.random.randint(0, len(entries))
         self.entry = entries[self.env_idx]
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)

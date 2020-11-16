@@ -3,19 +3,20 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import _pickle as cPickle
-import json
-import logging
-import os
-import random
-
-import pandas as pd
-import torch
 from nltk.probability import FreqDist
-from nltk.tokenize import word_tokenize
-from torch.utils.data import Dataset
+import os
+import json
+import _pickle as cPickle
+import logging
 import numpy as np
 
+import torch
+from torch.utils.data import Dataset
+import pandas as pd
+from nltk.tokenize import word_tokenize
+import nltk
+nltk.download('punkt')
+import random
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -305,7 +306,7 @@ class VQADataset(Dataset):
             self.images_idx = images_idx[:num_images]
             self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in images_idx]
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
-        self.entries.clear()
+        del self.entries
 
     def split_entries(self):
         train_entries, test_entries = [], []
@@ -456,7 +457,7 @@ class VQADataset(Dataset):
                 target.scatter_(0, labels, scores)
         return labels, target
 
-    def __getitem__(self, index):
+    def __getitem__(self, index, add_sos_token=True):
         entries = self.filtered_entries
         entry = entries[index]
 
@@ -464,6 +465,8 @@ class VQADataset(Dataset):
         labels, _ = self.get_answer_data(entry)
 
         question = entry["q_token"]
+        if add_sos_token:
+            question = torch.cat([torch.tensor(self.vocab_questions["<SOS>"]).view(1), question])
 
         inputs = question[:-1]
         targets = question[1:]
@@ -500,9 +503,9 @@ class VQADataset(Dataset):
 
     def __len__(self):
         if self.max_samples is not None:
-            return min(self.max_samples, len(self._image_features_reader), len(self.entries))
+            return min(self.max_samples, len(self._image_features_reader), len(self.filtered_entries))
         else:
-            return min(len(self._image_features_reader), len(self.entries))
+            return min(len(self._image_features_reader), len(self.filtered_entries))
 
 
 if __name__ == '__main__':
@@ -583,7 +586,7 @@ if __name__ == '__main__':
         features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
             index=0)
         print("question", question)
-        print("target", target.shape)  # 3129 answers.
+        print("target", target.shape) # 3129 answers.
 
         print("print test of decode function...")
         entry = vqa_dataset.filtered_entries[0]
@@ -592,3 +595,4 @@ if __name__ == '__main__':
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
+

@@ -303,7 +303,7 @@ class PPLMetric(Metric):
                 # getting the probs for the complete policy
                 policy_dist, _, _ = self.policy(state.text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
                                                 alpha=kwargs["alpha"])
-                log_prob_actions = torch.gather(policy_dist.probs, -1, input_ids)
+                log_prob_actions = torch.gather(policy_dist.probs.detach().cpu(), -1, input_ids.cpu())
                 self.measure.extend(log_prob_actions.view(-1))
 
     def compute_(self, **kwargs):
@@ -414,7 +414,7 @@ class TrueWordRankLM(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["origin_log_probs_lm"] is not None:
-            true_action = kwargs["action"].numpy().item()
+            true_action = kwargs["action"].cpu().numpy().item()
             # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
             # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
             true_lm_action = self.language_model.dataset_to_lm_trad[true_action]

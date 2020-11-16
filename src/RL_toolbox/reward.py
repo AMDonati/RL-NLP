@@ -45,6 +45,23 @@ class Cosine(Reward):
         return rew
 
 
+class LevenshteinNorm(Reward):
+    def __init__(self, correct_vocab=False, path=None, vocab=None, dataset=None):
+        Reward.__init__(self, path)
+        self.correct_vocab = correct_vocab
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+        if question is None:
+            return 0., "N/A", None
+        else:
+            distances = np.array([nltk.edit_distance(question.split(), true_question.split()) for true_question in
+                              ep_questions_decoded])
+            distance = min(distances)
+            closest_question = ep_questions_decoded[distances.argmin()]
+            distance_norm = distance / (max(len(question.split()), len(closest_question.split())))
+            reward = -distance_norm if done else 0
+            return reward, closest_question, None
+
 class Levenshtein_(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
@@ -282,3 +299,4 @@ if __name__ == '__main__':
     print('ref_questions', ref_questions)
     print('reward w/o vocab', reward_func.get(str, ref_questions))
     print('rew with vocab', reward_func_vocab.get(str, ref_questions))
+

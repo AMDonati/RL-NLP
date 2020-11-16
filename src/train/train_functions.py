@@ -6,7 +6,7 @@ def assert_correctness_batch(inputs, targets):
     assert torch.all(torch.eq(inputs[:,1:], targets[:,:-1])) == 1, "error in inputs/targets"
 
 
-def train_one_epoch(model, train_generator, optimizer, criterion, device, args, print_interval=10):
+def train_one_epoch(model, train_generator, optimizer, criterion, device, grad_clip=None, print_interval=10):
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
@@ -18,8 +18,8 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, args, 
         loss = criterion(output, targets)
         loss.backward()
         # clip grad norm:
-        if args.grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=args.grad_clip)
+        if grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=grad_clip)
         optimizer.step()
         total_loss += loss.item()
         # print loss every number of batches
@@ -33,29 +33,19 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, args, 
     return curr_loss, elapsed
 
 
-def get_inputs_targets_vqa(elements):
-    entry = elements[6]
-    question = entry["q_token"].view(1,-1)
-    inputs = question[:, :-1]
-    targets = question[:, 1:]
-    return inputs, targets
-
-
-def train_one_epoch_vqa(model, train_generator, optimizer, criterion, device, args, print_interval=10, num_epoch=0):
+def train_one_epoch_vqa(model, train_generator, optimizer, criterion, device, grad_clip=None, print_interval=10):
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
     for batch, ((inputs, targets), _, _) in enumerate(train_generator):
-        #if num_epoch == 0:
-             #assert_correctness_batch(inputs, targets)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
         output, hidden = model(inputs)  # output (S * B, V), hidden (num_layers,B,1)
         loss = criterion(output, targets)
         loss.backward()
         # clip grad norm:
-        if args.grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=args.grad_clip)
+        if grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=grad_clip)
         optimizer.step()
         total_loss += loss.item()
         # print loss every number of batches
@@ -69,11 +59,15 @@ def train_one_epoch_vqa(model, train_generator, optimizer, criterion, device, ar
     return curr_loss, elapsed
 
 
-def train_one_epoch_policy(model, train_generator, optimizer, criterion, device, args, print_interval=10):
+def train_one_epoch_policy(model, train_generator, optimizer, criterion, device, grad_clip, print_interval=10):
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
-    for batch, ((inputs, targets), feats, answers) in enumerate(train_generator):
+    for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
+        if isinstance(img, list):
+            feats = img[0]
+        else:
+            feats = img
         inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
@@ -82,8 +76,8 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
         loss = criterion(log_probs, targets)
         loss.backward()
         # clip grad norm:
-        if args.grad_clip is not None:
-            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=args.grad_clip)
+        if grad_clip is not None:
+            torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=grad_clip)
         optimizer.step()
         total_loss += loss.item()
         # print loss every number of batches
@@ -127,7 +121,11 @@ def evaluate_policy(model, val_generator, criterion, device):
     model.eval()  # turn on evaluation mode which disables dropout.
     total_loss = 0.
     with torch.no_grad():
-        for batch, ((inputs, targets), feats, answers) in enumerate(val_generator):
+        for batch, ((inputs, targets), answers, img) in enumerate(val_generator):
+            if isinstance(img, list):
+                feats = img[0]
+            else:
+                feats = img
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             targets = targets.view(targets.size(1) * targets.size(0)).to(device)
             logits, _ = model(inputs, feats, answers)
