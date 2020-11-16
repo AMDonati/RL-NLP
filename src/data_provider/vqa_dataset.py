@@ -181,8 +181,8 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=None,
             tokenize=True,
-            max_samples=None
-    ):
+            max_samples=None,
+    rl=True):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
@@ -240,7 +240,7 @@ class VQADataset(Dataset):
                 self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
-                if self.split == 'train':
+                if self.split == 'train' and rl:
                     self.split_entries()
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
@@ -286,7 +286,7 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=100):
+    def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=None):
         self.filtered_entries = []
         self.remaining_entries = []
         yes_idx = self.ans2label["yes"]

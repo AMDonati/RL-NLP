@@ -121,13 +121,13 @@ if __name__ == '__main__':
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                        num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
-                                       filter_entries=True)
+                                       filter_entries=True, rl=False)
             val_dataset = VQADataset(split=val_split, dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                      num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
-                                     filter_entries=True)
+                                     filter_entries=True, rl=False)
             test_dataset = val_dataset
 
         return train_dataset, val_dataset, test_dataset
