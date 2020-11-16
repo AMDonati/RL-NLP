@@ -3,20 +3,20 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from nltk.probability import FreqDist
-import os
-import json
 import _pickle as cPickle
+import json
 import logging
+import os
+
+import nltk
+import pandas as pd
+import torch
+from nltk.probability import FreqDist
+from nltk.tokenize import word_tokenize
+from torch.utils.data import Dataset
 import numpy as np
 
-import torch
-from torch.utils.data import Dataset
-import pandas as pd
-from nltk.tokenize import word_tokenize
-import nltk
 nltk.download('punkt')
-import random
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -222,6 +222,8 @@ class VQADataset(Dataset):
         if tokenize:
             if not os.path.exists(cache_path):
                 self.entries = _load_dataset(dataroot, split, clean_datasets)
+                image_ids = list(map(int, image_features_reader._image_ids[:-1]))
+                self.entries = [entry for entry in self.entries if entry["image_id"] in image_ids]
                 self.tokenize()
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
@@ -422,12 +424,6 @@ class VQADataset(Dataset):
 
     def get_img_data(self, entry):
         image_id = entry["image_id"]
-        if len(self.filtered_entries) > len(self._image_features_reader) - 1:
-            if self.split == "mintrain":
-                image_id = 100012
-            else:
-                image_id = int(random.choice(self._image_features_reader._image_ids))
-
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
         mix_num_boxes = min(int(num_boxes), self._max_region_num)
@@ -587,7 +583,7 @@ if __name__ == '__main__':
         features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
             index=0)
         print("question", question)
-        print("target", target.shape) # 3129 answers.
+        print("target", target.shape)  # 3129 answers.
 
         print("print test of decode function...")
         entry = vqa_dataset.filtered_entries[0]
