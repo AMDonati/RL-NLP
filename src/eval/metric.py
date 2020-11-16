@@ -415,12 +415,28 @@ class TrueWordRankLM(Metric):
     def fill_(self, **kwargs):
         if kwargs["origin_log_probs_lm"] is not None:
             true_action = kwargs["action"].cpu().numpy().item()
-            # true_action_decoded = self.dataset.question_tokenizer.decode(text=[true_action])
-            # true_lm_action = self.language_model.tokenizer.encode(text=true_action_decoded, return_tensors="pt")
             true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
             sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
-            rank = int((indices.squeeze() == true_lm_action).nonzero().squeeze().numpy())
+            rank = int((indices.squeeze().cpu() == true_lm_action).nonzero().squeeze().numpy())
             self.measure.append(rank)
+
+    def compute_(self, **kwargs):
+        self.metric.extend(self.measure)
+
+class TrueWordProbLM(Metric):
+    """
+    Compute the probability of the true word in the original lm logits
+    """
+
+    def __init__(self, agent, train_test):
+        Metric.__init__(self, agent, train_test, "true_word_prob", "scalar")
+
+    def fill_(self, **kwargs):
+        if kwargs["origin_log_probs_lm"] is not None:
+            true_action = kwargs["action"].cpu().numpy().item()
+            true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
+            prob = kwargs["origin_log_probs_lm"][:, -1, true_lm_action].exp().cpu().numpy()[0]
+            self.measure.append(prob)
 
     def compute_(self, **kwargs):
         self.metric.extend(self.measure)
@@ -503,7 +519,7 @@ class LMVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            closest_question = self.question_tokenizer.decode(tex=kwargs["closest_question"].split())
+            closest_question = self.question_tokenizer.decode(kwargs["closest_question"].split())
             if len(closest_question) > self.idx_word:
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
@@ -600,4 +616,4 @@ class LMActionProbs(Metric):
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
-           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM}
+           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM, "true_word_prob": TrueWordProbLM}

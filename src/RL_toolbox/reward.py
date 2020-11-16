@@ -8,8 +8,8 @@ import torch
 from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from vilbert.task_utils import compute_score_with_logits
-from vilbert.vilbert import VILBertForVLTasks, BertConfig
+#from vilbert.task_utils import compute_score_with_logits
+#from vilbert.vilbert import VILBertForVLTasks, BertConfig
 from vr.utils import load_execution_engine, load_program_generator
 
 
@@ -46,7 +46,7 @@ class Cosine(Reward):
 
 
 class LevenshteinNorm(Reward):
-    def __init__(self, correct_vocab=False, path=None, vocab=None, dataset=None):
+    def __init__(self, correct_vocab=False, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.correct_vocab = correct_vocab
 
@@ -195,7 +195,7 @@ class VILBERT(Reward):
         return reward, "N/A", None
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "vqa": VQAAnswer, "bleu": Bleu, "vilbert": VILBERT}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu, "vilbert": VILBERT}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
