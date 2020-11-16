@@ -211,7 +211,7 @@ class VQADataset(Dataset):
             print("Vocab built...")
         else:
             print("Loading vocab...")
-            self.load_vocab(vocab_path)
+            self.load_vocab(vocab_path_)
 
         # tokenize with vocab & tensorize
         self.question_tokenizer.set_vocab(self.vocab_questions)
