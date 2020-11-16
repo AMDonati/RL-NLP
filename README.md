@@ -37,14 +37,7 @@ To preprocess the questions of the three datasets, run the scripts src/sh/prepro
 * `python src/preprocessing/preprocess_questions.py -data_path "data/CLEVR_v1.0/questions/CLEVR_test_questions.json" \`
 `-out_vocab_path "data/vocab.json" -out_h5_path "data/test_questions.h5" -min_token_count 1`
 
-### VQA
-1. First, extract the vocab:
-* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb"
-> This creates a file "vocab.json" with the vocab.
-2. Once the vocab is extracted, you can create the preprocessed pkl file for each dataset:
-* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -test 1
-
-### Extracting the image features
+#### Extracting the image features
 To extract the image features, run the script src/sh/extract_features.py or the 3 following command lines (batch size arg must be tuned depending on memory availability): 
 * `python src/preprocessing/extract_features.py \`
   `--input_image_dir data/CLEVR_v1.0/images/train \`
@@ -58,6 +51,13 @@ To extract the image features, run the script src/sh/extract_features.py or the 
   `--input_image_dir data/CLEVR_v1.0/images/test \`
   `--output_h5_file data/test_features.h5 --batch_size 128`
 
+### VQA
+1. First, extract the vocab:
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb"
+> This creates a file "vocab.json" with the vocab.
+2. Once the vocab is extracted, you can create the preprocessed pkl file for each dataset:
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -test 1
+
 ## Training the models 
 #### Link to the pre-trained models 
 1. Language Model .pt file [here](https://drive.google.com/drive/folders/1zRT4EF8xNmilzZMYysyhCj73oQKvBLsX?usp=sharing). 
@@ -67,12 +67,18 @@ To extract the image features, run the script src/sh/extract_features.py or the 
   * Pretrained VQA model (FiLM version [here](https://drive.google.com/file/d/15HiUyfcXcJyGdZEs-knb9EQEFGfyg4cj/view?usp=sharing). 
   * Pretrained Policy [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing)
 ### Training the Language Model on the Dataset of Questions
-`python src/train/train_LM_network.py -model "lstm" -num_layers 1 -emb_size 512  \`
+#### CLEVR
+`python src/train/launch_train.py -task "lm" -dataset "clevr" -model "lstm" -num_layers 1 -emb_size 512  \`
 `-hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data" \`
 `-out_path "output" -bs 512 -ep 20 -num_workers 6`
+#### VQA
+`python src/train/launch_train.py -task "lm" -dataset "vqa" -model "lstm" -num_layers 1 -emb_size 512  \`
+`-hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" \`
+`-out_path "output" -bs 512 -ep 50 -num_workers 6`
 
 ### Pre-training of the Policy with Supervised Learning 
-`python src/train/train_Policy_SL.py -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 \
+#### CLEVR
+`python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 \
  -bs 512 -ep 50 -num_workers 0 -max_samples 21`  
  N.B: When training only on a CPU, the max_samples args is required to train only on a subset of the dataset. 
  
