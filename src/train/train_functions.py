@@ -38,6 +38,7 @@ def train_one_epoch_vqa(model, train_generator, optimizer, criterion, device, gr
     total_loss = 0.
     start_time = time.time()
     for batch, ((inputs, targets), _, _) in enumerate(train_generator):
+        inputs = inputs.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
         output, hidden = model(inputs)  # output (S * B, V), hidden (num_layers,B,1)
