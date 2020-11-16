@@ -443,7 +443,7 @@ class VQADataset(Dataset):
                 target.scatter_(0, labels, scores)
         return labels, target
 
-    def __getitem__(self, index):
+    def __getitem__(self, index, add_sos_token=True):
         entries = self.filtered_entries
         entry = entries[index]
 
@@ -451,6 +451,8 @@ class VQADataset(Dataset):
         labels, _ = self.get_answer_data(entry)
 
         question = entry["q_token"]
+        if add_sos_token:
+            question = torch.cat([torch.tensor(self.vocab_questions["<SOS>"]).view(1), question])
 
         inputs = question[:-1]
         targets = question[1:]

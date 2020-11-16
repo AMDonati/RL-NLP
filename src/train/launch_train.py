@@ -39,25 +39,31 @@ if __name__ == '__main__':
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-task", type=str, default='policy', help="choosing between training the lm or the policy.")
+    # task and data args.
+    parser.add_argument("-task", type=str, default='lm', help="choosing between training the lm or the policy.")
     parser.add_argument("-dataset", type=str, default="vqa", help="dataset: clevr ou vqa datasets.")
+    parser.add_argument("-data_path", type=str, default='../../data/vqa-v2')
+    parser.add_argument("-features_path", type=str, default='../../data/vqa-v2/coco_trainval.lmdb')
+    parser.add_argument("-out_path", type=str, default='../../output/temp')
+    # model params.
     parser.add_argument("-model", type=str, default="lstm", help="rnn model")
-    parser.add_argument('-condition_answer', type=str, default="none", help="conditioning on answer")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-emb_size", type=int, default=512, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=512, help="dimension of the hidden state")
+    # policy network specific args.
     parser.add_argument("-kernel_size", default=1, type=int)
     parser.add_argument("-num_filters", default=3, type=int)
     parser.add_argument("-fusion", default="average", type=str)
     parser.add_argument("-stride", default=2, type=int)
+    parser.add_argument('-condition_answer', type=str, default="none", help="conditioning on answer")
+    # SL algo args.
     parser.add_argument("-p_drop", type=float, default=0., help="dropout rate")
     parser.add_argument("-grad_clip", type=float)
     parser.add_argument("-lr", type=float, default=0.001)
-    parser.add_argument("-bs", type=int, default=1, help="batch size")
-    parser.add_argument("-ep", type=int, default=30, help="number of epochs")
-    parser.add_argument("-data_path", type=str, default='../../data/vqa-v2')
-    parser.add_argument("-out_path", type=str, default='../../output/temp')
+    parser.add_argument("-bs", type=int, default=2, help="batch size")
+    parser.add_argument("-ep", type=int, default=3, help="number of epochs")
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
+    # Misc.
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
@@ -105,8 +111,7 @@ if __name__ == '__main__':
         elif args.dataset == "vqa":
             lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
             reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-            features_h5path = os.path.join(args.data_path, "coco_trainval.lmdb")
-            images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
+            images_feature_reader = ImageFeaturesH5Reader(args.features_path, False)
             question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
             train_split = "mintrain" if device.type == "cpu" else "train"
@@ -174,3 +179,5 @@ if __name__ == '__main__':
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args)
     sl_algo.train()
+    if args.task == "lm":
+        sl_algo.generate_text()

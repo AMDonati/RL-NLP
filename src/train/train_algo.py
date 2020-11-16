@@ -31,22 +31,22 @@ class SLAlgo:
 
 
     def create_out_path(self, args):
-        out_path = '{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.model, args.num_layers,
+        out_path = '{}_{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.task, args.model, args.num_layers,
                                                                                            args.emb_size,
                                                                                            args.hidden_size,
                                                                                            args.p_drop, args.grad_clip,
                                                                                            args.bs, args.lr)
-        out_path = os.path.join(args.out_path, out_path)
-        if not os.path.exists(out_path):
-            os.makedirs(out_path)
-        out_file_log = os.path.join(out_path, 'training_log.log')
+        self.out_path = os.path.join(args.out_path, out_path)
+        if not os.path.exists(self.out_path):
+            os.makedirs(self.out_path)
+        out_file_log = os.path.join(self.out_path, 'training_log.log')
         self.logger = create_logger(out_file_log)
-        self.out_csv = os.path.join(out_path, 'train_history.csv')
-        self.model_path = os.path.join(out_path, 'model.pt')
+        self.out_csv = os.path.join(self.out_path, 'train_history.csv')
+        self.model_path = os.path.join(self.out_path, 'model.pt')
         self.logger.info("hparams: {}".format(vars(args)))
         self.logger.info('train dataset length: {}'.format(self.train_dataset.__len__()))
         self.logger.info('number of tokens: {}'.format(self.train_dataset.len_vocab))
-        self._save_hparams(args, out_path)
+        self._save_hparams(args, self.out_path)
 
     def _save_hparams(self, args, out_path):
         dict_hparams = vars(args)
@@ -99,6 +99,29 @@ class SLAlgo:
         hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
         hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
         write_to_csv(self.out_csv, hist_dict)
+
+    def generate_text(self, temperatures=[None, 0.5, 1, 2], words=50):
+        input = self.test_dataset.vocab_questions["<SOS>"]
+        input = torch.LongTensor([input]).view(1, 1).to(self.device)
+        for temp in temperatures:
+            self.logger.info("generating text with temperature: {}".format(temp))
+            out_file_generate = os.path.join(self.out_path, 'generate_words_temp_{}.txt'.format(temp))
+            with open(out_file_generate, 'w') as f:
+                with torch.no_grad():
+                    for i in range(words):
+                        output, hidden = self.model(input)  # output (1, num_tokens)
+                        if temp is not None:
+                            word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
+                            word_weights = word_weights / word_weights.sum(dim=-1).cpu()
+                            word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
+                        else:
+                            word_idx = output.squeeze().argmax()
+                        input.fill_(word_idx)
+                        word = self.test_dataset.question_tokenizer.decode([word_idx.item()])
+                        f.write(word + ('\n' if i % 20 == 19 else ' '))
+                        if i % 10 == 0:
+                            print('| Generated {}/{} words'.format(i, words))
+                    f.close()
 
 # class PolicyAlgo(SLAlgo)
 #     def __init__(self, model, train_dataset, val_dataset, test_dataset, args):
