@@ -3,18 +3,19 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from nltk.probability import FreqDist
-import os
-import json
 import _pickle as cPickle
+import json
 import logging
+import os
+import random
+
+import pandas as pd
+import torch
+from nltk.probability import FreqDist
+from nltk.tokenize import word_tokenize
+from torch.utils.data import Dataset
 import numpy as np
 
-import torch
-from torch.utils.data import Dataset
-import pandas as pd
-from nltk.tokenize import word_tokenize
-import random
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -320,6 +321,20 @@ class VQADataset(Dataset):
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
 
+    def get_masks_for_tokens(self, tokens):
+        tokens = tokens[: self._max_seq_length - 2]
+        segment_ids = [0] * len(tokens)
+        input_mask = [1] * len(tokens)
+
+        if len(tokens) < self._max_seq_length:
+            # Note here we pad in front of the sentence
+            padding = [self._padding_index] * (self._max_seq_length - len(tokens))
+            tokens = tokens + padding
+            input_mask += padding
+            segment_ids += padding
+        assert_eq(len(tokens), self._max_seq_length)
+        return segment_ids, input_mask, tokens
+
     def tokenize(self):
         """Tokenizes the questions.
         This will add q_token in each entry of the dataset.
@@ -568,7 +583,7 @@ if __name__ == '__main__':
         features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
             index=0)
         print("question", question)
-        print("target", target.shape) # 3129 answers.
+        print("target", target.shape)  # 3129 answers.
 
         print("print test of decode function...")
         entry = vqa_dataset.filtered_entries[0]
@@ -577,4 +592,3 @@ if __name__ == '__main__':
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
-

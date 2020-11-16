@@ -5,10 +5,10 @@ import nltk
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 from nltk.translate.bleu_score import sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from vilbert.task_utils import compute_score_with_logits
 from vilbert.vilbert import VILBertForVLTasks, BertConfig
 from vr.utils import load_execution_engine, load_program_generator
 
@@ -29,7 +29,7 @@ class Reward:
 
 
 class Cosine(Reward):
-    def __init__(self, path, vocab=None, dataset=None):
+    def __init__(self, path, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         with open(path) as json_file:
             data = json.load(json_file)
@@ -46,7 +46,7 @@ class Cosine(Reward):
 
 
 class Levenshtein_(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
 
@@ -60,7 +60,7 @@ class Levenshtein_(Reward):
 
 
 class Bleu(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
 
@@ -72,7 +72,7 @@ class Bleu(Reward):
 
 
 class Differential(Reward):
-    def __init__(self, reward_function, path=None, vocab=None, dataset=None):
+    def __init__(self, reward_function, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "step"
         self.reward_function = reward_function
@@ -90,7 +90,7 @@ class Differential(Reward):
 
 
 class VQAAnswer(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -128,31 +128,35 @@ class VQAAnswer(Reward):
 class VILBERT(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.dataset = dataset
+        self.dataset = env.dataset if env is not None else None
         self.task_id = 1
         self.env = env
         config = BertConfig.from_json_file(vocab)
         self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
-        # print(self.model)
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
-        (features, spatials, image_mask, co_attention_mask, real_question, real_question_vil, target, input_mask,
-         segment_ids,
-         labels, entry) = self.dataset.last_entry
+        (features,
+         spatials,
+         image_mask,
+         real_question,
+         target,
+         real_input_mask,
+         real_segment_ids,
+         co_attention_mask,
+         question_id) = self.dataset.get_data_for_ViLBERT(self.env.env_idx)
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
-        encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(
-           list(real_question_vil[real_question_vil != 0].numpy()))
-        if type(encoded_question) != torch.tensor:
-            encoded_question = torch.tensor(encoded_question).view(-1)
-        encoded_question = F.pad(input=encoded_question, pad=(0, real_question.size(0) - encoded_question.size(0)),
-                                 mode='constant', value=0)
+        # encoded_question = F.pad(input=encoded_question, pad=(0, question.size(0) - encoded_question.size(0)),
+        #                        mode='constant', value=0)
+        segment_ids, input_mask, encoded_question = self.dataset.get_masks_for_tokens(encoded_question)
+        segment_ids, input_mask, encoded_question = torch.tensor(segment_ids), torch.tensor(input_mask), torch.tensor(
+            encoded_question).view(-1)
         task_tokens = encoded_question.new().resize_(encoded_question.size(0), 1).fill_(int(self.task_id))
         start_time = time.time()
         vil_prediction, vil_prediction_gqa, vil_logit, vil_binary_prediction, vil_tri_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, _ = self.model(
-            real_question_vil.unsqueeze(dim=0),
+            encoded_question.unsqueeze(dim=0),
             features.unsqueeze(dim=0),
             spatials.unsqueeze(dim=0),
             segment_ids.unsqueeze(dim=0),
@@ -163,9 +167,10 @@ class VILBERT(Reward):
         )
         print("--- %s seconds ---" % (time.time() - start_time))
         _, sorted_indices = torch.sort(vil_prediction, descending=True)
-        rank = (sorted_indices.view(-1) == torch.argmax(target)).nonzero().item()
-        reward = torch.argmax(vil_prediction) == torch.argmax(target)
-        reward = int(reward)
+        reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0))
+        reward = reward.sum().item()
+        ranks = (sorted_indices.squeeze()[..., None] == (target == 1).nonzero().squeeze()).any(-1).nonzero()
+        rank = ranks.min().item()
         print("reward {}".format(reward))
         print("rank {}".format(rank))
         print("number of target {}".format((target == 1).nonzero().numpy()))

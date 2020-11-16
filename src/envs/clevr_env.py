@@ -45,7 +45,7 @@ class GenericEnv(gym.Env):
 
     def set_reward_function(self, reward_type, reward_path, reward_vocab, diff_reward):
         self.reward_type = reward_type
-        self.reward_func = rewards[reward_type](path=reward_path, vocab=reward_vocab, dataset=self.dataset)
+        self.reward_func = rewards[reward_type](path=reward_path, vocab=reward_vocab, dataset=self.dataset, env=self)
         self.diff_reward = diff_reward
         if diff_reward:
             self.reward_func = Differential(self.reward_func)
