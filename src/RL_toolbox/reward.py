@@ -55,12 +55,13 @@ class LevenshteinNorm(Reward):
             return 0., "N/A", None
         else:
             distances = np.array([nltk.edit_distance(question.split(), true_question.split()) for true_question in
-                              ep_questions_decoded])
+                                  ep_questions_decoded])
             distance = min(distances)
             closest_question = ep_questions_decoded[distances.argmin()]
             distance_norm = distance / (max(len(question.split()), len(closest_question.split())))
             reward = -distance_norm if done else 0
             return reward, closest_question, None
+
 
 class Levenshtein_(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
@@ -186,11 +187,11 @@ class VILBERT(Reward):
         _, sorted_indices = torch.sort(vil_prediction, descending=True)
         reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0))
         reward = reward.sum().item()
-        ranks = (sorted_indices.squeeze()[..., None] == (target == 1).nonzero().squeeze()).any(-1).nonzero()
+        ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
         print("reward {}".format(reward))
         print("rank {}".format(rank))
-        print("number of target {}".format((target == 1).nonzero().numpy()))
+        print("number of target {}".format((target != 0).nonzero().numpy()))
         return reward, "N/A", None
 
 
@@ -299,4 +300,3 @@ if __name__ == '__main__':
     print('ref_questions', ref_questions)
     print('reward w/o vocab', reward_func.get(str, ref_questions))
     print('rew with vocab', reward_func_vocab.get(str, ref_questions))
-
