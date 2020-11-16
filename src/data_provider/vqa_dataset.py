@@ -301,7 +301,8 @@ class VQADataset(Dataset):
                 else:
                     self.filtered_entries.append(entry)
             else:
-                self.remaining_entries.append(entry)
+                if entry["answer"]["labels"] is not None:
+                    self.remaining_entries.append(entry)
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = np.sort(df.image_id.unique())
