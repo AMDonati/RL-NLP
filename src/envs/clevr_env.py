@@ -230,7 +230,11 @@ if __name__ == '__main__':
 
     print("Testing VQA Env...")
     vqa_data_path = '../../data/vqa-v2'
-    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="mintrain", max_seq_length=16, debug="0,20")
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train", max_seq_length=16, debug="0,20")
+    env_vqa.mode = "test_text"
+    env_vqa.reset()
+    env_vqa.mode = "train"
+
     print(len(env.dataset.vocab_questions))
     state = env_vqa.reset()
     print("State idx", env_vqa.env_idx)
@@ -240,9 +244,6 @@ if __name__ == '__main__':
     print("Ref Question decoded", env_vqa.ref_question_decoded)
     print('Ref Answer', env_vqa.ref_answer)
     print("entry", env_vqa.entry)
-
-    env_vqa.mode = "test_text"
-    env_vqa.reset()
 
     print("checking step function for VQA env...")
     state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(6))
