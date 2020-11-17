@@ -134,7 +134,7 @@ def get_parser():
                         help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
-    parser.add_argument('-log_interval', type=int, default=10, help="log interval")
+    parser.add_argument('-log_interval', type=int, default=100, help="log interval")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
 
     return parser

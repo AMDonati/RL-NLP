@@ -98,7 +98,7 @@ class VAMetric(Metric):
         self.measure.append(string)
 
     def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
+        self.metric.extend(self.measure[0])
 
     def log(self, **kwargs):
         if kwargs["valid_actions"] is not None:
