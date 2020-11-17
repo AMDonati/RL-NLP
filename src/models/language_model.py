@@ -9,9 +9,11 @@ class LanguageModel:
         self.language_model = pretrained_lm.to(self.device)
         self.dataset = dataset
         self.prefix_tokenizer = prefix_tokenizer
-        self.dataset_to_lm_trad = {value: self.tokenizer.encode(text=prefix_tokenizer + key)[0] for
-                                   key, value in self.dataset.vocab_questions.items() if
-                                   len(self.tokenizer.encode(text=prefix_tokenizer + key)) == 1}
+        #self.dataset_to_lm_trad = {value: self.tokenizer.encode(text=prefix_tokenizer + key)[0] for
+                                   #key, value in self.dataset.vocab_questions.items() if
+                                   #len(self.tokenizer.encode(text=prefix_tokenizer + key)) == 1}
+        self.init_text = None
+        self.init_text_short = None
 
     def forward(self, state):
         pass
@@ -26,6 +28,7 @@ class LanguageModel:
 class ClevrLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, dataset, tokenizer=None):
         LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer)
+        self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
 
     def forward(self, state_text):
         seq_len = state_text.size(1)
@@ -35,6 +38,20 @@ class ClevrLanguageModel(LanguageModel):
         last_log_probas = log_probas.view(len(state_text), seq_len, -1)
         last_log_probas = last_log_probas[:, -1, :]
         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
+
+# class VQALanguageModel(LanguageModel):
+#     def __init__(self, pretrained_lm, dataset, tokenizer=None):
+#         LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer)
+#         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
+#
+#     def forward(self, state_text):
+#         seq_len = state_text.size(1)
+#         log_probas, logits = self.language_model(state_text.to(self.device))
+#         logits = logits.view(len(state_text), seq_len, -1)
+#         logits = logits[:, -1, :]
+#         last_log_probas = log_probas.view(len(state_text), seq_len, -1)
+#         last_log_probas = last_log_probas[:, -1, :]
+#         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
 
 
 class GenericLanguageModel(LanguageModel):
