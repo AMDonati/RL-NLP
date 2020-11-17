@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import pickle
-import random
 
 import numpy as np
 import torch
@@ -68,9 +67,6 @@ class VQADataset(VQAClassificationDataset):
     def __getitem__(self, index):
         entry = self.entries[index]
         image_id = entry["image_id"]
-        if len(self.entries) > len(self._image_features_reader) - 1:
-            print("getting random image")
-            image_id = int(random.choice(self._image_features_reader._image_ids[:-1]))
         question_id = entry["question_id"]
         features, num_boxes, boxes, _ = self._image_features_reader[image_id]
 
@@ -169,8 +165,10 @@ if __name__ == '__main__':
             co_attention_mask,
             task_tokens,
         )
-        compute_score_with_logits()
+        score = compute_score_with_logits(vil_prediction, target).sum()
+        score /= batch_size
         print("{},{}".format(torch.argmax(vil_prediction, dim=-1), torch.argmax(target, dim=-1)))
         _, sorted_indices = torch.sort(vil_prediction, descending=True)
         ranks = torch.gather(sorted_indices, 1, torch.argmax(target, dim=-1).view(-1, 1))
         print("rank {}".format(ranks))
+        print("score {}".format(score))
