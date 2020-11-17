@@ -190,7 +190,6 @@ class VQAEnv(GenericEnv):
         if seed is not None:
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
-        #entries = [entry for entry in entries if entry["image_id"] == 100012]
         self.env_idx = np.random.randint(0, len(entries))
         self.entry = entries[self.env_idx]
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)
@@ -231,7 +230,7 @@ if __name__ == '__main__':
 
     print("Testing VQA Env...")
     vqa_data_path = '../../data/vqa-v2'
-    env_vqa = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20")
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="mintrain", max_seq_length=16, debug="0,20")
     print(len(env.dataset.vocab_questions))
     state = env_vqa.reset()
     print("State idx", env_vqa.env_idx)
@@ -241,6 +240,9 @@ if __name__ == '__main__':
     print("Ref Question decoded", env_vqa.ref_question_decoded)
     print('Ref Answer', env_vqa.ref_answer)
     print("entry", env_vqa.entry)
+
+    env_vqa.mode = "test_text"
+    env_vqa.reset()
 
     print("checking step function for VQA env...")
     state, (reward, closest_question, pred_answer), done, _ = env_vqa.step(np.array(6))
@@ -253,8 +255,9 @@ if __name__ == '__main__':
     print("closest_question", closest_question)
     print("pred answer", pred_answer)
 
-    print("Testing init state  - GPT conditionment...")
+    print("Testing init state  - GPT conditioning...")
     init_string = "The question is:"
     env_vqa = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20", init_string=init_string)
     env_vqa.reset()
     print("initial state", env_vqa.initial_state)
+
