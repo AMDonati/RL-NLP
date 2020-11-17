@@ -83,4 +83,7 @@ To extract the image features, run the script src/sh/extract_features.py or the 
 
 #### logging on tensorboard to display results: 
 * `cd output/2000_img_len_20"`
-* `tensorboard --logdir=experiments/train`
+* `tensorboard --logdir=experiments/train`  
+
+With GCP VM (VM Instance name here = alice_martindonati@pytorch-3-vm), on local machine:  
+* `gcloud compute ssh alice_martindonati@pytorch-3-vm -- -NfL 6006:localhost:6006`

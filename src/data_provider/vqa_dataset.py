@@ -15,6 +15,7 @@ from nltk.probability import FreqDist
 from nltk.tokenize import word_tokenize
 from torch.utils.data import Dataset
 import numpy as np
+import time
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -213,7 +214,9 @@ class VQADataset(Dataset):
             print("Vocab built...")
         else:
             print("Loading vocab...")
+            current_time = time.time()
             self.load_vocab(vocab_path_)
+            print("Time for loading vocab:", time.time()- current_time)
 
         # tokenize with vocab & tensorize
         self.question_tokenizer.set_vocab(self.vocab_questions)
@@ -229,7 +232,9 @@ class VQADataset(Dataset):
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
                 logger.info("Loading from %s" % cache_path)
+                current_time = time.time()
                 self.entries = cPickle.load(open(cache_path, "rb"))
+                print("time to load entries:", time.time() - current_time)
 
             self.len_vocab = len(self.vocab_questions)
             logger.info("vocab size: {}".format(self.len_vocab))
@@ -237,11 +242,15 @@ class VQADataset(Dataset):
 
             # filter entries if needed.
             if filter_entries:
+                current_time = time.time()
                 self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
+                print("time to filter entries:", time.time() - current_time)
                 if self.split == 'train' and rl:
+                    current_time = time.time()
                     self.split_entries()
+                    print("time to split entries:", time.time() - current_time)
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
                          save_first_words=False):
@@ -540,6 +549,7 @@ if __name__ == '__main__':
                                  question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                                  reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                  num_images=20, vocab_path=args.vocab_path)
+
 
     if args.test:
         vocab = vqa_dataset.vocab_questions
