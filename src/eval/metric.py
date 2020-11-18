@@ -623,4 +623,4 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM}
-metrics_to_tensorboard = ["return", "size_valid_actions"]
+metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated"]
