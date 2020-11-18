@@ -298,17 +298,26 @@ class PPLMetric(Metric):
 
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test, "ppl", "scalar")
+        self.agent = agent
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
             with torch.no_grad():
-                input_ids = kwargs["ref_question"].view(1, -1)
                 state = kwargs["state"]
+                sos = torch.tensor([self.dataset.special_tokens["<SOS>"]])
+                ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
                 # getting the probs for the complete policy
-                policy_dist, _, _ = self.policy(state.text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
-                                                alpha=kwargs["alpha"])
-                log_prob_actions = torch.gather(policy_dist.probs.detach().cpu(), -1, input_ids.cpu())
-                self.measure.extend(log_prob_actions.view(-1))
+                ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
+
+                for i, action in enumerate(ref_question[:, 1:].view(-1)):
+                    forced_state = state.__class__(ref_question[:, :i + 1], state.img, state.answer)
+
+                    real_action, log_probs, _, _, dist, _, _, _ = self.agent.act(
+                        state=forced_state,
+                        mode="forced",
+                        truncation=True,
+                        timestep=i)
+                    self.measure.append(log_probs)
 
     def compute_(self, **kwargs):
         ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
