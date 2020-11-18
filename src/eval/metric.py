@@ -304,14 +304,21 @@ class PPLMetric(Metric):
             with torch.no_grad():
                 input_ids = kwargs["ref_question"].view(1, -1)
                 state = kwargs["state"]
+                sos = torch.tensor([self.dataset.special_tokens["<SOS>"]])
+                ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
                 # getting the probs for the complete policy
-                policy_dist, _, _ = self.policy(state.text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
-                                                alpha=kwargs["alpha"])
-                log_prob_actions = torch.gather(policy_dist.probs.detach().cpu(), -1, input_ids.cpu())
-                self.measure.extend(log_prob_actions.view(-1))
+                ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
+
+                for i, action in enumerate(ref_question[:, 1:].view(-1)):
+                    state_text = ref_question[:, :i + 1]
+                    policy_dist, _, _ = self.policy(state_text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
+                                                    alpha=kwargs["alpha"])
+                    prob = policy_dist.probs[:, action]
+                    self.measure.append(prob)
 
     def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+        log_probs = torch.log(torch.stack(self.measure))
+        ppl = torch.exp(-log_probs.sum() / len(self.measure)).cpu().numpy().item()
         self.metric.append(ppl)
 
 
