@@ -115,7 +115,7 @@ def get_parser():
     parser.add_argument('-custom_init', type=int, default=0)
     parser.add_argument('-add_answers', type=int, default=0)
     # train / test pipeline:
-    parser.add_argument("-num_episodes_train", type=int, default=1000, help="number of episodes training")
+    parser.add_argument("-num_episodes_train", type=int, default=100, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
