@@ -124,11 +124,10 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions",
-                                 "valid_actions", "ppl",
-                                 "dialog", "eps_truncation",
+                                 "valid_actions",  "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["return", "dialog", "bleu", "ppl", "ppl_dialog_lm",
+                        default=["return", "dialog", "bleu", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs"],
                         help="test metrics")
     # misc.
@@ -249,22 +248,18 @@ def get_rl_env(args, device):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
-        env_args_train = {"data_path": args.data_path, "features_h5path": args.features_path, "max_len": args.max_len,
-                          "reward_type": args.reward, "mode": "train", "max_seq_length": 23, "debug": args.debug,
-                          "diff_reward": args.diff_reward, "reward_path": args.reward_path,
-                          "reward_vocab": args.reward_vocab, "mask_answers": args.mask_answers}
-        env_args_test_images, env_args_test_text = env_args_train, env_args_train
-        env_args_test_images["mode"] = "test_images"
-        env_args_test_text["mode"] = "test_text"
-
         if device.type == "cpu":
-            env_args_train["mode"] = "mintrain"
-            env = VQAEnv(**env_args_train)
+            env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
             test_envs = [env, env]
         else:
-            env = VQAEnv(**env_args_train)
-            test_envs = [VQAEnv(**env_args_test_images), VQAEnv(**env_args_test_text)]
-
+            env = VQAEnv(args.data_path, features_h5path=args.features_path,
+                         max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
+                         debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+            test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
+                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers), env]
+            test_envs[1].mode = "test_text"
     return env, test_envs
 
 
