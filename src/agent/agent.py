@@ -108,7 +108,7 @@ class Agent:
         epsilon_truncated_sample = random.random()
         if epsilon_truncated_sample < self.epsilon_truncated:
             policy_to_sample_from = policy_dist
-        if self.pretrain:
+        if mode == 'forced':
             action = self.env.ref_question[timestep]
         elif mode == 'sampling':
             action = policy_to_sample_from.sample()
@@ -235,13 +235,15 @@ class Agent:
         logging.info("-" * 60)
 
     def learn(self, num_episodes=100):
+        sampling_mode = "forced" if self.pretrain else "sampling"
         start_time = time.time()
         current_time = time.time()
         timestep = 1
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             seed = i_episode if self.train_seed else None
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
-                timestep=timestep, i_episode=i_episode, env=self.env, seed=seed, metrics=self.metrics["train"])
+                timestep=timestep, i_episode=i_episode, env=self.env, seed=seed,
+                metrics=self.metrics["train"], test_mode=sampling_mode)
             self.update_per_episode(i_episode=i_episode, num_episodes_train=num_episodes)
             if i_episode % self.log_interval == 0:
                 self.log_at_train(i_episode=i_episode, ep_reward=ep_reward, state=state,

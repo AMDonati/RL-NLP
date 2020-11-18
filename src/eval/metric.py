@@ -298,11 +298,11 @@ class PPLMetric(Metric):
 
     def __init__(self, agent, train_test):
         Metric.__init__(self, agent, train_test, "ppl", "scalar")
+        self.agent = agent
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
             with torch.no_grad():
-                input_ids = kwargs["ref_question"].view(1, -1)
                 state = kwargs["state"]
                 sos = torch.tensor([self.dataset.special_tokens["<SOS>"]])
                 ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
@@ -310,15 +310,17 @@ class PPLMetric(Metric):
                 ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
 
                 for i, action in enumerate(ref_question[:, 1:].view(-1)):
-                    state_text = ref_question[:, :i + 1]
-                    policy_dist, _, _ = self.policy(state_text, state.img, state.answer, logits_lm=kwargs["logits_lm"],
-                                                    alpha=kwargs["alpha"])
-                    prob = policy_dist.probs[:, action]
-                    self.measure.append(prob)
+                    forced_state = state.__class__(ref_question[:, :i + 1], state.img, state.answer)
+
+                    real_action, log_probs, _, _, dist, _, _, _ = self.agent.act(
+                        state=forced_state,
+                        mode="forced",
+                        truncation=True,
+                        timestep=i)
+                    self.measure.append(log_probs)
 
     def compute_(self, **kwargs):
-        log_probs = torch.log(torch.stack(self.measure))
-        ppl = torch.exp(-log_probs.sum() / len(self.measure)).cpu().numpy().item()
+        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
         self.metric.append(ppl)
 
 
