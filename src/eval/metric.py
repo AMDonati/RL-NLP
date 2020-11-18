@@ -35,9 +35,10 @@ class Metric:
         self.key = key
         self.train_test = train_test
         # self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
-        self.out_csv_file = os.path.join(self.out_path, self.train_test + '_' + self.key + ".csv")
-        self.stats_path = os.path.join(self.out_path, self.train_test + "_" + self.key + '_stats.csv')
+        self.out_csv_file = os.path.join(self.out_path, "metrics", self.train_test + '_' + self.key + ".csv")
+        self.stats_path = os.path.join(self.out_path, "stats", self.train_test + "_" + self.key + '_stats.csv')
         self.stats = None
+        self.to_tensorboard = True if key in metrics_to_tensorboard else False
 
     def fill(self, **kwargs):
         self.fill_(**kwargs)
@@ -57,10 +58,11 @@ class Metric:
         self.train_test = train_test
 
     def write(self, **kwargs):
-        if self.type == "scalar":
-            self.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
-        elif self.type == "text":
-            self.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
+        if self.to_tensorboard:
+            if self.type == "scalar":
+                self.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
+            elif self.type == "text":
+                self.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
         self.metric_history.extend(self.metric)
         self.metric = []
@@ -70,10 +72,10 @@ class Metric:
 
     def post_treatment(self):
         serie = pd.Series(self.metric_history)
-        #serie.to_csv(self.out_csv_file, index=False)
+        serie.to_csv(self.out_csv_file, index=False)
         if self.type == "scalar":
             self.stats = [serie.mean(), serie.std(), serie.size]
-            pd.Series(self.stats).to_csv(self.stats_path)
+            pd.Series(self.stats).to_csv(self.stats_path, index=False)
 
 
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
@@ -91,7 +93,8 @@ class VAMetric(Metric):
             state_decoded = self.language_model.init_text_short + "\n" + state_decoded
         string = ""
         if kwargs["valid_actions"] is not None:
-            top_words_decoded = [self.dataset.question_tokenizer.decode([va]) for va in kwargs["valid_actions"].cpu().numpy()[0]]
+            top_words_decoded = [self.dataset.question_tokenizer.decode([va]) for va in
+                                 kwargs["valid_actions"].cpu().numpy()[0]]
             weights_words = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
                              zip(top_words_decoded, kwargs["actions_probs"].cpu().detach().numpy()[0])]
             string = "next possible words for {} : {}".format(state_decoded, ", ".join(weights_words))
@@ -423,6 +426,7 @@ class TrueWordRankLM(Metric):
     def compute_(self, **kwargs):
         self.metric.extend(self.measure)
 
+
 class TrueWordProbLM(Metric):
     """
     Compute the probability of the true word in the original lm logits
@@ -616,4 +620,6 @@ class LMActionProbs(Metric):
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
-           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM, "true_word_prob": TrueWordProbLM}
+           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
+           "true_word_prob": TrueWordProbLM}
+metrics_to_tensorboard = ["return", "size_valid_actions"]

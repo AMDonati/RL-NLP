@@ -1,19 +1,18 @@
-import argparse
 import datetime
 import os
 from configparser import ConfigParser
 
+import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
-import argparse
+
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
-from envs.clevr_env import *
+from envs.clevr_env import ClevrEnv,VQAEnv
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
-from utils.utils_train import compute_write_all_metrics
 from utils.utils_train import create_logger
-
+import argparse
 
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
@@ -154,7 +153,8 @@ def get_pretrained_lm(args, env):
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
-                                             tokenizer=tokenizer, init_text=args.init_text, custom_init=args.custom_init, add_answers=args.add_answers)
+                                             tokenizer=tokenizer, init_text=args.init_text,
+                                             custom_init=args.custom_init, add_answers=args.add_answers)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
@@ -197,6 +197,12 @@ def get_output_path(args):
                                        "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
+    stats_path = os.path.join(output_path, "stats")
+    metric_path = os.path.join(output_path, "metrics")
+    if not os.path.isdir(stats_path):
+        os.makedirs(stats_path)
+    if not os.path.isdir(metric_path):
+        os.makedirs(metric_path)
     return output_path
 
 
@@ -230,6 +236,7 @@ def log_hparams(logger, args):
     logger.info("Number of TRAINING EPISODES: {}".format(args.num_episodes_train))
     logger.info("Number of TEST EPISODES: {}".format(args.num_episodes_test))
 
+
 def get_rl_env(args, device):
     # upload env.
     if args.env == "clevr":
@@ -242,18 +249,21 @@ def get_rl_env(args, device):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
+        env_args_train = {"data_path": args.data_path, "features_h5path": args.features_path, "max_len": args.max_len,
+                          "reward_type": args.reward, "mode": "train", "max_seq_length": 23, "debug": args.debug,
+                          "diff_reward": args.diff_reward, "reward_path": args.reward_path,
+                          "reward_vocab": args.reward_vocab, "mask_answers": args.mask_answers}
+        env_args_test_images, env_args_test_text = env_args_train, env_args_train
+        env_args_test_images["mode"] = "test_images"
+        env_args_test_text["mode"] = "test_text"
+
         if device.type == "cpu":
-            env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+            env_args_train["mode"] = "mintrain"
+            env = VQAEnv(**env_args_train)
             test_envs = [env, env]
         else:
-            env = VQAEnv(args.data_path, features_h5path=args.features_path,
-                         max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
-                         debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-            test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers), env]
-            test_envs[1].mode = "test_text"
+            env = VQAEnv(**env_args_train)
+            test_envs = [VQAEnv(**env_args_test_images), VQAEnv(**env_args_test_text)]
 
     return env, test_envs
 
@@ -315,14 +325,15 @@ def run(args):
                 mode))
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
     # write to csv test scalar metrics:
-    if agent.truncate_mode is not None and args.eval_no_trunc:
-        logger.info("computing all metrics for dialog keeping the truncation mask...")
-        compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="with_trunc")
-        logger.info("computing all metrics for dialog without the truncation mask...")
-        compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="no_trunc")
-    else:
-        compute_write_all_metrics(agent=agent, output_path=output_path,
-                                  logger=logger, keep=None)
+    agent.compute_write_all_metrics(output_path=output_path, logger=logger)
+    # if agent.truncate_mode is not None and args.eval_no_trunc:
+    #     logger.info("computing all metrics for dialog keeping the truncation mask...")
+    #     compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="with_trunc")
+    #     logger.info("computing all metrics for dialog without the truncation mask...")
+    #     compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="no_trunc")
+    # else:
+    # compute_write_all_metrics(agent=agent, output_path=output_path,
+    #                          logger=logger, keep=None)
     logger.info(
         '------------------------------------ DONE ---------------------------------------------------------------')
     return agent

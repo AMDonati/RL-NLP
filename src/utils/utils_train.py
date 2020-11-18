@@ -74,7 +74,7 @@ def compute_write_all_metrics(agent, output_path, logger, keep=None):
 
     logger.info(
         "------------------------------------- test metrics statistics -----------------------------------------")
-    for key, metric in agent.test_metrics.items():
+    for key, metric in agent.metrics.items():
         logger.info('------------------- {} -------------------'.format(key))
         # metric.write_to_csv()
         # saving the mean of all metrics in a single csv file:

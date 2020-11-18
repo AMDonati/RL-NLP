@@ -10,6 +10,7 @@ import torch.optim as optim
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
+from utils.utils_train import write_to_csv
 
 
 class Agent:
@@ -36,18 +37,18 @@ class Agent:
         self.epsilon_truncated = epsilon_truncated
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
+        p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
+
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
-        else:
-            self.eval_trunc = {"no_trunc": False}
-        p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
-        if truncate_mode is not None:
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
                                                          p_th=p_th_, pretrained_lm=pretrained_lm,
                                                          top_p=top_p)  # adding the truncation class.
         else:
+            self.eval_trunc = {"no_trunc": False}
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p,
                                                       pretrained_lm=pretrained_lm)
+
         self.writer = writer
         self.out_path = out_path
         self.checkpoints_path = os.path.join(out_path, "checkpoints")
@@ -61,10 +62,14 @@ class Agent:
         self.train_seed = train_seed
 
     def init_metrics(self):
-        self.test_metrics = {key: metrics[key](self, train_test="test") for key in
-                             self.test_metrics_names if key in metrics}
-        self.train_metrics = {key: metrics[key](self, train_test="train") for key in
-                              self.train_metrics_names if key in metrics}
+        self.metrics = {}
+        self.metrics["train"] = {key: metrics[key](self, train_test="train") for key in
+                                 self.train_metrics_names if key in metrics}
+        for trunc in self.eval_trunc.keys():
+            for sampling_mode in ["sampling", "greedy"]:
+                key = "{}_{}".format(trunc, sampling_mode)
+                self.metrics[key] = {key: metrics[key](self, train_test="test") for key in
+                                     self.test_metrics_names if key in metrics}
 
     def update_per_episode(self, i_episode, alpha_min=0.001, update_every=500, num_episodes_train=1000):
         if self.alpha_decay_rate > 0 and self.alpha_logits_lm > alpha_min:
@@ -106,11 +111,7 @@ class Agent:
         if self.pretrain:
             action = self.env.ref_question[timestep]
         elif mode == 'sampling':
-            try:
-                action = policy_to_sample_from.sample()
-            except:
-                action = policy_dist.sample()  # TODO: why this is needed?
-                print("error")
+            action = policy_to_sample_from.sample()
         elif mode == 'greedy':
             action = torch.argmax(policy_to_sample_from.probs).view(1).detach()
         if policy_to_sample_from.probs.size() != policy_dist.probs.size():
@@ -143,9 +144,8 @@ class Agent:
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode)
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
-                             test_mode='sampling'):
+                             test_mode='sampling', metrics=[]):
         state, ep_reward = env.reset(seed), 0
-        metrics = self.train_metrics if train else self.test_metrics
         for t in range(0, env.max_len):
             action, log_probs, value, (
                 valid_actions, actions_probs,
@@ -202,31 +202,26 @@ class Agent:
     def test_env(self, env, num_episodes=10, test_mode='sampling'):
         env.reset()  # init env.
         timestep = 1
-        for m in self.test_metrics.values():
-            m.reinit_train_test(env.mode + '_' + test_mode)
         self.policy.eval()
         for i_episode in range(num_episodes):
-            dialogs = {key: [] for key in self.eval_trunc.keys()}
+            # dialogs = {key: [] for key in self.eval_trunc.keys()}
             logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
-            for key, trunc in self.eval_trunc.items():
-                for m in self.test_metrics.values():
-                    m.reinit_train_test(m.train_test + '_' + key)
+            for key_trunc, trunc in self.eval_trunc.items():
+                metrics = self.metrics["{}_{}".format(key_trunc, test_mode)]
                 for i in range(env.ref_questions.size(
                         0)):  # loop multiple time over the same image to measure langage diversity.
                     with torch.no_grad():
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode,
-                            truncation=trunc)
-                    for _, metric in self.test_metrics.items():
+                            truncation=trunc, metrics=metrics)
+                    for _, metric in metrics.items():
                         metric.write()
-                    if i == env.ref_questions.size(0) - 1:
-                        # reset metrics key value for writing:
-                        for m in self.test_metrics.values():
-                            m.reinit_train_test(env.mode + '_' + test_mode)
-        for _, metric in self.test_metrics.items():
-            metric.post_treatment()
+        for key_trunc in self.eval_trunc.keys():
+            metrics = self.metrics["{}_{}".format(key_trunc, test_mode)]
+            for _, metric in metrics.items():
+                metric.post_treatment()
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
@@ -234,7 +229,7 @@ class Agent:
         logging.info('LAST DIALOG: {}'.format(
             self.env.dataset.question_tokenizer.decode(state.text[:, 1:].numpy()[0])))
         logging.info('Closest Question: {}'.format(closest_question))
-        for key, metric in self.train_metrics.items():
+        for key, metric in self.metrics["train"].items():
             metric.log(valid_actions=valid_actions)
             metric.write()
         logging.info("-" * 60)
@@ -246,13 +241,13 @@ class Agent:
         for i_episode in range(self.start_episode, self.start_episode + num_episodes):
             seed = i_episode if self.train_seed else None
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
-                timestep=timestep, i_episode=i_episode, env=self.env, seed=seed)
+                timestep=timestep, i_episode=i_episode, env=self.env, seed=seed, metrics=self.metrics["train"])
             self.update_per_episode(i_episode=i_episode, num_episodes_train=num_episodes)
             if i_episode % self.log_interval == 0:
                 self.log_at_train(i_episode=i_episode, ep_reward=ep_reward, state=state,
                                   closest_question=closest_question, valid_actions=valid_actions)
                 # write train metrics:
-                for _, metric in self.train_metrics.items():
+                for _, metric in self.metrics["train"].items():
                     metric.write()
 
             if i_episode % 1000 == 0:
@@ -262,13 +257,30 @@ class Agent:
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
 
-        if valid_actions is not None and "action_probs" in self.train_metrics and "action_probs" in self.train_metrics and "action_probs_lm" in self.train_metrics:  # to compare the discrepancy between the 'truncated policy' and the 'all space' policy
+        if valid_actions is not None and "action_probs" in self.metrics["train"] and "action_probs_lm" in self.metrics[
+            "train"]:  # to compare the discrepancy between the 'truncated policy' and the 'all space' policy
             self.writer.add_custom_scalars({'Train_all_probs': {'action_probs': ['Multiline', ['train_action_probs',
                                                                                                'train_action_probs_truncated',
                                                                                                'train_action_probs_lm']]}})
 
-        for _, metric in self.train_metrics.items():
+        for _, metric in self.metrics["train"].items():
             metric.post_treatment()
         logging.info("total training time: {:7.2f}".format(time.time() - start_time))
         logging.info(
             "--------------------------------------------END OF TRAINING ----------------------------------------------------")
+
+    def compute_write_all_metrics(self, output_path, logger):
+        # write to csv test scalar metrics:
+        logger.info(
+            "------------------------------------- test metrics statistics -----------------------------------------")
+        for eval_trunc in self.eval_trunc:
+            logger.info("computing all metrics for dialog with {} ...".format(eval_trunc))
+            csv_file = "all_metrics_{}.csv".format(eval_trunc)
+            trunc_stats = {}
+            for key in self.test_metrics_names:
+                instances_of_metric = [self.metrics[key_mode][key] for key_mode in self.metrics.keys() if
+                                       eval_trunc in key_mode]
+                means = [instance.stats[0] for instance in instances_of_metric if instance.stats is not None]
+                trunc_stats[key] = np.round(np.mean(means), decimals=3)
+
+            write_to_csv(os.path.join(output_path, csv_file), trunc_stats)
