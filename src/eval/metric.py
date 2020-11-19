@@ -303,7 +303,7 @@ class PPLMetric(Metric):
         if kwargs["done"]:
             with torch.no_grad():
                 state = kwargs["state"]
-                sos = torch.tensor([self.dataset.special_tokens["<SOS>"]])
+                sos = torch.tensor([self.dataset.vocab_questions["<SOS>"]])
                 ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
                 # getting the probs for the complete policy
                 ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
