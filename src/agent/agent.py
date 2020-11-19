@@ -249,9 +249,6 @@ class Agent:
             if i_episode % self.log_interval == 0:
                 self.log_at_train(i_episode=i_episode, ep_reward=ep_reward, state=state,
                                   closest_question=closest_question, valid_actions=valid_actions)
-                # write train metrics:
-                for _, metric in self.metrics["train"].items():
-                    metric.write()
 
             if i_episode % 1000 == 0:
                 elapsed = time.time() - current_time
