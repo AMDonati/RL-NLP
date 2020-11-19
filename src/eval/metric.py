@@ -186,7 +186,6 @@ class DialogMetric(Metric):
                                               "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
             self.metric.append(string)
 
-
     def write_to_csv(self):
         '''save padded array of generated dialog for later use (for example with word cloud)'''
         if self.train_test != "train":
@@ -362,7 +361,7 @@ class BleuMetric(Metric):
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
-            ref_questions = [q.split() for q in ref_questions]
+            ref_questions = [q.replace("?", "").split() for q in ref_questions]
             question_tokens = question_decoded.split()
             score = sentence_bleu(ref_questions, question_tokens)
             self.measure.append(score)
