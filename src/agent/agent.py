@@ -82,7 +82,7 @@ class Agent:
             self.epsilon_truncated = 1
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
-    def act(self, state, mode='sampling', truncation=True, timestep=0):
+    def act(self, state, mode='sampling', truncation=True, forced=None):
         valid_actions, action_probs, logits_lm, log_probas_lm, origin_log_probs_lm = self.truncation.get_valid_actions(
             state, truncation)
         alpha = self.alpha_logits_lm
@@ -90,7 +90,7 @@ class Agent:
                                                                                   logits_lm,
                                                                                   alpha=alpha)
         action = self.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
-                                    valid_actions=valid_actions, mode=mode, timestep=timestep)
+                                    valid_actions=valid_actions, mode=mode, forced=forced)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
@@ -103,13 +103,13 @@ class Agent:
                                                                 logits_lm=logits_lm, alpha=alpha)
         return policy_dist, policy_dist_truncated, value
 
-    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling', timestep=0):
+    def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling', forced=None):
         policy_to_sample_from = policy_dist_truncated
         epsilon_truncated_sample = random.random()
         if epsilon_truncated_sample < self.epsilon_truncated:
             policy_to_sample_from = policy_dist
         if mode == 'forced':
-            action = self.env.ref_question[timestep]
+            action = forced
         elif mode == 'sampling':
             action = policy_to_sample_from.sample()
         elif mode == 'greedy':
@@ -147,13 +147,14 @@ class Agent:
                              test_mode='sampling', metrics=[]):
         state, ep_reward = env.reset(seed), 0
         for t in range(0, env.max_len):
+            forced = env.ref_question[t]
             action, log_probs, value, (
                 valid_actions, actions_probs,
                 log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm = self.act(
                 state=state,
                 mode=test_mode,
                 truncation=truncation,
-                timestep=t)
+                forced=forced)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
