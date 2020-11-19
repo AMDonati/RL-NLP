@@ -134,6 +134,7 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
+    parser.add_argument('-device_id', type=str, default="1", help="device id when running on a multi-GPU VM.")
 
     return parser
 
@@ -264,6 +265,8 @@ def get_rl_env(args, device):
 
 
 def run(args):
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.device_id
     # check consistency hparams
     if args.reward == "vqa":
         assert args.condition_answer is not None, "VQA task should be conditioned on the answer"
