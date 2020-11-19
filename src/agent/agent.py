@@ -63,13 +63,18 @@ class Agent:
 
     def init_metrics(self):
         self.metrics = {}
-        self.metrics["train"] = {key: metrics[key](self, train_test="train") for key in
+        self.metrics["train"] = {key: metrics[key](self, train_test="train", id="sampling") for key in
                                  self.train_metrics_names if key in metrics}
-        for trunc in self.eval_trunc.keys():
-            for sampling_mode in ["sampling", "greedy"]:
-                key = "{}_{}".format(trunc, sampling_mode)
-                self.metrics[key] = {key: metrics[key](self, train_test="test") for key in
-                                     self.test_metrics_names if key in metrics}
+        for mode in [env_.mode for env_ in self.test_envs]:
+            for trunc in self.eval_trunc.keys():
+                for sampling_mode in ["sampling", "greedy"]:
+                    id = "{}_{}_{}".format(mode, trunc, sampling_mode)
+                    self.metrics[id] = {key: metrics[key](self, train_test="test", id=id) for key in
+                                        self.test_metrics_names if key in metrics}
+
+    def get_metrics(self, mode, trunc, sampling_mode):
+        id = "{}_{}_{}".format(mode, trunc, sampling_mode)
+        return self.metrics[id]
 
     def update_per_episode(self, i_episode, alpha_min=0.001, update_every=500, num_episodes_train=1000):
         if self.alpha_decay_rate > 0 and self.alpha_logits_lm > alpha_min:
@@ -209,7 +214,7 @@ class Agent:
             logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
             for key_trunc, trunc in self.eval_trunc.items():
-                metrics = self.metrics["{}_{}".format(key_trunc, test_mode)]
+                metrics = self.get_metrics(env.mode,key_trunc, test_mode)
                 for i in range(env.ref_questions.size(
                         0)):  # loop multiple time over the same image to measure langage diversity.
                     with torch.no_grad():
@@ -220,7 +225,7 @@ class Agent:
                     for _, metric in metrics.items():
                         metric.write()
         for key_trunc in self.eval_trunc.keys():
-            metrics = self.metrics["{}_{}".format(key_trunc, test_mode)]
+            metrics = self.get_metrics(env.mode, key_trunc, test_mode)
             for _, metric in metrics.items():
                 metric.post_treatment()
 

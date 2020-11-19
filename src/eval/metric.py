@@ -18,7 +18,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 
 class Metric:
-    def __init__(self, agent, train_test, key, type):
+    def __init__(self, agent, train_test, key, type, id):
         self.measure = []
         self.metric = []
         self.metric_history = []
@@ -34,9 +34,11 @@ class Metric:
         self.type = type
         self.key = key
         self.train_test = train_test
+        self.id = id
         # self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
-        self.out_csv_file = os.path.join(self.out_path, "metrics", self.train_test + '_' + self.key + ".csv")
-        self.stats_path = os.path.join(self.out_path, "stats", self.train_test + "_" + self.key + '_stats.csv')
+        self.name = train_test + "_" + id + '_' + self.key
+        self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".csv")
+        self.stats_path = os.path.join(self.out_path, "stats", self.name + '_stats.csv')
         self.stats = None
         self.to_tensorboard = True if key in metrics_to_tensorboard else False
 
@@ -60,9 +62,9 @@ class Metric:
     def write(self, **kwargs):
         if self.to_tensorboard:
             if self.type == "scalar":
-                self.writer.add_scalar(self.train_test + "_" + self.key, np.mean(self.metric), self.idx_write)
+                self.writer.add_scalar(self.name, np.mean(self.metric), self.idx_write)
             elif self.type == "text":
-                self.writer.add_text(self.train_test + "_" + self.key, '  \n'.join(self.metric[-1:]), self.idx_write)
+                self.writer.add_text(self.name, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
         self.metric_history.extend(self.metric)
         self.metric = []
@@ -83,8 +85,8 @@ class Metric:
 class VAMetric(Metric):
     '''Display the valid action space in the training log.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "valid_actions", "text")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "valid_actions", "text", id)
 
     def fill_(self, **kwargs):
         state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
@@ -101,7 +103,7 @@ class VAMetric(Metric):
         self.measure.append(string)
 
     def compute_(self, **kwargs):
-        #self.metric.extend(self.measure[0])
+        # self.metric.extend(self.measure[0])
         self.metric = self.measure
 
     def log(self, **kwargs):
@@ -117,8 +119,8 @@ class VAMetric(Metric):
 class SizeVAMetric(Metric):
     '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar", id)
         self.counter = 0
 
     def fill_(self, **kwargs):
@@ -132,8 +134,8 @@ class SizeVAMetric(Metric):
 class SumProbsOverTruncated(Metric):
     '''Compute the sum of the probabilities the action space given by the language model.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar", id)
 
     def fill_(self, **kwargs):
         sum_over_truncated_space = 1
@@ -150,10 +152,10 @@ class SumProbsOverTruncated(Metric):
 class DialogMetric(Metric):
     """Display the test dialog."""
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "dialog", "text")
-        self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.txt')
-        self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "dialog", "text", id)
+        # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.txt')
+        # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
 
     def fill_(self, **kwargs):
@@ -183,10 +185,7 @@ class DialogMetric(Metric):
                 string = 'IMG {}:'.format(kwargs[
                                               "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
             self.metric.append(string)
-            # write dialog in a .txt file:
-            with open(self.out_dialog_file, 'a') as f:
-                f.write(string + '\n')
-            pass
+
 
     def write_to_csv(self):
         '''save padded array of generated dialog for later use (for example with word cloud)'''
@@ -200,8 +199,8 @@ class DialogMetric(Metric):
 class DialogImageMetric(Metric):
     '''Display the Dialog on a html format at test time.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "dialog", "text")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "dialog", "text", id)
         self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
         self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
@@ -296,8 +295,8 @@ class PPLMetric(Metric):
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "ppl", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "ppl", "scalar", id)
         self.agent = agent
 
     def fill_(self, **kwargs):
@@ -326,8 +325,8 @@ class PPLMetric(Metric):
 class PPLDialogfromLM(Metric):
     '''Computes the PPL of the Language Model over the generated dialog'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["log_probas_lm"] is not None:
@@ -340,8 +339,8 @@ class PPLDialogfromLM(Metric):
 
 
 class Return(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "return", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "return", "scalar", id)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["reward"])
@@ -354,8 +353,8 @@ class Return(Metric):
 class BleuMetric(Metric):
     '''Compute the bleu score over the ref questions and the generated dialog.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "bleu", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "bleu", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -379,8 +378,8 @@ class RefQuestionsMetric(Metric):
     Compute the ratio of Unique closest questions on all the set of questions generated for the same image.
     '''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -404,8 +403,8 @@ class TTRQuestionMetric(Metric):
     Compute the token-to-token ratio for each question (useful to measure language drift).
     '''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "ttr_question", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "ttr_question", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -421,8 +420,8 @@ class TrueWordRankLM(Metric):
     Compute the rank of the true word in the original lm logits
     """
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["origin_log_probs_lm"] is not None:
@@ -441,8 +440,8 @@ class TrueWordProbLM(Metric):
     Compute the probability of the true word in the original lm logits
     """
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "true_word_prob", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "true_word_prob", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["origin_log_probs_lm"] is not None:
@@ -458,8 +457,8 @@ class TrueWordProbLM(Metric):
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "unique_words", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "unique_words", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -485,8 +484,8 @@ class UniqueWordsMetric(Metric):
 # --------------------------------------- OLD METRICS ----------------------------------------------------------------------------------------------------
 
 class PolicyMetric(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "policy", "text")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "policy", "text", id)
 
     def fill_(self, **kwargs):
         # compute top_k_words from the Policy:
@@ -526,8 +525,8 @@ class PolicyMetric(Metric):
 class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "lm_valid_actions", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "lm_valid_actions", "scalar", id)
         self.counter = 0
 
     def fill_(self, **kwargs):
@@ -545,8 +544,8 @@ class LMVAMetric(Metric):
 class PoliciesRatioMetric(Metric):
     '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "policies_discrepancy", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "policies_discrepancy", "scalar", id)
 
     def fill_(self, **kwargs):
         ratios = np.exp(
@@ -560,8 +559,8 @@ class PoliciesRatioMetric(Metric):
 class LMPolicyProbsRatio(Metric):
     '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
 
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "lm_policy_probs_ratio", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "lm_policy_probs_ratio", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
@@ -576,8 +575,8 @@ class LMPolicyProbsRatio(Metric):
 
 
 class ActionProbs(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "action_probs", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "action_probs", "scalar", id)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["log_probs"])
@@ -592,8 +591,8 @@ class ActionProbs(Metric):
 
 
 class ActionProbsTruncated(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar", id)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["log_probs_truncated"])
@@ -608,8 +607,8 @@ class ActionProbsTruncated(Metric):
 
 
 class LMActionProbs(Metric):
-    def __init__(self, agent, train_test):
-        Metric.__init__(self, agent, train_test, "action_probs_lm", "scalar")
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "action_probs_lm", "scalar", id)
 
     def fill_(self, **kwargs):
         if kwargs["action"] in kwargs["valid_actions"]:
