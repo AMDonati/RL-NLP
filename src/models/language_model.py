@@ -1,5 +1,7 @@
 import torch.nn.functional as F
-
+import torch
+import numpy as np
+import os
 
 class LanguageModel:
     def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=""):
@@ -109,7 +111,7 @@ class GenericLanguageModel(LanguageModel):
 
 if __name__ == '__main__':
     from transformers import AutoModelWithLMHead, GPT2Tokenizer, BertTokenizer
-    from data_provider.vqa_dataset import *
+    from data_provider.vqa_dataset import VQADataset,ImageFeaturesH5Reader
     from data_provider.vqa_tokenizer import VQATokenizer
 
     print("test of generic language model...")
