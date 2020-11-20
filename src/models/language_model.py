@@ -1,7 +1,9 @@
-import torch.nn.functional as F
-import torch
-import numpy as np
 import os
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
 
 class LanguageModel:
     def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=""):
@@ -98,7 +100,7 @@ class GenericLanguageModel(LanguageModel):
         #    text = self.tokenizer.bos_token
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
         if input_ids.size(1) == 0:
-            self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
+            input_ids = self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
         origin_logits_lm = self.language_model(input_ids.to(self.device))[0]
         origin_log_probs_lm = F.log_softmax(origin_logits_lm, dim=-1)
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
@@ -111,7 +113,7 @@ class GenericLanguageModel(LanguageModel):
 
 if __name__ == '__main__':
     from transformers import AutoModelWithLMHead, GPT2Tokenizer, BertTokenizer
-    from data_provider.vqa_dataset import VQADataset,ImageFeaturesH5Reader
+    from data_provider.vqa_dataset import VQADataset, ImageFeaturesH5Reader
     from data_provider.vqa_tokenizer import VQATokenizer
 
     print("test of generic language model...")
