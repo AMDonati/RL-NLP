@@ -1,6 +1,7 @@
 import time
 import torch
 import torch.nn.functional as F
+import os
 
 def assert_correctness_batch(inputs, targets):
     assert torch.all(torch.eq(inputs[:,1:], targets[:,:-1])) == 1, "error in inputs/targets"
@@ -134,3 +135,56 @@ def evaluate_policy(model, val_generator, criterion, device):
             total_loss += criterion(log_probs, targets).item()
 
     return total_loss / (batch + 1)
+
+
+def generate_text_lm(model, val_dataset, temperatures, logger, device, out_path, words=50):
+    input = val_dataset.vocab_questions["<SOS>"]
+    input = torch.LongTensor([input]).view(1, 1).to(device)
+    for temp in temperatures:
+        logger.info("generating text with temperature: {}".format(temp))
+        out_file_generate = os.path.join(out_path, 'generate_words_temp_{}.txt'.format(temp))
+        with open(out_file_generate, 'w') as f:
+            with torch.no_grad():
+                for i in range(words):
+                    output, hidden = model(input)  # output (1, num_tokens)
+                    if temp is not None:
+                        word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
+                        word_weights = word_weights / word_weights.sum(dim=-1).cpu()
+                        word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
+                    else:
+                        word_idx = output.squeeze().argmax()
+                    input.fill_(word_idx)
+                    word = val_dataset.question_tokenizer.decode([word_idx.item()])
+                    f.write(word + ('\n' if i % 20 == 19 else ' '))
+                    if i % 10 == 0:
+                        print('| Generated {}/{} words'.format(i, words))
+                f.close()
+
+def generate_text_policy(model, val_dataset, temperatures, device, logger, out_path, words):
+    input = val_dataset.vocab_questions["<SOS>"]
+    input = torch.LongTensor([input]).view(1, 1).to(device)
+    indexes = list(range(5))
+    for index in indexes:
+        img_feats = val_dataset.get_feats_from_img_idx(index).unsqueeze(0)
+        for temp in temperatures:
+            logger.info("generating text with temperature: {}".format(temp))
+            out_file_generate = os.path.join(out_path, 'generate_words_temp_{}_img_{}.txt'.format(temp, index))
+            with open(out_file_generate, 'w') as f:
+                with torch.no_grad():
+                    for i in range(words):
+                        output, hidden, _ = model(state_text=input, state_img=img_feats,
+                                                  state_answer=None)  # output (1, num_tokens)
+                        if temp is not None:
+                            word_weights = output.squeeze().div(
+                                temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
+                            word_weights = word_weights / word_weights.sum(dim=-1).cpu()
+                            word_idx = torch.multinomial(word_weights, num_samples=1)[
+                                0]  # [0] to have a scalar tensor.
+                        else:
+                            word_idx = output.squeeze().argmax()
+                        input.fill_(word_idx)
+                        word = val_dataset.question_tokenizer.decode(seq_idx=[word_idx.item()], delim='')
+                        f.write(word + ('\n' if i % 20 == 19 else ' '))
+                        if i % 10 == 0:
+                            print('| Generated {}/{} words'.format(i, words))
+                    f.close()

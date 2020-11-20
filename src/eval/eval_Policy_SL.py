@@ -72,6 +72,7 @@ if __name__ == '__main__':
     # generate words
     ###############################################################################
     indexes = [i for i in range(5)]
+    indexes = list(range(5))
     for index in indexes:
         img_feats = test_dataset.get_feats_from_img_idx(index).unsqueeze(0)
         input = torch.LongTensor([SOS_idx]).view(1,1).to(device)
@@ -83,7 +84,7 @@ if __name__ == '__main__':
                 f.write(input_word + '\n')
                 with torch.no_grad():
                     for i in range(args.words):
-                        output, hidden, _ = model(input, img_feats)  # output (1, num_tokens)
+                        output, hidden, _ = model(state_text=input, state_img=img_feats, state_answer=None)  # output (1, num_tokens)
                         if temp is not None:
                             word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
                             word_weights = word_weights / word_weights.sum(dim=-1).cpu()

@@ -103,7 +103,6 @@ class VAMetric(Metric):
         self.measure.append(string)
 
     def compute_(self, **kwargs):
-        # self.metric.extend(self.measure[0])
         self.metric = self.measure
 
     def log(self, **kwargs):

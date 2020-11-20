@@ -85,7 +85,7 @@ class PolicyLSTMBatch(nn.Module):
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_) #(1,101,64)
+            img_feat__ = self.projection(img_feat_) #(1,101,64) #TODO: increase dim size.
             img_feat__ = img_feat__.transpose(2,1)
             img_feat__ = self.avg_pooling(img_feat__) #(1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)

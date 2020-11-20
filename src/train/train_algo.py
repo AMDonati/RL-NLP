@@ -13,6 +13,7 @@ from utils.utils_train import create_logger, write_to_csv
 class SLAlgo:
     def __init__(self, model, train_dataset, val_dataset, test_dataset, args):
         self.model = model
+        self.dataset_name = args.dataset
         self.train_dataset, self.val_dataset, self.test_dataset = train_dataset, val_dataset, test_dataset
         self.train_generator = DataLoader(dataset=train_dataset, batch_size=args.bs, drop_last=True, num_workers=args.num_workers)
         self.val_generator = DataLoader(dataset=val_dataset, batch_size=args.bs, drop_last=True,
@@ -28,6 +29,7 @@ class SLAlgo:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.create_out_path(args)
         self.train_function, self.eval_function = self.get_algo_functions(args)
+        self.task = args.task
 
 
     def create_out_path(self, args):
@@ -63,6 +65,15 @@ class SLAlgo:
             train_function = train_one_epoch_policy
             eval_function = evaluate_policy
         return train_function, eval_function
+
+    def get_img_features(self, dataset, index):
+        if self.dataset_name == "clevr":
+            img_feats = dataset.get_feats_from_img_idx(index).unsqueeze(0)
+        elif self.dataset_name == "vqa":
+            entry = dataset.filtered_entries[index]
+            img_feats, _, _ = dataset.get_img_data(entry)
+        return img_feats
+
 
     def train(self):
         self.logger.info("start training...")
@@ -100,16 +111,18 @@ class SLAlgo:
         hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
         write_to_csv(self.out_csv, hist_dict)
 
-    def generate_text(self, temperatures=[None, 0.5, 1, 2], words=50):
-        input = self.test_dataset.vocab_questions["<SOS>"]
-        input = torch.LongTensor([input]).view(1, 1).to(self.device)
+    def _generate_text(self, input, temperatures=[None, 0.5, 1, 2], words=50, img_feats=None, index_img=None):
         for temp in temperatures:
             self.logger.info("generating text with temperature: {}".format(temp))
-            out_file_generate = os.path.join(self.out_path, 'generate_words_temp_{}.txt'.format(temp))
+            out_file_generate = os.path.join(self.out_path, 'generate_words_temp_{}_img_{}.txt'.format(temp, index_img))
             with open(out_file_generate, 'w') as f:
                 with torch.no_grad():
                     for i in range(words):
-                        output, hidden = self.model(input)  # output (1, num_tokens)
+                        if img_feats is None:
+                            output, hidden = self.model(input)  # output (1, num_tokens)
+                        else:
+                            output, hidden, _ = self.model(state_text=input, state_img=img_feats,
+                                                      state_answer=None)  # output (1, num_tokens)
                         if temp is not None:
                             word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
                             word_weights = word_weights / word_weights.sum(dim=-1).cpu()
@@ -117,15 +130,27 @@ class SLAlgo:
                         else:
                             word_idx = output.squeeze().argmax()
                         input.fill_(word_idx)
-                        word = self.test_dataset.question_tokenizer.decode([word_idx.item()])
+                        word = self.val_dataset.question_tokenizer.decode([word_idx.item()])
                         f.write(word + ('\n' if i % 20 == 19 else ' '))
                         if i % 10 == 0:
                             print('| Generated {}/{} words'.format(i, words))
                     f.close()
 
-# class PolicyAlgo(SLAlgo)
-#     def __init__(self, model, train_dataset, val_dataset, test_dataset, args):
-#         super(PolicyAlgo, self).__init__(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset, args=args)
+    def generate_text(self, temperatures=[None, 0.5, 1, 2], words=50):
+        input = self.test_dataset.vocab_questions["<SOS>"]
+        input = torch.LongTensor([input]).view(1, 1).to(self.device)
+        if self.task == "lm":
+            self._generate_text(input, temperatures=temperatures, words=words)
+        elif self.task == "policy":
+            indexes = list(range(5))
+            for index in indexes:
+                print("Generating text condtioned on img: {}".format(index))
+                img_feats = self.get_img_features(dataset=self.val_dataset, index=index).unsqueeze(0)
+                self._generate_text(input, temperatures=temperatures, words=words, img_feats=img_feats, index_img=index)
+
+
+
+
 
 
 

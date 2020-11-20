@@ -66,6 +66,8 @@ if __name__ == '__main__':
     # Misc.
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
+    parser.add_argument('-max_samples', type=str, default=21,
+                        help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
     args = parser.parse_args()
 
@@ -100,6 +102,7 @@ if __name__ == '__main__':
                                                 h5_feats_path=val_feats_path,
                                                 vocab_path=vocab_path,
                                                 max_samples=args.max_samples)
+                    test_dataset = val_dataset
                 else:
                     train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
                                                   h5_feats_path=train_feats_path,
@@ -107,6 +110,7 @@ if __name__ == '__main__':
                     val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
                                                 h5_feats_path=val_feats_path,
                                                 vocab_path=vocab_path)
+                    test_dataset = val_dataset
 
         elif args.dataset == "vqa":
             lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -115,7 +119,7 @@ if __name__ == '__main__':
             question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
             train_split = "mintrain" if device.type == "cpu" else "train"
-            val_split = "minval" if device.type == "cpu" else "val"
+            val_split = "mintrain" if device.type == "cpu" else "val"
             train_dataset = VQADataset(split=train_split, dataroot=args.data_path,
                                        question_tokenizer=question_tokenizer,
                                        image_features_reader=images_feature_reader,
