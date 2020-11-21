@@ -47,6 +47,8 @@ class SLAlgo:
         self.model_path = os.path.join(self.out_path, 'model.pt')
         self.logger.info("hparams: {}".format(vars(args)))
         self.logger.info('train dataset length: {}'.format(self.train_dataset.__len__()))
+        if self.dataset_name == "vqa":
+            self.logger.info("number of filtered entries:", len(self.train_dataset.filtered_entries))
         self.logger.info('number of tokens: {}'.format(self.train_dataset.len_vocab))
         self._save_hparams(args, self.out_path)
 
@@ -68,7 +70,8 @@ class SLAlgo:
 
     def get_img_features(self, dataset, index):
         if self.dataset_name == "clevr":
-            img_feats = dataset.get_feats_from_img_idx(index).unsqueeze(0)
+            img_idx = dataset.img_idxs[index]
+            img_feats = dataset.get_feats_from_img_idx(img_idx)
         elif self.dataset_name == "vqa":
             entry = dataset.filtered_entries[index]
             img_feats, _, _ = dataset.get_img_data(entry)
@@ -119,10 +122,10 @@ class SLAlgo:
                 with torch.no_grad():
                     for i in range(words):
                         if img_feats is None:
-                            output, hidden = self.model(input)  # output (1, num_tokens)
+                            output, _ = self.model(input)  # output (1, num_tokens)
                         else:
-                            output, hidden, _ = self.model(state_text=input, state_img=img_feats,
-                                                      state_answer=None)  # output (1, num_tokens)
+                            output, _ = self.model(state_text=input, state_img=img_feats,
+                                                      state_answer=None)  # output = logits (1, num_tokens)
                         if temp is not None:
                             word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
                             word_weights = word_weights / word_weights.sum(dim=-1).cpu()
@@ -142,7 +145,7 @@ class SLAlgo:
         if self.task == "lm":
             self._generate_text(input, temperatures=temperatures, words=words)
         elif self.task == "policy":
-            indexes = list(range(5))
+            indexes = list(range(3))
             for index in indexes:
                 print("Generating text condtioned on img: {}".format(index))
                 img_feats = self.get_img_features(dataset=self.val_dataset, index=index).unsqueeze(0)

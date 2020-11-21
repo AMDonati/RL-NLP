@@ -500,7 +500,6 @@ class VQADataset(Dataset):
         )
 
     def __len__(self):
-        print("length of image_reader:", len(self._image_features_reader))
         if self.max_samples is not None:
             return min(self.max_samples, len(self._image_features_reader), len(self.filtered_entries))
         else:

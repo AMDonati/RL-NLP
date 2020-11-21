@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # Misc.
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
-    parser.add_argument('-max_samples', type=str, default=21,
+    parser.add_argument('-max_samples', type=int,
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
     args = parser.parse_args()
@@ -124,13 +124,13 @@ if __name__ == '__main__':
                                        question_tokenizer=question_tokenizer,
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                       num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                       num_images=None, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
                                        filter_entries=True, rl=False)
             val_dataset = VQADataset(split=val_split, dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                     num_images=20, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                     num_images=None, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
                                      filter_entries=True, rl=False)
             test_dataset = val_dataset
 
@@ -183,5 +183,5 @@ if __name__ == '__main__':
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args)
     sl_algo.train()
-    if args.task == "lm":
-        sl_algo.generate_text()
+    #if args.task == "lm":
+    sl_algo.generate_text()

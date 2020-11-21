@@ -74,7 +74,7 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
         logits, _ = model(inputs, feats, answers)  # output (S * B, V)
-        log_probs = F.log_softmax(logits, dim=-1)
+        log_probs = F.log_softmax(logits, dim=-1) # (S*B, V)
         loss = criterion(log_probs, targets)
         loss.backward()
         # clip grad norm:
@@ -146,7 +146,7 @@ def generate_text_lm(model, val_dataset, temperatures, logger, device, out_path,
         with open(out_file_generate, 'w') as f:
             with torch.no_grad():
                 for i in range(words):
-                    output, hidden = model(input)  # output (1, num_tokens)
+                    output, hidden = model(input)  # output (1, num_tokens): log_probs
                     if temp is not None:
                         word_weights = output.squeeze().div(temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))
                         word_weights = word_weights / word_weights.sum(dim=-1).cpu()
@@ -172,7 +172,7 @@ def generate_text_policy(model, val_dataset, temperatures, device, logger, out_p
             with open(out_file_generate, 'w') as f:
                 with torch.no_grad():
                     for i in range(words):
-                        output, hidden, _ = model(state_text=input, state_img=img_feats,
+                        output, hidden = model(state_text=input, state_img=img_feats,
                                                   state_answer=None)  # output (1, num_tokens)
                         if temp is not None:
                             word_weights = output.squeeze().div(

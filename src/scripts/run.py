@@ -324,14 +324,6 @@ def run(args):
         agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
     # write to csv test scalar metrics:
     agent.compute_write_all_metrics(output_path=output_path, logger=logger)
-    # if agent.truncate_mode is not None and args.eval_no_trunc:
-    #     logger.info("computing all metrics for dialog keeping the truncation mask...")
-    #     compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="with_trunc")
-    #     logger.info("computing all metrics for dialog without the truncation mask...")
-    #     compute_write_all_metrics(agent=agent, output_path=output_path, logger=logger, keep="no_trunc")
-    # else:
-    # compute_write_all_metrics(agent=agent, output_path=output_path,
-    #                          logger=logger, keep=None)
     logger.info(
         '------------------------------------ DONE ---------------------------------------------------------------')
     return agent
