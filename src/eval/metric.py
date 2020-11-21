@@ -414,7 +414,7 @@ class TTRQuestionMetric(Metric):
         self.metric.append(diversity_metric)
 
 
-class TrueWordRankLM(Metric):
+class TrueWordRankOriginLM(Metric):
     """
     Compute the rank of the true word in the original lm logits
     """
@@ -433,7 +433,23 @@ class TrueWordRankLM(Metric):
     def compute_(self, **kwargs):
         self.metric.extend(self.measure)
 
+class TrueWordRankLM(Metric):
+    """
+    Compute the rank of the target word in the lm logits
+    """
 
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", id)
+
+    def fill_(self, **kwargs):
+        true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
+        if kwargs["log_probas_lm"] is not None and true_action != 0:
+            sorted, indices = torch.sort(kwargs["log_probas_lm"].squeeze(), descending=True)
+            rank = int((indices.squeeze().cpu() == true_action).nonzero().squeeze().numpy())
+            self.measure.append(rank)
+
+    def compute_(self, **kwargs):
+        self.metric.extend(self.measure)
 
 class ActionRankLM(Metric):
     """
