@@ -127,7 +127,7 @@ class ClevrEnv(GenericEnv):
 
         if self.condition_answer != "none":
             self.ref_questions = self.ref_questions[
-                                 self.ref_question_idx:self.ref_question_idx + 1] 
+                                 self.ref_question_idx:self.ref_question_idx + 1]
             self.ref_answers = self.ref_answers[self.ref_question_idx:self.ref_question_idx + 1]
 
         self.ref_questions_decoded = [self.dataset.question_tokenizer.decode(question, ignored=['<SOS>', '<PAD>'])

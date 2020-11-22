@@ -1,22 +1,17 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
 # https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 import argparse
-import json
-import math
 import os
-
-import numpy as np
 import torch
-from torch.utils.data import DataLoader
 
 from data_provider.QuestionsDataset import QuestionsDataset
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from data_provider.vqa_dataset import *
+from data_provider.vqa_dataset import VQADataset
 from data_provider.vqa_tokenizer import VQATokenizer
+from data_provider._image_features_reader import ImageFeaturesH5Reader
 from transformers import BertTokenizer, GPT2Tokenizer
 from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
 from models.rl_basic import PolicyLSTMBatch_SL
-from train.train_functions import *
 from train.train_algo import SLAlgo
 
 '''
@@ -182,6 +177,6 @@ if __name__ == '__main__':
     model = get_model(args, train_dataset)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args)
-    sl_algo.train()
-    #if args.task == "lm":
+    if args.ep > 0:
+        sl_algo.train()
     sl_algo.generate_text()

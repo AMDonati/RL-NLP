@@ -98,7 +98,6 @@ class PolicyLSTMBatch(nn.Module):
         return embedding
 
     def _get_embed_text(self, text, answer):
-        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.condition_answer == "before_lstm" and answer is not None:
@@ -149,7 +148,6 @@ class PolicyLSTMBatch_SL(nn.Module):
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
 
     def _get_embed_text(self, text):
-        # padded = pad_sequence(text, batch_first=True, padding_value=0).to(self.device)
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)

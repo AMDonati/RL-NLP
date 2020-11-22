@@ -70,6 +70,7 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
             feats = img[0]
         else:
             feats = img
+        answers = answers.squeeze()
         inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
@@ -128,6 +129,7 @@ def evaluate_policy(model, val_generator, criterion, device):
                 feats = img[0]
             else:
                 feats = img
+            answers = answers.squeeze()
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             targets = targets.view(targets.size(1) * targets.size(0)).to(device)
             logits, _ = model(inputs, feats, answers)
