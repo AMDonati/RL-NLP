@@ -241,8 +241,9 @@ class VQADataset(Dataset):
                 self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
-                if self.split == 'train' or self.split == 'mintrain' and rl:
-                    self.split_entries()
+                if rl:
+                    if self.split == 'train' or self.split == 'mintrain':
+                        self.split_entries()
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
                          save_first_words=False):
