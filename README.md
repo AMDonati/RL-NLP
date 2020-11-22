@@ -75,16 +75,16 @@ To extract the image features, run the script src/sh/extract_features.py or the 
 ### Pre-training of the Policy with Supervised Learning 
 #### CLEVR
 ##### No answer conditioning 
-`python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 -bs 512 -ep 50 -num_workers 0 -max_samples 21 -fusion "cat"`  
+`python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -emb_size 32 -hidden_size 64 -bs 512 -ep 50 -num_workers 0 -max_samples 21 -fusion "cat"`  
  N.B: When training only on a CPU, the max_samples args is required to train only on a subset of the dataset. 
  ##### w/ answer conditioning 
- `python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 -bs 512 -ep 50 -num_workers 0 -max_samples 21 -fusion "cat" -condition_answer "after_fusion"`
+ `python src/train/launch_train.py -task "policy" -dataset "clevr" -data_path "data" -out_path "output/policy_pre_training" -emb_size 32 -hidden_size 64 -bs 512 -ep 50 -num_workers 0 -max_samples 21 -fusion "cat" -condition_answer "after_fusion"`
  
 #### VQA
 ##### No answer conditioning
-`python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 -bs 512  -ep 50 -num_workers 0 -fusion "average"`
+`python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data" -out_path "output/policy_pre_training" -emb_size 32 -hidden_size 64 -bs 512  -ep 50 -num_workers 0 -fusion "average"`
 ##### w/ answer conditioning
-`python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data" -out_path "output/policy_pre_training" -word_emb_size 32 -hidden_size 64 -bs 512  -ep 50 -num_workers 0 -fusion "average" -condition_answer "after_fusion"`
+`python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data" -out_path "output/policy_pre_training" -emb_size 32 -hidden_size 64 -bs 512  -ep 50 -num_workers 0 -fusion "average" -condition_answer "after_fusion"`
  
 ### Training the RL Agent 
 * See examples in src/scripts/sh.
