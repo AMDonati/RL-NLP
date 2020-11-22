@@ -209,8 +209,8 @@ class VQADataset(Dataset):
             "vocab.json")
         if not os.path.isfile(vocab_path_):
             print("Building vocab...")
-            self.entries = _load_dataset(dataroot, split, clean_datasets)
-            self.build_true_vocab(vocab_path_)
+            entries = _load_dataset(dataroot, "trainval", clean_datasets)
+            self.build_true_vocab(vocab_path_,entries)
             print("Vocab built...")
         else:
             print("Loading vocab...")
@@ -220,35 +220,35 @@ class VQADataset(Dataset):
         self.question_tokenizer.set_vocab(self.vocab_questions)
         self.set_traduction_dictionnaries()
 
-        if tokenize:
-            if not os.path.exists(cache_path):
-                self.entries = _load_dataset(dataroot, split, clean_datasets)
-                image_ids = list(map(int, image_features_reader._image_ids[:-1]))
-                self.entries = [entry for entry in self.entries if entry["image_id"] in image_ids]
-                self.tokenize()
-                self.tensorize()
-                cPickle.dump(self.entries, open(cache_path, "wb"))
-            else:
-                logger.info("Loading from %s" % cache_path)
-                self.entries = cPickle.load(open(cache_path, "rb"))
+        #if tokenize: this
+        if not os.path.exists(cache_path):
+            self.entries = _load_dataset(dataroot, split, clean_datasets)
+            image_ids = list(map(int, image_features_reader._image_ids[:-1]))
+            self.entries = [entry for entry in self.entries if entry["image_id"] in image_ids]
+            self.tokenize()
+            self.tensorize()
+            cPickle.dump(self.entries, open(cache_path, "wb"))
+        else:
+            logger.info("Loading from %s" % cache_path)
+            self.entries = cPickle.load(open(cache_path, "rb"))
 
-            self.len_vocab = len(self.vocab_questions)
-            logger.info("vocab size: {}".format(self.len_vocab))
-            logger.info("number of answers: {}".format(self.len_vocab_answer))
+        self.len_vocab = len(self.vocab_questions)
+        logger.info("vocab size: {}".format(self.len_vocab))
+        logger.info("number of answers: {}".format(self.len_vocab_answer))
 
-            # filter entries if needed.
-            if filter_entries:
-                self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
-                                    filter_yes_no=filter_yes_no,
-                                    num_images=num_images)
-                if self.split == 'train' and rl:
-                    self.split_entries()
+        # filter entries if needed.
+        if filter_entries:
+            self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
+                                filter_yes_no=filter_yes_no,
+                                num_images=num_images)
+            if self.split == 'train' and rl:
+                self.split_entries()
 
-    def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
+    def build_true_vocab(self, vocab_out_path, entries,tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
                          save_first_words=False):
         true_vocab = self.special_tokens
         first_words = []
-        for entry in self.entries:
+        for entry in entries:
             tokens = self.lm_tokenizer.encode(entry["question"])
             for i, token in enumerate(tokens):
                 key = self.lm_tokenizer.decoder[token]

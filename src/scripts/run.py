@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import os
 from configparser import ConfigParser
@@ -8,11 +9,11 @@ from transformers import AutoModelWithLMHead, AutoTokenizer
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
-from envs.clevr_env import ClevrEnv,VQAEnv
+from envs.clevr_env import ClevrEnv, VQAEnv
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
-import argparse
+
 
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
@@ -251,7 +252,7 @@ def get_rl_env(args, device):
     elif args.env == "vqa":
         if device.type == "cpu":
             env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
             test_envs = [env, env]
         else:
             env = VQAEnv(args.data_path, features_h5path=args.features_path,

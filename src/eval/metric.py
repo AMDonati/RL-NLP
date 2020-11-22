@@ -167,7 +167,7 @@ class DialogMetric(Metric):
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].numpy()[0],
+            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, :].numpy()[0],
                                                                    ignored=[])
             if self.reward_type == 'vqa':
                 pred_answer_decoded = self.dataset.question_tokenizer.decode(kwargs["pred_answer"].numpy(),
