@@ -28,6 +28,10 @@ def assert_eq(real, expected):
     assert real == expected, "%s (true) vs %s (expected)" % (real, expected)
 
 
+def assert_correctness_batch(inputs, targets):
+    assert torch.all(torch.eq(inputs[1:], targets[:-1])) == 1, "error in inputs/targets"
+
+
 def _create_entry(question, answer):
     answer.pop("image_id")
     answer.pop("question_id")
@@ -38,6 +42,14 @@ def _create_entry(question, answer):
         "answer": answer,
     }
     return entry
+
+
+def split_question(question):
+    last_id = question.nonzero()[-1]
+    input_question = torch.cat([question[:last_id], question[last_id+1:]])
+    target_question = question[1:]
+    assert_correctness_batch(input_question[:last_id], target_question[:last_id])
+    return input_question, target_question
 
 
 def clean_key(key, tokens_to_remove):
@@ -183,7 +195,7 @@ class VQADataset(Dataset):
             vocab_path=None,
             tokenize=True,
             max_samples=None,
-    rl=True):
+            rl=True):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
@@ -457,6 +469,7 @@ class VQADataset(Dataset):
                 target.scatter_(0, labels, scores)
         return labels, target
 
+
     def __getitem__(self, index, add_sos_token=True):
         entries = self.filtered_entries
         entry = entries[index]
@@ -468,8 +481,7 @@ class VQADataset(Dataset):
         if add_sos_token:
             question = torch.cat([torch.tensor(self.vocab_questions["<SOS>"]).view(1), question])
 
-        inputs = question[:-1]
-        targets = question[1:]
+        inputs, targets = split_question(question)
 
         return (inputs, targets), labels, (features, image_mask, spatials)
 
@@ -543,7 +555,6 @@ if __name__ == '__main__':
                                  reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                  num_images=20, vocab_path=args.vocab_path)
 
-
     if args.test:
         vocab = vqa_dataset.vocab_questions
         new_d = {}
@@ -596,4 +607,3 @@ if __name__ == '__main__':
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
-
