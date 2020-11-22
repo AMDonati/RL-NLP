@@ -196,6 +196,7 @@ class VQADataset(Dataset):
         self.special_tokens = question_tokenizer.special_tokens
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
         self.max_samples = max_samples
+        self.images_idx = list(map(int, image_features_reader._image_ids[:-1]))
         '''
         '''
         cache_path = os.path.join(
