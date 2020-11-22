@@ -7,8 +7,12 @@ from transformers import GPT2Tokenizer
 
 from RL_toolbox.reward import rewards, Differential
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from data_provider.vqa_dataset import *
+from data_provider._image_features_reader import ImageFeaturesH5Reader
+from data_provider.vqa_dataset import VQADataset
 from data_provider.vqa_tokenizer import VQATokenizer
+import numpy as np
+import torch
+import os
 
 
 class GenericEnv(gym.Env):
@@ -229,7 +233,7 @@ if __name__ == '__main__':
 
     print("Testing VQA Env...")
     vqa_data_path = '../../data/vqa-v2'
-    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="mintrain",
                      max_seq_length=16, debug="0,20")
     env_vqa.mode = "test_text"
     env_vqa.reset()
@@ -255,9 +259,3 @@ if __name__ == '__main__':
     print("reward", reward)
     print("closest_question", closest_question)
     print("pred answer", pred_answer)
-
-    print("Testing init state  - GPT conditioning...")
-    init_string = "The question is:"
-    env_vqa = VQAEnv(data_path=vqa_data_path, mode="minval", max_seq_length=16, debug="0,20", init_string=init_string)
-    env_vqa.reset()
-    print("initial state", env_vqa.initial_state)
