@@ -152,6 +152,8 @@ class SLAlgo:
                         if img_feats is None:
                             output, _ = self.model(input)  # output (1, num_tokens)
                         else:
+                            img_feats = img_feats.to(self.device)
+                            answer = answer.to(self.device)
                             output, _ = self.model(state_text=input, state_img=img_feats,
                                                    state_answer=answer)  # output = logits (1, num_tokens)
                         if temp is not None:

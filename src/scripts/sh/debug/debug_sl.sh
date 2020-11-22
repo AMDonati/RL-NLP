@@ -10,4 +10,4 @@ echo "-------------------------- train policy on CLEVR - condition_answer  -----
 echo "-------------------------- train policy on VQA  ---------------------------------------------------------------------------------------------------"
 python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data" -out_path "output/temp" -emb_size 16 -hidden_size 16 -bs 512 -ep 1 -num_workers 6 -fusion "average"
 echo "-------------------------- train policy on VQA - condition_answer  ---------------------------------------------------------------------------------"
-python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data" -out_path "output/temp" -emb_size 16 -hidden_size 16 -bs 512 -ep 1 -num_workers 6 -fusion "average" -condition_answer "after_fusion"
+python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data/vqa-v2" --features_path "data/vqa-v2/coco_trainval.lmdb" -out_path "output/temp" -emb_size 16 -hidden_size 16 -bs 512 -ep 1 -num_workers 6 -fusion "average" -condition_answer "after_fusion"
