@@ -223,15 +223,14 @@ class VQADataset(Dataset):
         #if tokenize: this
         if not os.path.exists(cache_path):
             self.entries = _load_dataset(dataroot, split, clean_datasets)
-            image_ids = list(map(int, image_features_reader._image_ids[:-1]))
-            self.entries = [entry for entry in self.entries if entry["image_id"] in image_ids]
             self.tokenize()
             self.tensorize()
             cPickle.dump(self.entries, open(cache_path, "wb"))
         else:
             logger.info("Loading from %s" % cache_path)
             self.entries = cPickle.load(open(cache_path, "rb"))
-
+        image_ids = list(map(int, image_features_reader._image_ids[:-1]))
+        self.entries = [entry for entry in self.entries if entry["image_id"] in image_ids]
         self.len_vocab = len(self.vocab_questions)
         logger.info("vocab size: {}".format(self.len_vocab))
         logger.info("number of answers: {}".format(self.len_vocab_answer))
