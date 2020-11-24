@@ -482,6 +482,8 @@ class VQADataset(Dataset):
             question = torch.cat([torch.tensor(self.vocab_questions["<SOS>"]).view(1), question])
 
         inputs, targets = split_question(question)
+        #inputs = inputs[:-1]
+        #targets = targets[1:]
 
         return (inputs, targets), labels, (features, image_mask, spatials)
 

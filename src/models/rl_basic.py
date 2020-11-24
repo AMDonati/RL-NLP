@@ -165,7 +165,7 @@ class PolicyLSTMBatch_SL(nn.Module):
             embedding = self.film(img_feat__, gamma.view(-1, gamma.size(2)), beta.view(-1, beta.size(2)))
             embedding = embedding.view(embed_text.size(0), embed_text.size(1), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_)  # (1,101,64)
+            img_feat__ = self.projection(img_feat_)  # (1,101,64) #TODO: inverse.
             img_feat__ = img_feat__.transpose(2, 1)
             img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1) # (1,64)
