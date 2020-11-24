@@ -21,6 +21,38 @@ To download the dataset directly via the shell, you can run the following comman
 * The code relies on the CLOSURE github: you need to install it with: `python -m pip install git+https://github.com/gqkc/CLOSURE.git --upgrade`
 * And on the VILBERT multi-task github: `python -m pip install git+https://github.com/gqkc/vilbert-multi-task.git --upgrade`
 
+## File architecture
+```
+RL-NLP
+├── config         # store the configuration file to create/train models
+|  
+|
+├── output         # store the output experiments (pre-trained models, logs...)
+|   ├── lm_model / model.pt : path for pre-trained model .pt on CLEVR dataset. 
+|   ├── SL_LSTM_32_64 / model.pt: path for the pre-trained policy .pt on CLEVR dataset. 
+|   ├── SL_LSTM_32_64_VQA / model.pt: path for the pre-trained policy conditioned on the answer (for VQA reward) on the CLEVR dataset. 
+|   └── vqa_model_film / model.pt: path for the pre-trained oracle model for the "vqa" reward of the CLEVR dataset
+    └── lm_model_vqa / model.pt: path for pre-trained lm model 
+|
+├── data          
+|   └── CLEVR1.0  # root folder for the CLEVR dataset.
+    └── vqa-v2 # root folder for the VQA-V2 dataset.
+         ├── coco_trainval.lmdb # lmdb folder for the image features (reduced one on local machine, complete one on VM). 
+         ├── cache 
+              ├── vocab.json: path for vocab. 
+    └── closure_vocab.json: vocab path for closure dataset (used on the "vqa reward" of CLEVR). 
+    └── vocab.json: vocab path for the CLEVR dataset. 
+    └── train_questions.h5: h5 file for training question dataset. 
+    └── val_questions.h5: h5 file for validation question dataset. 
+    └── test_questions.h5: h5 file for test question dataset. 
+    └── train_features.h5: h5 file for training images features. 
+    └── val_features.h5: h5 file for validation images features. 
+    └── test_features.h5: h5 file for test images features. 
+    
+|
+└── src            # source files
+```
+
 ## Data preprocessing
 ### CLEVR
 * To run all the scripts from the origin repo (RL-NLP), run first the following command line: `export PYTHONPATH=src:${PYTHONPATH}`
