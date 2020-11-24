@@ -48,7 +48,7 @@ def split_question(question):
     last_id = question.nonzero()[-1]
     input_question = torch.cat([question[:last_id], question[last_id+1:]])
     target_question = question[1:]
-    assert_correctness_batch(input_question[:last_id], target_question[:last_id])
+    #assert_correctness_batch(input_question[:last_id], target_question[:last_id])
     return input_question, target_question
 
 
@@ -481,9 +481,9 @@ class VQADataset(Dataset):
         if add_sos_token:
             question = torch.cat([torch.tensor(self.vocab_questions["<SOS>"]).view(1), question])
 
-        inputs, targets = split_question(question)
-        #inputs = inputs[:-1]
-        #targets = targets[1:]
+        #inputs, targets = split_question(question)
+        inputs = question[:-1]
+        targets = question[1:]
 
         return (inputs, targets), labels, (features, image_mask, spatials)
 
