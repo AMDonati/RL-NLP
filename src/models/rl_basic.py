@@ -56,18 +56,18 @@ class PolicyLSTMBatch(nn.Module):
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
         state_answer = state_answer if state_answer is None else state_answer.to(self.device)
-        img_feat = state_img.to(self.device) # shape (1, 1024, 14, 14) vs (1,101,2048)
-        img_feat_ = img_feat if self.fusion == "average" else F.relu(self.conv(img_feat)) # shape (1,3,7,7)
+        img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
+        img_feat_ = img_feat if self.fusion == "average" else F.relu(self.conv(img_feat))  # shape (1,3,7,7)
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
-        probs = F.softmax(logits, dim=-1)
         logits_exploration = (1 - alpha) * logits + alpha * logits_lm
-        policy_dist, policy_dist_truncated = self.get_policies(probs, valid_actions, logits_exploration)
+        policy_dist, policy_dist_truncated = self.get_policies(valid_actions, logits_exploration)
         return policy_dist, policy_dist_truncated, value
 
-    def get_policies(self, probs, valid_actions, logits_exploration):
+    def get_policies(self, valid_actions, logits_exploration):
+        probs = F.softmax(logits_exploration, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
             policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens)
@@ -85,9 +85,9 @@ class PolicyLSTMBatch(nn.Module):
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_) #(1,101,64)
-            img_feat__ = img_feat__.transpose(2,1)
-            img_feat__ = self.avg_pooling(img_feat__) #(1,64,1)
+            img_feat__ = self.projection(img_feat_)  # (1,101,64)
+            img_feat__ = img_feat__.transpose(2, 1)
+            img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
@@ -170,8 +170,8 @@ class PolicyLSTMBatch_SL(nn.Module):
             img_feat__ = self.projection(img_feat_)  # (1,101,64)
             img_feat__ = img_feat__.transpose(2, 1)
             img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
-            img_feat__ = img_feat__.squeeze(dim=-1) # (1,64)
-            img_feat__ = img_feat__.unsqueeze(1).repeat(1,seq_len,1)
+            img_feat__ = img_feat__.squeeze(dim=-1)  # (1,64)
+            img_feat__ = img_feat__.unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
@@ -188,7 +188,8 @@ class PolicyLSTMBatch_SL(nn.Module):
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = img_feat if self.fusion == "average" else F.relu(self.conv(img_feat))
-        embedding = self.process_fusion(embed_text=embed_text, img_feat_=img_feat_, img_feat=img_feat, answer=state_answer, seq_len=seq_len)
+        embedding = self.process_fusion(embed_text=embed_text, img_feat_=img_feat_, img_feat=img_feat,
+                                        answer=state_answer, seq_len=seq_len)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
         value = None
