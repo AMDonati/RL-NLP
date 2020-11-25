@@ -88,24 +88,16 @@ if __name__ == '__main__':
                 val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
                 test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
             elif args.task == "policy":
-                if device.type == 'cpu':
-                    train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
+                train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
                                                   h5_feats_path=train_feats_path,
                                                   vocab_path=vocab_path,
                                                   max_samples=args.max_samples)
-                    val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
+                val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
                                                 h5_feats_path=val_feats_path,
                                                 vocab_path=vocab_path,
                                                 max_samples=args.max_samples)
-                    test_dataset = val_dataset
-                else:
-                    train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
-                                                  h5_feats_path=train_feats_path,
-                                                  vocab_path=vocab_path)
-                    val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
-                                                h5_feats_path=val_feats_path,
-                                                vocab_path=vocab_path)
-                    test_dataset = val_dataset
+                test_dataset = val_dataset
+
 
         elif args.dataset == "vqa":
             lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")

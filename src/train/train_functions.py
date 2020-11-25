@@ -11,6 +11,7 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, grad_c
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
+    start_time_epoch = time.time()
     for batch, (inputs, targets) in enumerate(train_generator):
         inputs = inputs.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
@@ -27,9 +28,10 @@ def train_one_epoch(model, train_generator, optimizer, criterion, device, grad_c
         if (batch + 1) % print_interval == 0:
             print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
             print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
+            start_time = time.time()
 
     curr_loss = total_loss / (batch + 1)
-    elapsed = time.time() - start_time
+    elapsed = time.time() - start_time_epoch
 
     return curr_loss, elapsed
 
@@ -38,6 +40,7 @@ def train_one_epoch_vqa(model, train_generator, optimizer, criterion, device, gr
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
+    start_time_epoch = time.time()
     for batch, ((inputs, targets), _, _) in enumerate(train_generator):
         inputs = inputs.to(device)
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
@@ -54,9 +57,10 @@ def train_one_epoch_vqa(model, train_generator, optimizer, criterion, device, gr
         if (batch + 1) % print_interval == 0:
             print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
             print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
+            start_time = time.time()
 
     curr_loss = total_loss / (batch + 1)
-    elapsed = time.time() - start_time
+    elapsed = time.time() - start_time_epoch
 
     return curr_loss, elapsed
 
@@ -65,6 +69,7 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
     model.train()  # Turns on train mode which enables dropout.
     total_loss = 0.
     start_time = time.time()
+    start_time_epoch = time.time()
     for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
         if isinstance(img, list):
             feats = img[0]
@@ -87,9 +92,10 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
         if (batch + 1) % print_interval == 0:
             print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
             print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
+            start_time = time.time()
 
     curr_loss = total_loss / (batch + 1)
-    elapsed = time.time() - start_time
+    elapsed = time.time() - start_time_epoch
 
     return curr_loss, elapsed
 
@@ -97,32 +103,35 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
 def evaluate(model, val_generator, criterion, device):
     model.eval()  # turn on evaluation mode which disables dropout.
     total_loss = 0.
+    start_time = time.time()
     with torch.no_grad():
         for batch, (inputs, targets) in enumerate(val_generator):
             inputs = inputs.to(device)
             targets = targets.view(targets.size(1) * targets.size(0)).to(device)
             output, hidden = model(inputs)
             total_loss += criterion(output, targets).item()
-
+    print("Evaluation time {:5.2f}".format(time.time() - start_time))
     return total_loss / (batch + 1)
 
 
 def evaluate_vqa(model, val_generator, criterion, device):
     model.eval()  # turn on evaluation mode which disables dropout.
     total_loss = 0.
+    start_time = time.time()
     with torch.no_grad():
         for batch, ((inputs, targets), _, _) in enumerate(val_generator):
             inputs = inputs.to(device)
             targets = targets.view(targets.size(1) * targets.size(0)).to(device)
             output, hidden = model(inputs)
             total_loss += criterion(output, targets).item()
-
+    print("Evaluation time {:5.2f}".format(time.time() - start_time))
     return total_loss / (batch + 1)
 
 
 def evaluate_policy(model, val_generator, criterion, device):
     model.eval()  # turn on evaluation mode which disables dropout.
     total_loss = 0.
+    start_time = time.time()
     with torch.no_grad():
         for batch, ((inputs, targets), answers, img) in enumerate(val_generator):
             if isinstance(img, list):
@@ -135,7 +144,7 @@ def evaluate_policy(model, val_generator, criterion, device):
             logits, _ = model(inputs, feats, answers)
             log_probs = F.log_softmax(logits, dim=-1)
             total_loss += criterion(log_probs, targets).item()
-
+    print("Evaluation time {:5.2f}".format(time.time() - start_time))
     return total_loss / (batch + 1)
 
 
