@@ -52,7 +52,7 @@ echo "------------------------- CLEVR ------------------------------------------
 echo "---------------------------------------------------------------------------------------------------------------------------------"
 
 DATA_PATH="data"
-LM_PATH="data/lm_model/model.pt"
+LM_PATH="output/lm_model/model.pt"
 OUTPUT_PATH="output/RL/debug"
 #POLICY_PATH="output/SL_LSTM_32_64_vqa/model.pt"
 K_EPOCHS=10
