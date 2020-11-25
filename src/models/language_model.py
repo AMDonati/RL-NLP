@@ -90,9 +90,11 @@ class GenericLanguageModel(LanguageModel):
         text = self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(), stop_at_end=True)
         if self.init_text is not None:
             text = self.init_text + text
-        if text == "":
-            text = self.tokenizer.bos_token
+        # if text in ["", " "]:
+        #    text = self.tokenizer.bos_token
         input_ids = self.tokenizer.encode(text, return_tensors="pt")
+        if input_ids.size(1) == 0:
+            input_ids = self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
         origin_logits_lm = self.language_model(input_ids.to(self.device))[0]
         origin_log_probs_lm = F.log_softmax(origin_logits_lm, dim=-1)
         logits = (-torch.ones(len(self.dataset.vocab_questions)) * 1e32).to(self.device)
