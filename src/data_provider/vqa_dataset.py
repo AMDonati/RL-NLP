@@ -480,7 +480,9 @@ class VQADataset(Dataset):
         if add_sos_token:
             question = torch.cat([torch.tensor(self.vocab_questions["<SOS>"]).view(1), question])
 
-        inputs, targets = split_question(question)
+        inputs = question[:-1]
+        targets = question[1:]
+        #inputs, targets = split_question(question)
 
         return (inputs, targets), labels, (features, image_mask, spatials)
 
