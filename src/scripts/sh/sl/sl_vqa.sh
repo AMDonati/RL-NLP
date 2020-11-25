@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+python src/train/launch_train.py -task "policy" -dataset "vqa" -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -out_path "output/temp" -emb_size 512 -hidden_size 1024 -bs 512 -ep 30 -num_workers 6 -fusion "average" -condition_answer "after_fusion"

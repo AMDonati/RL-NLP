@@ -48,7 +48,6 @@ def split_question(question):
     last_id = question.nonzero()[-1]
     input_question = torch.cat([question[:last_id], question[last_id+1:]])
     target_question = question[1:]
-    assert_correctness_batch(input_question[:last_id], target_question[:last_id])
     return input_question, target_question
 
 
