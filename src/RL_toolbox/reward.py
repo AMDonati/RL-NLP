@@ -5,11 +5,11 @@ import nltk
 import numpy as np
 import pandas as pd
 import torch
-from nltk.translate.bleu_score import sentence_bleu
+from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-#from vilbert.task_utils import compute_score_with_logits
-#from vilbert.vilbert import VILBertForVLTasks, BertConfig
+# from vilbert.task_utils import compute_score_with_logits
+# from vilbert.vilbert import VILBertForVLTasks, BertConfig
 from vr.utils import load_execution_engine, load_program_generator
 
 
@@ -85,7 +85,10 @@ class Bleu(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
-        reward = sentence_bleu(list(map(str.split, ep_questions_decoded)), question.split())
+        normalize_function = lambda x: x.replace("?", " ?").split()
+        ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
+        smoothing_function = SmoothingFunction().method4
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=smoothing_function)
         return reward, "N/A", None
 
 
@@ -195,7 +198,8 @@ class VILBERT(Reward):
         return reward, "N/A", None
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu, "vilbert": VILBERT}
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu,
+           "vilbert": VILBERT}
 
 if __name__ == '__main__':
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
