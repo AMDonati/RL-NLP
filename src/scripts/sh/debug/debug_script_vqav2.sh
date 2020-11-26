@@ -7,7 +7,7 @@ echo "--------------------------------------------------------------------------
 echo "------------------------- VQAv2 -------------------------------------------------------------------------------------------------"
 echo "---------------------------------------------------------------------------------------------------------------------------------"
 
-DATA_PATH="data/vqa_v2/"
+DATA_PATH="data/vqa-v2/"
 FEATURES_PATH="data/vqa_v2/coco_trainval.lmdb/"
 LM_PATH="output/vqa_lm_model/model.pt"
 OUTPUT_PATH="output/RL/debug"
@@ -68,12 +68,13 @@ HIDDEN_SIZE=64
 NUM_EPISODE_TRAIN=10
 NUM_EPISODE_TEST=5
 EPS_CLIP=0.01
-REWARD="lv_norm"
+REWARD="bleu"
 FUSION="cat"
 CONDITION_ANSWER="after_fusion"
 DEBUG="0,10"
 REWARD_PATH="output/vqa_model_film/model.pt"
 REWARD_VOCAB="data/closure_vocab.json"
+
 echo "$(date +"%Y_%m_%d_%I_%M_%S_%p")-------------------------- Scratch ---------------------------------------------------------------------------------------------------"
 python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -debug $DEBUG
 echo "$(date +"%Y_%m_%d_%I_%M_%S_%p")------------------------- pretrain ----------------------------------------------------------------------------------------------------"
@@ -93,10 +94,6 @@ python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -ou
 
 REWARD="vqa"
 echo "$(date +"%Y_%m_%d_%I_%M_%S_%p")------------------------- sample_va + oracle reward ----------------------------------------------------------------------------------------------------"
-python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -debug $DEBUG -reward_path $REWARD_PATH -reward_vocab $REWARD_VOCAB -truncate_mode "sample_va"
-
-REWARD="bleu"
-echo "$(date +"%Y_%m_%d_%I_%M_%S_%p")------------------------- sample_va + bleu reward ----------------------------------------------------------------------------------------------------"
 python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -debug $DEBUG -reward_path $REWARD_PATH -reward_vocab $REWARD_VOCAB -truncate_mode "sample_va"
 
 #!/usr/bin/env bash
