@@ -531,7 +531,7 @@ if __name__ == '__main__':
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
+    parser.add_argument("-vocab_path", type=str)
     parser.add_argument("-split", type=str, default="mintrain")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
