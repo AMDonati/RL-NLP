@@ -43,7 +43,8 @@ class Truncation:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def get_valid_actions(self, state, truncation):
-        if not truncation and self.alpha_logits_lm == 0:
+        # if not truncation and self.alpha_logits_lm == 0:
+        if not truncation:
             return None, None, 0, None, None
         with torch.no_grad():
             log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device))
