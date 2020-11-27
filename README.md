@@ -95,12 +95,19 @@ To extract the image features, run the script src/sh/extract_features.py or the 
 
 ## Training the models 
 #### Link to the pre-trained models 
+#### CLEVR
 1. Language Model .pt file [here](https://drive.google.com/drive/folders/1zRT4EF8xNmilzZMYysyhCj73oQKvBLsX?usp=sharing). 
 2. Levenshtein Task: 
   * Pretrained Policy .pt file (word_emb_size = 32, hidden_size = 64) [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing). 
 3. VQA task: 
   * Pretrained VQA model (FiLM version [here](https://drive.google.com/file/d/15HiUyfcXcJyGdZEs-knb9EQEFGfyg4cj/view?usp=sharing). 
   * Pretrained Policy [here](https://drive.google.com/file/d/1m_pXVQwQ41jgDUwuBvRHJ1U-GLqKRd3N/view?usp=sharing)
+
+#### VQAV2
+3. VQA task: 
+  * Pretrained VQA VILBERT model [here](https://drive.google.com/file/d/1FOtqA7QY0nitc7aJBf-9eLF9RRYkhxps/view?usp=sharing). 
+  * Pretrained VQA VILBERT config file [here](https://drive.google.com/file/d/1OtxCDSqE1mTgSoeBpJSbGNcbN0Pc81bx/view?usp=sharing). 
+
 ### Training the Language Model on the Dataset of Questions
 #### CLEVR
 `python src/train/launch_train.py -task "lm" -dataset "clevr" -model "lstm" -num_layers 1 -emb_size 512 -hidden_size 512 -p_drop 0.1 -lr 0.001 -data_path "data" -out_path "output" -bs 512 -ep 20 -num_workers 6`
