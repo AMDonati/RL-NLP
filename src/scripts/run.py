@@ -1,5 +1,7 @@
+import argparse
 import datetime
 import os
+from collections import OrderedDict
 from configparser import ConfigParser
 
 import torch
@@ -8,11 +10,11 @@ from transformers import AutoModelWithLMHead, AutoTokenizer
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
-from envs.clevr_env import ClevrEnv,VQAEnv
+from envs.clevr_env import ClevrEnv, VQAEnv
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
-import argparse
+
 
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
@@ -124,7 +126,7 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions",
-                                 "valid_actions",  "dialog", "eps_truncation",
+                                 "valid_actions", "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
@@ -250,16 +252,20 @@ def get_rl_env(args, device):
                      for mode in test_modes]
     elif args.env == "vqa":
         if device.type == "cpu":
-            env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                           reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+            env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
+                         reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug,
+                         diff_reward=args.diff_reward, reward_path=args.reward_path,
+                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
             test_envs = [env, env]
         else:
             env = VQAEnv(args.data_path, features_h5path=args.features_path,
                          max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
                          debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-            test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len, reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers), env]
+            test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
+                                reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug,
+                                diff_reward=args.diff_reward, reward_path=args.reward_path,
+                                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers), env]
             test_envs[1].mode = "test_text"
     return env, test_envs
 
@@ -297,8 +303,10 @@ def run(args):
                                 fusion=args.fusion, env=env,
                                 condition_answer=args.condition_answer)
     if args.policy_path is not None:
-        policy.load_state_dict(torch.load(args.policy_path, map_location=device), strict=False)
-
+        pretrained = torch.load(args.policy_path, map_location=device)
+        if pretrained.__class__ != OrderedDict:
+            pretrained = pretrained.state_dict()
+        policy.load_state_dict(pretrained, strict=False)
     agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_=args)
 
     eval_mode = ['sampling', 'greedy']
