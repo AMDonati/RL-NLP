@@ -89,7 +89,10 @@ class Bleu(Reward):
         ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
         smoothing_function = SmoothingFunction().method4
         reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=smoothing_function)
-        return reward, "N/A", None
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref in
+                  ep_questions_decoded_normalized]
+        closest_question = ep_questions_decoded[np.array(scores).argmax()]
+        return reward, closest_question, None
 
 
 class Differential(Reward):

@@ -256,7 +256,7 @@ def get_rl_env(args, device):
                          reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug,
                          diff_reward=args.diff_reward, reward_path=args.reward_path,
                          reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
-            test_envs = [env, env]
+            test_envs = [env]
         else:
             env = VQAEnv(args.data_path, features_h5path=args.features_path,
                          max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
