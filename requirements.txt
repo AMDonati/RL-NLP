@@ -22,3 +22,8 @@ gym
 lmdb
 PyYAML
 easydict
+gdown
+torch
+pytorch_transformers
+git+https://github.com/gqkc/CLOSURE.git
+torchvision
