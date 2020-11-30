@@ -136,7 +136,7 @@ if __name__ == '__main__':
     def get_model(args, train_dataset):
         if args.model_path is not None:
             print("Loading trained model...")
-            model = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu'))
+            model = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu')).to(device)
         else:
             num_tokens = train_dataset.len_vocab
             if args.task == "lm":
