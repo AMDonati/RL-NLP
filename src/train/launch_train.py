@@ -134,40 +134,44 @@ if __name__ == '__main__':
     # BUILD THE MODEL
     ###############################################################################
     def get_model(args, train_dataset):
+        num_tokens = train_dataset.len_vocab
+        if args.task == "lm":
+            if args.model == "gru":
+                model = GRUModel(num_tokens=num_tokens,
+                                 emb_size=args.emb_size,
+                                 hidden_size=args.hidden_size,
+                                 num_layers=args.num_layers,
+                                 p_drop=args.p_drop).to(device)
+            elif args.model == "lstm":
+                model = LSTMModel(num_tokens=num_tokens,
+                                  emb_size=args.emb_size,
+                                  hidden_size=args.hidden_size,
+                                  num_layers=args.num_layers,
+                                  p_drop=args.p_drop).to(device)
+            elif args.model == "ln_lstm":
+                model = LayerNormLSTMModel(num_tokens=num_tokens,
+                                           emb_size=args.emb_size,
+                                           hidden_size=args.hidden_size,
+                                           num_layers=args.num_layers,
+                                           p_drop=args.p_drop).to(device)
+        elif args.task == "policy":
+            model = PolicyLSTMBatch_SL(num_tokens=num_tokens,
+                                       word_emb_size=args.emb_size,
+                                       hidden_size=args.hidden_size,
+                                       kernel_size=args.kernel_size,
+                                       num_filters=args.num_filters,
+                                       stride=args.stride,
+                                       fusion=args.fusion,
+                                       condition_answer=args.condition_answer,
+                                       num_tokens_answer=train_dataset.len_vocab_answer).to(device)
         if args.model_path is not None:
             print("Loading trained model...")
-            model = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu')).to(device)
-        else:
-            num_tokens = train_dataset.len_vocab
-            if args.task == "lm":
-                if args.model == "gru":
-                    model = GRUModel(num_tokens=num_tokens,
-                                     emb_size=args.emb_size,
-                                     hidden_size=args.hidden_size,
-                                     num_layers=args.num_layers,
-                                     p_drop=args.p_drop).to(device)
-                elif args.model == "lstm":
-                    model = LSTMModel(num_tokens=num_tokens,
-                                      emb_size=args.emb_size,
-                                      hidden_size=args.hidden_size,
-                                      num_layers=args.num_layers,
-                                      p_drop=args.p_drop).to(device)
-                elif args.model == "ln_lstm":
-                    model = LayerNormLSTMModel(num_tokens=num_tokens,
-                                               emb_size=args.emb_size,
-                                               hidden_size=args.hidden_size,
-                                               num_layers=args.num_layers,
-                                               p_drop=args.p_drop).to(device)
-            elif args.task == "policy":
-                model = PolicyLSTMBatch_SL(num_tokens=num_tokens,
-                                           word_emb_size=args.emb_size,
-                                           hidden_size=args.hidden_size,
-                                           kernel_size=args.kernel_size,
-                                           num_filters=args.num_filters,
-                                           stride=args.stride,
-                                           fusion=args.fusion,
-                                           condition_answer=args.condition_answer,
-                                           num_tokens_answer=train_dataset.len_vocab_answer).to(device)
+            model_ = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu'))
+            if isinstance(model_, dict):
+                model = model.load_state_dict(model_, strict=False)
+                model = model.to(device)
+            else:
+                model = model_.to(device)
         return model
 
     def get_temperatures(args):

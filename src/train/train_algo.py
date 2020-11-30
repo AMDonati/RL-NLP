@@ -36,7 +36,6 @@ class SLAlgo:
         self.task = args.task
         self.check_batch()
         self.language_metrics = {k:v for k,v in zip(["bleu-1", "bleu-2", "bleu"], [Bleu1_sf7(), Bleu2_sf7(), Bleu_sf7()])}
-        #self.language_metrics = {"bleu-1": Bleu1_sf7()}
 
     def create_out_path(self, args):
         if args.model_path is not None:

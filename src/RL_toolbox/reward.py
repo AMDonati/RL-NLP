@@ -99,7 +99,7 @@ class Bleu_sf7(Reward):
         Reward.__init__(self, path)
         self.type = "episode"
 
-    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+    def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
         normalize_function = lambda x: x.replace("?", " ?").split()
@@ -252,7 +252,7 @@ class VILBERT(Reward):
         return reward, "N/A", None
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu,
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu, "bleu_sf7": Bleu_sf7,
            "vilbert": VILBERT}
 
 if __name__ == '__main__':
