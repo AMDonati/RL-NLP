@@ -206,9 +206,6 @@ class SLAlgo:
         """
         input = self.test_dataset.vocab_questions["<SOS>"]
         input = torch.LongTensor([input]).view(1, 1).to(self.device)
-        #dict_metrics_greedy = {k:0. for k in self.language_metrics.keys()}
-        #temperatures = [None, 1]
-        #dict_metrics_sampling = dict_metrics_greedy
         dict_metrics = {k:0. for k in self.language_metrics.keys()}
         result_metrics = {k: dict_metrics for k in temperatures}
         for ((inputs, targets), answers, img) in self.val_generator:
@@ -227,23 +224,9 @@ class SLAlgo:
                     for name, metric in self.language_metrics.items():
                         result, _, _ = metric.get(dict_questions[temp], question_decoded, step_idx=None,
                                                          done=True)
-                        #result_greedy, _, _ = metric.get(dict_questions[None], question_decoded, step_idx=None, done=True)
-                        #result_sampling, _, _ = metric.get(dict_questions[1], question_decoded, step_idx=None, done=True)
                         result_metrics[temp][name] = result_metrics[temp][name] + result
-                        #dict_metrics_greedy[name] += result_greedy
-                        #dict_metrics_sampling[name] += result_sampling
-        #dict_metrics_greedy = {k:v/len(self.val_dataset) for k,v in dict_metrics_greedy.items()}
-        #dict_metrics_sampling = {k: v / len(self.val_dataset) for k, v in dict_metrics_sampling.items()}
-        #print('greedy results', dict_metrics_greedy)
-        #print('sampling results', dict_metrics_sampling)
-        # for (temp, name) in zip(temperatures, self.language_metrics.keys()):
-        #     print('metric before averaging', result_metrics[temp][name])
-        #     result_metrics[temp][name] = result_metrics[temp][name] / len(self.val_dataset)
-        #     print('metric after averaging', result_metrics[temp][name])
-        # getting the average for
+        # getting the average
         result_metrics = {k:{k_:v_/len(self.val_dataset) for k_, v_ in v.items()} for k,v in result_metrics.items()}
-        #result_metrics = {k:v for k,v in zip(["greedy", "sampling"], [dict_metrics_greedy, dict_metrics_sampling])}
         df = pd.DataFrame.from_dict(result_metrics)
-        #df.to_csv(self.out_lm_metrics, columns=["greedy", "sampling"])
         df.to_csv(self.out_lm_metrics, columns=temperatures)
         return result_metrics
