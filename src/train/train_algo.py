@@ -11,7 +11,6 @@ from train.train_functions import train_one_epoch_policy, train_one_epoch, train
 from utils.utils_train import create_logger, write_to_csv
 from RL_toolbox.reward import Bleu1_sf7, Bleu2_sf7, Bleu_sf7
 import pandas as pd
-import numpy as np
 
 
 class SLAlgo:
@@ -31,7 +30,7 @@ class SLAlgo:
         self.EPOCHS = args.ep
         self.grad_clip = args.grad_clip
         self.print_interval = args.print_interval
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
         self.create_out_path(args)
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
@@ -40,7 +39,10 @@ class SLAlgo:
         #self.language_metrics = {"bleu-1": Bleu1_sf7()}
 
     def create_out_path(self, args):
-        out_path = '{}_{}_{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.dataset,
+        if args.model_path is not None:
+            out_path = os.path.join(args.model_path, "eval_from_loaded_model")
+        else:
+            out_path = '{}_{}_{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.dataset,
                                                                                                  args.task, args.model,
                                                                                                  args.num_layers,
                                                                                                  args.emb_size,
@@ -48,8 +50,8 @@ class SLAlgo:
                                                                                                  args.p_drop,
                                                                                                  args.grad_clip,
                                                                                                  args.bs, args.lr)
-        if args.task == 'policy':
-            out_path = out_path + '_cond-answer_{}'.format(args.condition_answer)
+            if args.task == 'policy':
+                out_path = out_path + '_cond-answer_{}'.format(args.condition_answer)
         self.out_path = os.path.join(args.out_path, out_path,
                                      "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
         if not os.path.exists(self.out_path):
@@ -61,6 +63,7 @@ class SLAlgo:
         self.model_path = os.path.join(self.out_path, 'model.pt')
         self.logger.info("hparams: {}".format(vars(args)))
         self.logger.info('train dataset length: {}'.format(self.train_dataset.__len__()))
+        self.logger.info("val dataset length: {}".format(len(self.val_dataset)))
         if self.dataset_name == "vqa":
             self.logger.info("number of filtered entries:{}".format(len(self.train_dataset.filtered_entries)))
         self.logger.info('number of tokens: {}'.format(self.train_dataset.len_vocab))
@@ -149,7 +152,7 @@ class SLAlgo:
         hist_dict = dict(zip(hist_keys, [train_loss_history, train_ppl_history, val_loss_history, val_ppl_history]))
         write_to_csv(self.out_csv, hist_dict)
 
-    def _generate_text(self, input, temperatures=[None, 0.5, 1, 2], num_words=20, img_feats=None, index_img=None,
+    def _generate_text(self, input, temperatures=["greedy", 0.5, 1, 2], num_words=20, img_feats=None, index_img=None,
                        answer=None, write=True):
         dict_words = {k: [] for k in temperatures}
         for temp in temperatures:
@@ -164,7 +167,7 @@ class SLAlgo:
                         answer = answer.to(self.device)
                         logits, _ = self.model(state_text=input_idx, state_img=img_feats,
                                                state_answer=answer)  # output = logits (S, num_tokens)
-                    if temp is not None:
+                    if temp != "greedy":
                         word_weights = logits[-1].squeeze().div(temp).exp()  # (exp(1/temp * logits)) = (p_i^(1/T))
                         word_weights = word_weights / word_weights.sum(dim=-1).cpu()
                         word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
@@ -184,7 +187,7 @@ class SLAlgo:
         return dict_words
 
 
-    def generate_text(self, temperatures=[None, 0.5, 1, 2], words=20):
+    def generate_text(self, temperatures=["greedy", 0.5, 1, 2], words=20):
         input = self.test_dataset.vocab_questions["<SOS>"]
         input = torch.LongTensor([input]).view(1, 1).to(self.device)
         if self.task == "lm":
@@ -192,7 +195,7 @@ class SLAlgo:
         elif self.task == "policy":
             indexes = list(range(3))
             for index in indexes:
-                print("Generating text condtioned on img: {}".format(index))
+                print("Generating text conditioned on img: {}".format(index))
                 img_feats, answer = self.get_answers_img_features(dataset=self.val_dataset, index=index)
                 img_feats = img_feats.unsqueeze(0)
                 _ = self._generate_text(input, temperatures=temperatures, num_words=words, img_feats=img_feats, index_img=index,
@@ -228,5 +231,5 @@ class SLAlgo:
         # getting the average
         result_metrics = {k:{k_:v_/len(self.val_dataset) for k_, v_ in v.items()} for k,v in result_metrics.items()}
         df = pd.DataFrame.from_dict(result_metrics)
-        df.to_csv(self.out_lm_metrics, columns=temperatures)
+        df.to_csv(self.out_lm_metrics, index_label="metrics", columns=temperatures)
         return result_metrics

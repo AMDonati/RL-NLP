@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, default='../../data/vqa-v2')
     parser.add_argument("-features_path", type=str, default='../../data/vqa-v2/coco_trainval.lmdb')
     parser.add_argument("-out_path", type=str, default='../../output/temp')
+    parser.add_argument("-model_path", type=str, help="path for loading the model if starting from a pre-trained model")
     # model params.
     parser.add_argument("-model", type=str, default="lstm", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
@@ -63,10 +64,12 @@ if __name__ == '__main__':
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument('-max_samples', type=int,
                         help="number of samples in the dataset - to train on a subset of the full dataset")
+    parser.add_argument("-eval_modes", type=str, nargs='+', default=["sampling"])
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
+    parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
 
 
     ###############################################################################
@@ -131,47 +134,61 @@ if __name__ == '__main__':
     # BUILD THE MODEL
     ###############################################################################
     def get_model(args, train_dataset):
-        num_tokens = train_dataset.len_vocab
-        if args.task == "lm":
-            if args.model == "gru":
-                model = GRUModel(num_tokens=num_tokens,
-                                 emb_size=args.emb_size,
-                                 hidden_size=args.hidden_size,
-                                 num_layers=args.num_layers,
-                                 p_drop=args.p_drop).to(device)
-            elif args.model == "lstm":
-                model = LSTMModel(num_tokens=num_tokens,
-                                  emb_size=args.emb_size,
-                                  hidden_size=args.hidden_size,
-                                  num_layers=args.num_layers,
-                                  p_drop=args.p_drop).to(device)
-            elif args.model == "ln_lstm":
-                model = LayerNormLSTMModel(num_tokens=num_tokens,
-                                           emb_size=args.emb_size,
+        if args.model_path is not None:
+            print("Loading trained model...")
+            model = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu'))
+        else:
+            num_tokens = train_dataset.len_vocab
+            if args.task == "lm":
+                if args.model == "gru":
+                    model = GRUModel(num_tokens=num_tokens,
+                                     emb_size=args.emb_size,
+                                     hidden_size=args.hidden_size,
+                                     num_layers=args.num_layers,
+                                     p_drop=args.p_drop).to(device)
+                elif args.model == "lstm":
+                    model = LSTMModel(num_tokens=num_tokens,
+                                      emb_size=args.emb_size,
+                                      hidden_size=args.hidden_size,
+                                      num_layers=args.num_layers,
+                                      p_drop=args.p_drop).to(device)
+                elif args.model == "ln_lstm":
+                    model = LayerNormLSTMModel(num_tokens=num_tokens,
+                                               emb_size=args.emb_size,
+                                               hidden_size=args.hidden_size,
+                                               num_layers=args.num_layers,
+                                               p_drop=args.p_drop).to(device)
+            elif args.task == "policy":
+                model = PolicyLSTMBatch_SL(num_tokens=num_tokens,
+                                           word_emb_size=args.emb_size,
                                            hidden_size=args.hidden_size,
-                                           num_layers=args.num_layers,
-                                           p_drop=args.p_drop).to(device)
-        elif args.task == "policy":
-            model = PolicyLSTMBatch_SL(num_tokens=num_tokens,
-                                       word_emb_size=args.emb_size,
-                                       hidden_size=args.hidden_size,
-                                       kernel_size=args.kernel_size,
-                                       num_filters=args.num_filters,
-                                       stride=args.stride,
-                                       fusion=args.fusion,
-                                       condition_answer=args.condition_answer,
-                                       num_tokens_answer=train_dataset.len_vocab_answer).to(device)
+                                           kernel_size=args.kernel_size,
+                                           num_filters=args.num_filters,
+                                           stride=args.stride,
+                                           fusion=args.fusion,
+                                           condition_answer=args.condition_answer,
+                                           num_tokens_answer=train_dataset.len_vocab_answer).to(device)
         return model
+
+    def get_temperatures(args):
+        temperatures = []
+        if "sampling" in args.eval_modes:
+            temperatures.append(1)
+        elif "greedy" in args.eval_modes:
+            temperatures.append("greedy")
+        return temperatures
 
     ################################################################################################################################################
         # MAIN
     ################################################################################################################################################
+    if args.model_path is not None:
+        assert args.ep == 0, "if model path is provided, only evaluation should be done."
     model = get_model(args, train_dataset)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args)
     if args.ep > 0:
         sl_algo.train()
     sl_algo.generate_text()
-    temperatures = [None, 1]
+    temperatures = get_temperatures(args)
     dict_metrics = sl_algo.compute_language_metrics(temperatures=temperatures)
     sl_algo.logger.info("language metrics: {}".format(dict_metrics))
