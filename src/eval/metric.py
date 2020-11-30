@@ -1,14 +1,10 @@
 import logging
 import os
-import pickle
 
 import h5py
 import numpy as np
 import pandas as pd
 import torch
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
 
@@ -199,26 +195,29 @@ class DialogImageMetric(Metric):
     '''Display the Dialog on a html format at test time.'''
 
     def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "dialog", "text", id)
+        Metric.__init__(self, agent, train_test, "dialog_image", "text", id)
         # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
         # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = []
         self.condition_answer = agent.policy.condition_answer
-        self.list_image_ids = pd.read_csv("output/image_ids.csv", index_col="id_coco")
+        image_id_file = "clevr" if self.dataset.__class__ == CLEVR_Dataset else "coco"
+        image_id_file = os.path.join("data", "drive", image_id_file + ".csv")
+        self.list_image_ids = pd.read_csv(image_id_file, index_col="id_image")
+        self.out_html_file = os.path.join(self.out_path, "metrics", self.name + ".html")
 
     def fill_(self, **kwargs):
         pass
 
     def compute_(self, **kwargs):
         with torch.no_grad():
-            self.generated_dialog.append(kwargs["state"].text.cpu().view(-1))
             state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
                                                                    ignored=[])
 
-            ref_question_decoded = kwargs["ref_questions_decoded"]
-            values = {"img": kwargs["img_idx"], "question": state_decoded,
-                      "closest_question": kwargs["closest_question"],
-                      "ref_question": ref_question_decoded}
+            values = {}
+            values["img"] = kwargs["img_idx"]
+            values["question"] = state_decoded
+            values["reward"] = round(kwargs["reward"], 3)
+            values["ref_questions"] = kwargs["ref_questions_decoded"]
             if self.condition_answer != "none":
                 ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
                 values["ref_answer"] = ref_answer_decoded
@@ -227,29 +226,31 @@ class DialogImageMetric(Metric):
                 pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
                                                                              decode_answers=True)
                 values["pred_answer"] = pred_answer_decoded
-            # if self.drive_service != None:
-            #img_name = self.get_name_image(kwargs["img_idx"])
+
+            dialog = ["{} : {}".format(key, value) for key, value in values.items()]
+            dialog.append("-" * 70)
+            dialog = " \n ".join(dialog)
+            self.metric.append(dialog)
+
             id = self.get_id_image(kwargs["img_idx"])
-            if id is not None:
-                url = "https://drive.google.com/uc?export=view&id={}".format(id)
-                values["link"] = "<img src={}>".format(url)
+            #if id is not None:
+            url = "https://drive.google.com/uc?export=view&id={}".format(id)
+            values["link"] = "<img src={}>".format(url)
+            values["closest_question"] = kwargs["closest_question"]
+            self.generated_dialog.append(values)
 
-            string = '<table><tr>'
-            string += "<td><ul><li>" + "</li><li>".join(
-                list(map(str, values.values()))) + "</li></ul></td></tr></table>"
-
-            self.metric.append(string)
 
     def get_name_image(self, img_idx):
         if self.dataset.__class__ == CLEVR_Dataset:
-            img_name = "CLEVR_{}_{:06d}.png".format(self.env.mode, img_idx)
+            img_name = "CLEVR_{}_{:06d}".format(self.env.mode, img_idx)
         else:
-            # img_name = "COCO_train2014_{:012d}.jpg".format(img_idx - 100000)
-            img_name = "{:012d}.jpg".format(img_idx - 100000)
+            # img_name = "COCO_train2014_{:012d}.jpg".format(img_idx)
+            # img_name = "{:012d}".format(img_idx)
+            img_name = img_idx
         return img_name
 
     def get_id_image(self, id_image):
-        id_image
+        id_image = self.get_name_image(id_image)
         try:
             id_drive = self.list_image_ids.loc[id_image]
         except KeyError:
@@ -257,28 +258,14 @@ class DialogImageMetric(Metric):
         finally:
             return id_drive
 
-    def get_google_service(self):
-        creds = None
-        # The file token.pickle stores the user's access and refresh tokens, and is
-        # created automatically when the authorization flow completes for the first
-        # time.
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                creds = pickle.load(token)
-        # If there are no (valid) credentials available, let the user log in.
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', SCOPES)
-                creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(creds, token)
-
-        service = build('drive', 'v3', credentials=creds)
-        return service
+    def post_treatment_(self):
+        to_html = lambda x: "".join(["<li>{} : {}</li>".format(key, value) for key, value in x.items()])
+        html_str = ["<tr><ul>" + to_html(x) + "</ul></tr>" for x in self.generated_dialog]
+        html_str = "".join(html_str)
+        html_str = "<table>" + html_str + "</table>"
+        f = open(self.out_html_file, "x")
+        f.write(html_str)
+        f.close()
 
 
 class PPLMetric(Metric):
