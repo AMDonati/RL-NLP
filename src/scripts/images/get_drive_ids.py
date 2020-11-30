@@ -43,7 +43,10 @@ def main(args):
 
     page_token = None
     data = []
+    i = 0
     while True:
+        i += 1
+        print("Iteration {}".format(i))
         response = service.files().list(q="'{}' in parents".format(id_parent_folder),
                                         spaces='drive',
                                         fields='nextPageToken, files(id, name)',
@@ -56,14 +59,14 @@ def main(args):
         if page_token is None:
             break
 
-    df = pd.DataFrame(data=data, columns=["id_coco", "id_google"])
-    df.set_index("id_coco", inplace=True)
-    df.to_csv("output/image_ids_{}.csv".format(args.name))
+    df = pd.DataFrame(data=data, columns=["id_image", "id_google"])
+    df.set_index("id_image", inplace=True)
+    df.to_csv("data/drive/image_ids_{}.csv".format(args.name))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-id_folder", type=str, default="1g84UPyiLSkx6rZLtxkTgCw8B43", help="id of the folder")
+    parser.add_argument("-id_folder", type=str, default="1J1K5aJAQ9RTmLmGCd7Qnnvuj03HJ3MPJ", help="id of the folder")
     parser.add_argument("-name", type=str, help="id of the folder")
     args = parser.parse_args()
 
