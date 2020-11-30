@@ -41,6 +41,8 @@ class SLAlgo:
     def create_out_path(self, args):
         if args.model_path is not None:
             out_path = os.path.join(args.model_path, "eval_from_loaded_model")
+            self.out_path = os.path.join(out_path,
+                                     "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
         else:
             out_path = '{}_{}_{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.dataset,
                                                                                                  args.task, args.model,
@@ -52,7 +54,7 @@ class SLAlgo:
                                                                                                  args.bs, args.lr)
             if args.task == 'policy':
                 out_path = out_path + '_cond-answer_{}'.format(args.condition_answer)
-        self.out_path = os.path.join(args.out_path, out_path,
+            self.out_path = os.path.join(args.out_path, out_path,
                                      "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
