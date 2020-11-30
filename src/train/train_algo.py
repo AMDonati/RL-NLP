@@ -9,6 +9,9 @@ from torch.utils.data import DataLoader
 from train.train_functions import train_one_epoch_policy, train_one_epoch, train_one_epoch_vqa, evaluate_vqa, evaluate, \
     evaluate_policy
 from utils.utils_train import create_logger, write_to_csv
+from RL_toolbox.reward import Bleu1_sf7, Bleu2_sf7, Bleu_sf7
+import pandas as pd
+import numpy as np
 
 
 class SLAlgo:
@@ -33,6 +36,8 @@ class SLAlgo:
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
         self.check_batch()
+        self.language_metrics = {k:v for k,v in zip(["bleu-1", "bleu-2", "bleu"], [Bleu1_sf7(), Bleu2_sf7(), Bleu_sf7()])}
+        #self.language_metrics = {"bleu-1": Bleu1_sf7()}
 
     def create_out_path(self, args):
         out_path = '{}_{}_{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.dataset,
@@ -52,6 +57,7 @@ class SLAlgo:
         out_file_log = os.path.join(self.out_path, 'training_log.log')
         self.logger = create_logger(out_file_log)
         self.out_csv = os.path.join(self.out_path, 'train_history.csv')
+        self.out_lm_metrics = os.path.join(self.out_path, 'lm_metrics.csv')
         self.model_path = os.path.join(self.out_path, 'model.pt')
         self.logger.info("hparams: {}".format(vars(args)))
         self.logger.info('train dataset length: {}'.format(self.train_dataset.__len__()))
@@ -145,43 +151,40 @@ class SLAlgo:
 
     def _generate_text(self, input, temperatures=[None, 0.5, 1, 2], num_words=20, img_feats=None, index_img=None,
                        answer=None, write=True):
+        dict_words = {k: [] for k in temperatures}
         for temp in temperatures:
-            self.logger.info("generating text with temperature: {}".format(temp))
             answer_ = answer[0].cpu().item() if answer is not None else answer
-            dict_words = dict(zip(temperatures, len(temperatures)*[]))
+            input_idx = input
             with torch.no_grad():
                 for i in range(num_words):
                     if img_feats is None:
-                        _, logits = self.model(input)  # output (1, num_tokens)
+                        _, logits = self.model(input_idx)  # output (S, num_tokens)
                     else:
                         img_feats = img_feats.to(self.device)
                         answer = answer.to(self.device)
-                        logits, _ = self.model(state_text=input, state_img=img_feats,
-                                               state_answer=answer)  # output = logits (1, num_tokens)
+                        logits, _ = self.model(state_text=input_idx, state_img=img_feats,
+                                               state_answer=answer)  # output = logits (S, num_tokens)
                     if temp is not None:
-                        word_weights = logits.squeeze().div(temp).exp()  # (exp(1/temp * logits)) = (p_i^(1/T))
+                        word_weights = logits[-1].squeeze().div(temp).exp()  # (exp(1/temp * logits)) = (p_i^(1/T))
                         word_weights = word_weights / word_weights.sum(dim=-1).cpu()
                         word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
                     else:
-                        word_idx = logits.squeeze().argmax()
-                    input.fill_(word_idx)
-                    if self.task == "lm" and self.dataset_name == "clevr":
-                        word = self.val_dataset.idx2word([word_idx.item()])
-                    else:
-                        word = self.val_dataset.question_tokenizer.decode([word_idx.item()])
-                    dict_words[temp].append(word)
+                        word_idx = logits[-1].squeeze().argmax()
+                    input_idx = torch.cat([input_idx, word_idx.view(1,1)], dim=-1)
+                words = self.val_dataset.question_tokenizer.decode(input_idx.squeeze().cpu().numpy())
+            dict_words[temp] = words
             if write:
                 out_file_generate = os.path.join(self.out_path,
                                                  'generate_words_temp_{}_img_{}_answer_{}.txt'.format(temp, index_img,
                                                                                                       answer_))
                 with open(out_file_generate, 'w') as f:
-                    f.write(" ".join(dict_words[temp]))
+                    f.write(dict_words[temp])
                     f.close()
 
         return dict_words
 
 
-    def generate_text(self, temperatures=[None, 0.5, 1, 2], words=50):
+    def generate_text(self, temperatures=[None, 0.5, 1, 2], words=20):
         input = self.test_dataset.vocab_questions["<SOS>"]
         input = torch.LongTensor([input]).view(1, 1).to(self.device)
         if self.task == "lm":
@@ -195,10 +198,52 @@ class SLAlgo:
                 _ = self._generate_text(input, temperatures=temperatures, num_words=words, img_feats=img_feats, index_img=index,
                                     answer=answer)
 
-    def compute_language_metrics(self):
+    def compute_language_metrics(self, temperatures):
         """
         Compute different versions of BLEU: try smoothing techniques seven at first. then 5, 6.
         METEOR
         :return:
         """
-        pass
+        input = self.test_dataset.vocab_questions["<SOS>"]
+        input = torch.LongTensor([input]).view(1, 1).to(self.device)
+        #dict_metrics_greedy = {k:0. for k in self.language_metrics.keys()}
+        #temperatures = [None, 1]
+        #dict_metrics_sampling = dict_metrics_greedy
+        dict_metrics = {k:0. for k in self.language_metrics.keys()}
+        result_metrics = {k: dict_metrics for k in temperatures}
+        for ((inputs, targets), answers, img) in self.val_generator:
+            if isinstance(img, list):
+                feats = img[0]
+            else:
+                feats = img
+            for i in range(targets.shape[0]):
+                question_decoded = [self.val_dataset.question_tokenizer.decode(targets[i].cpu().numpy())]
+                num_words = len(question_decoded[0].split(" ")) + 1
+                if self.task == "lm":
+                    dict_questions = self._generate_text(input, temperatures=temperatures, num_words=num_words, write=False)
+                elif self.task == "policy":
+                    dict_questions = self._generate_text(input, temperatures=temperatures, img_feats=feats[i].unsqueeze(0), answer=answers[i].view(1), num_words=num_words, write=False)
+                for temp in temperatures:
+                    for name, metric in self.language_metrics.items():
+                        result, _, _ = metric.get(dict_questions[temp], question_decoded, step_idx=None,
+                                                         done=True)
+                        #result_greedy, _, _ = metric.get(dict_questions[None], question_decoded, step_idx=None, done=True)
+                        #result_sampling, _, _ = metric.get(dict_questions[1], question_decoded, step_idx=None, done=True)
+                        result_metrics[temp][name] = result_metrics[temp][name] + result
+                        #dict_metrics_greedy[name] += result_greedy
+                        #dict_metrics_sampling[name] += result_sampling
+        #dict_metrics_greedy = {k:v/len(self.val_dataset) for k,v in dict_metrics_greedy.items()}
+        #dict_metrics_sampling = {k: v / len(self.val_dataset) for k, v in dict_metrics_sampling.items()}
+        #print('greedy results', dict_metrics_greedy)
+        #print('sampling results', dict_metrics_sampling)
+        # for (temp, name) in zip(temperatures, self.language_metrics.keys()):
+        #     print('metric before averaging', result_metrics[temp][name])
+        #     result_metrics[temp][name] = result_metrics[temp][name] / len(self.val_dataset)
+        #     print('metric after averaging', result_metrics[temp][name])
+        # getting the average for
+        result_metrics = {k:{k_:v_/len(self.val_dataset) for k_, v_ in v.items()} for k,v in result_metrics.items()}
+        #result_metrics = {k:v for k,v in zip(["greedy", "sampling"], [dict_metrics_greedy, dict_metrics_sampling])}
+        df = pd.DataFrame.from_dict(result_metrics)
+        #df.to_csv(self.out_lm_metrics, columns=["greedy", "sampling"])
+        df.to_csv(self.out_lm_metrics, columns=temperatures)
+        return result_metrics

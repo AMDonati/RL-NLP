@@ -172,3 +172,6 @@ if __name__ == '__main__':
     if args.ep > 0:
         sl_algo.train()
     sl_algo.generate_text()
+    temperatures = [None, 1]
+    dict_metrics = sl_algo.compute_language_metrics(temperatures=temperatures)
+    sl_algo.logger.info("language metrics: {}".format(dict_metrics))
