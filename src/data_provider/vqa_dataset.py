@@ -17,6 +17,8 @@ from torch.utils.data import Dataset
 import numpy as np
 import time
 
+from data_provider.tokenizer import Tokenizer
+
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
@@ -198,6 +200,7 @@ class VQADataset(Dataset):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
+        self.answer_tokenizer= Tokenizer(self.ans2label)
         self._max_region_num = max_region_num
         self._max_seq_length = max_seq_length
         self._image_features_reader = image_features_reader

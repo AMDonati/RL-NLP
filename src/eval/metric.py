@@ -13,6 +13,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
 
 # If modifying these scopes, delete the file token.pickle.
+from data_provider.CLEVR_Dataset import CLEVR_Dataset
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -56,9 +57,6 @@ class Metric:
     def reset(self):
         self.idx_word = 0
 
-    def reinit_train_test(self, train_test):
-        self.train_test = train_test
-
     def write(self, **kwargs):
         if self.to_tensorboard:
             if self.type == "scalar":
@@ -75,12 +73,16 @@ class Metric:
     def get_stats(self, serie):
         return [serie.mean(), serie.std(), serie.size]
 
+    def post_treatment_(self):
+        pass
+
     def post_treatment(self):
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False)
         if self.type == "scalar":
             self.stats = self.get_stats(serie)
             pd.Series(self.stats).to_csv(self.stats_path, index=False)
+        self.post_treatment_()
 
 
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
@@ -163,10 +165,6 @@ class DialogMetric(Metric):
     def fill_(self, **kwargs):
         pass
 
-    def reinit_train_test(self, train_test):
-        self.train_test = train_test
-        self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.txt')
-
     def compute_(self, **kwargs):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, :].numpy()[0],
@@ -188,7 +186,6 @@ class DialogMetric(Metric):
                                               "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
             self.metric.append(string)
 
-
     def write_to_csv(self):
         '''save padded array of generated dialog for later use (for example with word cloud)'''
         if self.train_test != "train":
@@ -203,69 +200,62 @@ class DialogImageMetric(Metric):
 
     def __init__(self, agent, train_test, id):
         Metric.__init__(self, agent, train_test, "dialog", "text", id)
-        self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
-        self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
-        self.generated_dialog = {}
-        self.drive_service = self.get_google_service()
+        # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
+        # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
+        self.generated_dialog = []
+        self.condition_answer = agent.policy.condition_answer
+        self.list_image_ids = pd.read_csv("output/image_ids.csv", index_col="id_coco")
 
     def fill_(self, **kwargs):
         pass
 
-    def reinit_train_test(self, train_test):
-        self.train_test = train_test
-        self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
-
     def compute_(self, **kwargs):
         with torch.no_grad():
-            if not self.train_test + '_' + self.key in self.generated_dialog.keys():
-                self.generated_dialog[self.train_test + '_' + self.key] = [kwargs["state"].text.squeeze().cpu()]
-            else:
-                self.generated_dialog[self.train_test + '_' + self.key].append(
-                    kwargs["state"].text.cpu().view(-1))
-            state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text[:, 1:].numpy()[0],
+            self.generated_dialog.append(kwargs["state"].text.cpu().view(-1))
+            state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
                                                                    ignored=[])
-            if self.env.reward_type == 'vqa':
-                pred_answer_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["pred_answer"].numpy(),
+
+            ref_question_decoded = kwargs["ref_questions_decoded"]
+            values = {"img": kwargs["img_idx"], "question": state_decoded,
+                      "closest_question": kwargs["closest_question"],
+                      "ref_question": ref_question_decoded}
+            if self.condition_answer != "none":
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                values["ref_answer"] = ref_answer_decoded
+
+            if self.reward_type == 'vqa':
+                pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
                                                                              decode_answers=True)
-                ref_answer_decoded = self.dataset.question_tokenizer.decode(
-                    tex=[kwargs["ref_answer"].numpy().item()],
-                    decode_answers=True)
-                ref_question_decoded = kwargs["ref_questions_decoded"][0]
+                values["pred_answer"] = pred_answer_decoded
+            # if self.drive_service != None:
+            #img_name = self.get_name_image(kwargs["img_idx"])
+            id = self.get_id_image(kwargs["img_idx"])
+            if id is not None:
+                url = "https://drive.google.com/uc?export=view&id={}".format(id)
+                values["link"] = "<img src={}>".format(url)
 
-                values = [kwargs["img_idx"], kwargs["question_idx"], state_decoded, pred_answer_decoded,
-                          ref_answer_decoded, ref_question_decoded]
-            else:
-                values = [kwargs["img_idx"], state_decoded, kwargs["closest_question"]]
             string = '<table><tr>'
-            img_name = "CLEVR_{}_{:06d}.png".format(self.env.clevr_mode, kwargs["img_idx"])
-            id = self.get_id_image(img_name)
-            url = "https://drive.google.com/uc?export=view&id={}".format(id)
-            values.append("<img src={}>".format(url))
-
-            string += "<td><ul><li>" + "</li><li>".join(list(map(str, values))) + "</li></ul></td></tr></table>"
+            string += "<td><ul><li>" + "</li><li>".join(
+                list(map(str, values.values()))) + "</li></ul></td></tr></table>"
 
             self.metric.append(string)
-            # write dialog in a .html file:
-            with open(self.out_dialog_file, 'a') as f:
-                f.write(string + '\n')
-            pass
 
-    def get_id_image(self, name):
-        page_token = None
-        id = "unknown"
-        while True:
-            try:
-                response = self.drive_service.files().list(q="name = '{}'".format(name),
-                                                           spaces='drive',
-                                                           fields='nextPageToken, files(id, name)',
-                                                           pageToken=page_token).execute()
-                file = response["files"][0]
-                id = file.get('id')
+    def get_name_image(self, img_idx):
+        if self.dataset.__class__ == CLEVR_Dataset:
+            img_name = "CLEVR_{}_{:06d}.png".format(self.env.mode, img_idx)
+        else:
+            # img_name = "COCO_train2014_{:012d}.jpg".format(img_idx - 100000)
+            img_name = "{:012d}.jpg".format(img_idx - 100000)
+        return img_name
 
-            except Exception as e:
-                print(e)
-            break
-        return id
+    def get_id_image(self, id_image):
+        id_image
+        try:
+            id_drive = self.list_image_ids.loc[id_image]
+        except KeyError:
+            id_drive = None
+        finally:
+            return id_drive
 
     def get_google_service(self):
         creds = None
