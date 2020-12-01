@@ -369,9 +369,6 @@ class BleuMetric(Metric):
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
-            #ref_questions = [q.split() for q in ref_questions]
-            #question_tokens = question_decoded.split()
-            #score = sentence_bleu(ref_questions, question_tokens)
             score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded, done=True)
             self.measure.append(score)
 

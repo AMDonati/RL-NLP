@@ -184,7 +184,7 @@ if __name__ == '__main__':
 
     ################################################################################################################################################
         # MAIN
-    ################################################################################################################################################
+################################################################################################################################################
     if args.model_path is not None:
         assert args.ep == 0, "if model path is provided, only evaluation should be done."
     model = get_model(args, train_dataset)
@@ -194,5 +194,7 @@ if __name__ == '__main__':
         sl_algo.train()
     sl_algo.generate_text()
     temperatures = get_temperatures(args)
-    dict_metrics = sl_algo.compute_language_metrics(temperatures=temperatures)
-    sl_algo.logger.info("language metrics: {}".format(dict_metrics))
+    if args.task != "lm" or args.dataset != "clevr":
+        print("computing langage metrics...")
+        dict_metrics = sl_algo.compute_language_metrics(temperatures=temperatures)
+        sl_algo.logger.info("language metrics: {}".format(dict_metrics))

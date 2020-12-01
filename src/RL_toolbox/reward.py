@@ -256,6 +256,25 @@ rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": Levenshtein
            "vilbert": VILBERT}
 
 if __name__ == '__main__':
+    print("testing of BLEU score with sf7 smoothing function")
+    reward_sf7 = rewards["bleu_sf7"]()
+    rew_1 = reward_sf7.get(question="The cat is on the mat", ep_questions_decoded=["The cat is on the mat"], done=True)
+    print(rew_1)
+    rew_0 = reward_sf7.get(question="The cat is on the mat", ep_questions_decoded=["the the the the the the"], done=True)
+    print(rew_0)
+    rew_2 = reward_sf7.get(question="What kinds of birds are flying", ep_questions_decoded=["What kinds of birds are flying"], done=True)
+    print(rew_2)
+
+    print("testing of BLEU score with sf4 smoothing function")
+    reward_sf7 = rewards["bleu"]()
+    rew_1 = reward_sf7.get(question="The cat is on the mat", ep_questions_decoded=["The cat is on the mat"], step_idx=None, done=True)
+    print(rew_1)
+    #rew_0 = reward_sf7.get(question="The cat is on the mat", ep_questions_decoded=["What kinds of birds are flying"], step_idx=None, done=True)
+    #print(rew_0)
+    rew_0 = reward_sf7.get(question="The cat is on the mat",
+                           ep_questions_decoded=["the the the the the the"], done=True, step_idx=None)
+    print(rew_0)
+
     reward_func = rewards["cosine"](path="../../data/CLEVR_v1.0/temp/50000_20000_samples_old/train_questions.json")
     rew = reward_func.get("is it blue ?", ["is it red ?", "where is it ?"])
     print("reward {} cosine".format(rew))
@@ -306,55 +325,4 @@ if __name__ == '__main__':
     rew_norm_pos, sim_q = reward_func.get(str_1, [str_2])
     print('rew norm positive', rew_norm_pos)
 
-    # --------------------------- CorrectVocab reward -----------------------------------------------------------------------------
-    print("correct vocab reward...")
 
-    reward_func = rewards["correct_vocab"](path=None)
-    str_1 = "is it blue ?"
-    str_2 = "is it blue ?"
-    print(str_1)
-    print(str_2)
-    # rew = reward_func.get(str_1, [str_2])
-    print('reward', rew)
-
-    str_1 = "blue it is ?"
-    str_2 = "is it blue ?"
-    print(str_1)
-    print(str_2)
-    rew = reward_func.get(str_1, [str_2, "red is there a black ball ?"])
-    print('reward', rew)
-
-    str_1 = "red it is ?"
-    str_2 = "is it blue ?"
-    print(str_1)
-    print(str_2)
-    rew = reward_func.get(str_1, [str_2])
-    print('reward', rew)
-
-    str_1 = "red that object"
-    str_2 = "is it blue"
-    print(str_1)
-    print(str_2)
-    rew = reward_func.get(str_1, [str_2])
-    print('reward', rew)
-
-    # ----- lv reward with correct vocab ---------------------------------------------------------------------------------------
-    print("lv reward with vocab...")
-    reward_func = rewards["levenshtein"](path=None)
-    reward_func_vocab = rewards["levenshtein"](path=None, correct_vocab=True)
-    ref_questions = ["is it blue", "red is there a black ball"]
-    str = "blue it is"
-    print('question', str)
-    print('ref_questions', ref_questions)
-    print('reward w/o vocab', reward_func.get(str, ref_questions))
-    print('rew with vocab', reward_func_vocab.get(str, ref_questions))
-    str = "blue red it"
-    print('question', str)
-    print('ref_questions', ref_questions)
-    print('reward w/o vocab', reward_func.get(str, ref_questions))
-    print('rew with vocab', reward_func_vocab.get(str, ref_questions))
-    str = "is it blue"
-    print('question', str)
-    print('ref_questions', ref_questions)
-    print('reward w/o vocab', reward_func.get(str, ref_questions))
-    print('rew with vocab', reward_func_vocab.get(str, ref_questions))
