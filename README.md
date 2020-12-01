@@ -33,6 +33,7 @@ RL-NLP
 |   ├── SL_LSTM_32_64_VQA / model.pt: path for the pre-trained policy conditioned on the answer (for VQA reward) on the CLEVR dataset. 
 |   └── vqa_model_film / model.pt: path for the pre-trained oracle model for the "vqa" reward of the CLEVR dataset
     └── lm_model_vqa / model.pt: path for pre-trained lm model
+    └── vqa_policy_512_1024_answer / model.pt
     └── vilbert_vqav2
          ├── model.bin : path for vilbert oracle fine-tuned on vqav2 task
          ├── bert_base_6layer_6conect.json : config file for vilbert oracle
