@@ -1,6 +1,5 @@
 import json
 import time
-
 import nltk
 import numpy as np
 import pandas as pd
@@ -17,6 +16,34 @@ def get_vocab(key, vocab_path):
     with open(vocab_path, 'r') as f:
         vocab = json.load(f)[key]
     return vocab
+
+def get_smoothing_function(sf_id):
+    if sf_id == 0:
+        smoothing_function = SmoothingFunction().method0
+    elif sf_id == 1:
+        smoothing_function = SmoothingFunction().method1
+    elif sf_id == 2:
+        smoothing_function = SmoothingFunction().method2
+    elif sf_id == 3:
+        smoothing_function = SmoothingFunction().method3
+    elif sf_id == 4:
+        smoothing_function = SmoothingFunction().method4
+    elif sf_id == 5:
+        smoothing_function = SmoothingFunction().method5
+    elif sf_id == 6:
+        smoothing_function = SmoothingFunction().method6
+    elif sf_id == 7:
+        smoothing_function = SmoothingFunction().method7
+    return smoothing_function
+
+def get_weights_bleu_score(n_gram=4):
+    if n_gram == 2:
+        weights = [0.5, 0.5]
+    elif n_gram == 3:
+        weights = [1/3, 1/3, 1/3]
+    elif n_gram == 4:
+        weights = [0.25, 0.25, 0.25, 0.25]
+    return weights
 
 
 class Reward:
@@ -76,76 +103,122 @@ class Levenshtein_(Reward):
         reward = -min(distances) if done else 0
         return reward, ep_questions_decoded[distances.argmin()], None
 
-
-class Bleu(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None, env=None):
-        Reward.__init__(self, path)
-        self.type = "episode"
-
-    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
-        if not done:
-            return 0, "N/A", None
-        normalize_function = lambda x: x.replace("?", " ?").split()
-        ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
-        smoothing_function = SmoothingFunction().method4
-        try:
-            reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question),
-                                   smoothing_function=smoothing_function)
-            scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref
-                      in
-                      ep_questions_decoded_normalized]
-            closest_question = ep_questions_decoded[np.array(scores).argmax()]
-        except:
-            reward, closest_question = 0, "N/A"
-        return reward, closest_question, None
-
 class Bleu_sf7(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+    def __init__(self, sf_id=7, n_gram=4,  path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
+        self.sf_id = sf_id
+        self.n_gram = n_gram
+        self.smoothing_function = get_smoothing_function(sf_id)
+        self.weights = get_weights_bleu_score(n_gram)
 
     def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
         normalize_function = lambda x: x.replace("?", " ?").split()
         ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
-        smoothing_function = SmoothingFunction().method7
-        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=smoothing_function)
-        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref in
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights)
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights) for ref in
                   ep_questions_decoded_normalized]
         closest_question = ep_questions_decoded[np.array(scores).argmax()]
         return reward, closest_question, None
 
-class Bleu2_sf7(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+class Bleu_sf0(Reward):
+    def __init__(self, sf_id=0, n_gram=4,  path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
+        self.sf_id = sf_id
+        self.n_gram = n_gram
+        self.smoothing_function = get_smoothing_function(sf_id)
+        self.weights = get_weights_bleu_score(n_gram)
 
     def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
         normalize_function = lambda x: x.replace("?", " ?").split()
         ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
-        smoothing_function = SmoothingFunction().method7
-        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=smoothing_function, weights=[1/3, 1/3, 1/3])
-        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref in
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights)
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights) for ref in
                   ep_questions_decoded_normalized]
         closest_question = ep_questions_decoded[np.array(scores).argmax()]
         return reward, closest_question, None
 
-class Bleu1_sf7(Reward):
-    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+class Bleu_sf1(Reward):
+    def __init__(self, sf_id=1, n_gram=4,  path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
+        self.sf_id = sf_id
+        self.n_gram = n_gram
+        self.smoothing_function = get_smoothing_function(sf_id)
+        self.weights = get_weights_bleu_score(n_gram)
 
     def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
         normalize_function = lambda x: x.replace("?", " ?").split()
         ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
-        smoothing_function = SmoothingFunction().method7
-        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=smoothing_function, weights=[0.5, 0.5])
-        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref in
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights)
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights) for ref in
+                  ep_questions_decoded_normalized]
+        closest_question = ep_questions_decoded[np.array(scores).argmax()]
+        return reward, closest_question, None
+
+class Bleu_sf2(Reward):
+    def __init__(self, sf_id=2, n_gram=4,  path=None, vocab=None, dataset=None, env=None):
+        Reward.__init__(self, path)
+        self.type = "episode"
+        self.sf_id = sf_id
+        self.n_gram = n_gram
+        self.smoothing_function = get_smoothing_function(sf_id)
+        self.weights = get_weights_bleu_score(n_gram)
+
+    def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
+        if not done:
+            return 0, "N/A", None
+        normalize_function = lambda x: x.replace("?", " ?").split()
+        ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights)
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights) for ref in
+                  ep_questions_decoded_normalized]
+        closest_question = ep_questions_decoded[np.array(scores).argmax()]
+        return reward, closest_question, None
+
+class Bleu_sf3(Reward):
+    def __init__(self, sf_id=3, n_gram=4,  path=None, vocab=None, dataset=None, env=None):
+        Reward.__init__(self, path)
+        self.type = "episode"
+        self.sf_id = sf_id
+        self.n_gram = n_gram
+        self.smoothing_function = get_smoothing_function(sf_id)
+        self.weights = get_weights_bleu_score(n_gram)
+
+    def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
+        if not done:
+            return 0, "N/A", None
+        normalize_function = lambda x: x.replace("?", " ?").split()
+        ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights)
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights) for ref in
+                  ep_questions_decoded_normalized]
+        closest_question = ep_questions_decoded[np.array(scores).argmax()]
+        return reward, closest_question, None
+
+class Bleu_sf4(Reward):
+    def __init__(self, sf_id=4, n_gram=4,  path=None, vocab=None, dataset=None, env=None):
+        Reward.__init__(self, path)
+        self.type = "episode"
+        self.sf_id = sf_id
+        self.n_gram = n_gram
+        self.smoothing_function = get_smoothing_function(sf_id)
+        self.weights = get_weights_bleu_score(n_gram)
+
+    def get(self, question, ep_questions_decoded, step_idx=None, done=False, real_answer="", state=None):
+        if not done:
+            return 0, "N/A", None
+        normalize_function = lambda x: x.replace("?", " ?").split()
+        ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
+        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights)
+        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=self.smoothing_function, weights=self.weights) for ref in
                   ep_questions_decoded_normalized]
         closest_question = ep_questions_decoded[np.array(scores).argmax()]
         return reward, closest_question, None
@@ -257,7 +330,8 @@ class VILBERT(Reward):
         return reward, "N/A", None
 
 
-rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer, "bleu": Bleu, "bleu_sf7": Bleu_sf7,
+rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer,
+           "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,
            "vilbert": VILBERT}
 
 if __name__ == '__main__':
