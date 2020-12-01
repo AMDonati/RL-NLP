@@ -507,11 +507,11 @@ class UniqueWordsMetric(Metric):
     def __init__(self, agent, train_test, id):
         Metric.__init__(self, agent, train_test, "unique_words", "scalar", id)
         self.measure_history = []
-        self.threshold = 3
+        self.threshold = 10
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            self.measure_history.append(list(kwargs["new_state"].text.squeeze().numpy()[1:]))
+            self.measure_history.append(list(kwargs["new_state"].text.squeeze().cpu().numpy()[1:]))
 
     def compute_(self, **kwargs):
         if self.idx_compute > self.threshold and "sampling" in self.id:
