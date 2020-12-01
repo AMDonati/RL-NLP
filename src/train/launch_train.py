@@ -59,12 +59,14 @@ if __name__ == '__main__':
     parser.add_argument("-bs", type=int, default=2, help="batch size")
     parser.add_argument("-ep", type=int, default=3, help="number of epochs")
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
+    # Evaluation:
+    parser.add_argument("-eval_modes", type=str, nargs='+', default=["sampling"])
+    parser.add_argument("-bleu_sf", type=int, default=1)
     # Misc.
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument('-max_samples', type=int,
                         help="number of samples in the dataset - to train on a subset of the full dataset")
-    parser.add_argument("-eval_modes", type=str, nargs='+', default=["sampling"])
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
     parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
     args = parser.parse_args()

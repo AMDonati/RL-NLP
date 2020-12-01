@@ -1,4 +1,4 @@
-from RL_toolbox.reward import Bleu
+from RL_toolbox.reward import Bleu_sf0 as Bleu
 import numpy as np
 import random
 

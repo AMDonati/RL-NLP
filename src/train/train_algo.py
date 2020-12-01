@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from train.train_functions import train_one_epoch_policy, train_one_epoch, train_one_epoch_vqa, evaluate_vqa, evaluate, \
     evaluate_policy
 from utils.utils_train import create_logger, write_to_csv
-from RL_toolbox.reward import Bleu1_sf7, Bleu2_sf7, Bleu_sf7
+from RL_toolbox.reward import Bleu_sf0
 import pandas as pd
 
 
@@ -35,32 +35,36 @@ class SLAlgo:
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
         self.check_batch()
-        self.language_metrics = {k:v for k,v in zip(["bleu-1", "bleu-2", "bleu"], [Bleu1_sf7(), Bleu2_sf7(), Bleu_sf7()])}
+        self.language_metrics = {k: v for k, v in zip(["bleu-1", "bleu-2", "bleu"],
+                                                      [Bleu_sf0(sf_id=args.bleu_sf, n_gram=2),
+                                                       Bleu_sf0(sf_id=args.bleu_sf, n_gram=3),
+                                                       Bleu_sf0(sf_id=args.bleu_sf, n_gram=4)])}
 
     def create_out_path(self, args):
         if args.model_path is not None:
             out_path = os.path.join(args.model_path, "eval_from_loaded_model")
             self.out_path = os.path.join(out_path,
-                                     "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+                                         "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
         else:
             out_path = '{}_{}_{}_layers_{}_emb_{}_hidden_{}_pdrop_{}_gradclip_{}_bs_{}_lr_{}'.format(args.dataset,
-                                                                                                 args.task, args.model,
-                                                                                                 args.num_layers,
-                                                                                                 args.emb_size,
-                                                                                                 args.hidden_size,
-                                                                                                 args.p_drop,
-                                                                                                 args.grad_clip,
-                                                                                                 args.bs, args.lr)
+                                                                                                     args.task,
+                                                                                                     args.model,
+                                                                                                     args.num_layers,
+                                                                                                     args.emb_size,
+                                                                                                     args.hidden_size,
+                                                                                                     args.p_drop,
+                                                                                                     args.grad_clip,
+                                                                                                     args.bs, args.lr)
             if args.task == 'policy':
                 out_path = out_path + '_cond-answer_{}'.format(args.condition_answer)
             self.out_path = os.path.join(args.out_path, out_path,
-                                     "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
+                                         "{}".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S")))
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
         out_file_log = os.path.join(self.out_path, 'training_log.log')
         self.logger = create_logger(out_file_log)
         self.out_csv = os.path.join(self.out_path, 'train_history.csv')
-        self.out_lm_metrics = os.path.join(self.out_path, 'lm_metrics.csv')
+        self.out_lm_metrics = os.path.join(self.out_path, 'lm_metrics_sf{}.csv'.format(args.bleu_sf))
         self.model_path = os.path.join(self.out_path, 'model.pt')
         self.logger.info("hparams: {}".format(vars(args)))
         self.logger.info('train dataset length: {}'.format(self.train_dataset.__len__()))
@@ -174,7 +178,7 @@ class SLAlgo:
                         word_idx = torch.multinomial(word_weights, num_samples=1)[0]  # [0] to have a scalar tensor.
                     else:
                         word_idx = logits[-1].squeeze().argmax()
-                    input_idx = torch.cat([input_idx, word_idx.view(1,1)], dim=-1)
+                    input_idx = torch.cat([input_idx, word_idx.view(1, 1)], dim=-1)
                 words = self.val_dataset.question_tokenizer.decode(input_idx.squeeze().cpu().numpy())
             dict_words[temp] = words
             if write:
@@ -187,7 +191,6 @@ class SLAlgo:
 
         return dict_words
 
-
     def generate_text(self, temperatures=["greedy", 0.5, 1, 2], words=20):
         input = self.test_dataset.vocab_questions["<SOS>"]
         input = torch.LongTensor([input]).view(1, 1).to(self.device)
@@ -199,8 +202,9 @@ class SLAlgo:
                 print("Generating text conditioned on img: {}".format(index))
                 img_feats, answer = self.get_answers_img_features(dataset=self.val_dataset, index=index)
                 img_feats = img_feats.unsqueeze(0)
-                _ = self._generate_text(input, temperatures=temperatures, num_words=words, img_feats=img_feats, index_img=index,
-                                    answer=answer)
+                _ = self._generate_text(input, temperatures=temperatures, num_words=words, img_feats=img_feats,
+                                        index_img=index,
+                                        answer=answer)
 
     def compute_language_metrics(self, temperatures):
         """
@@ -210,7 +214,7 @@ class SLAlgo:
         """
         input = self.test_dataset.vocab_questions["<SOS>"]
         input = torch.LongTensor([input]).view(1, 1).to(self.device)
-        dict_metrics = {k:0. for k in self.language_metrics.keys()}
+        dict_metrics = {k: 0. for k in self.language_metrics.keys()}
         result_metrics = {k: dict_metrics for k in temperatures}
         for ((inputs, targets), answers, img) in self.val_generator:
             if isinstance(img, list):
@@ -221,16 +225,20 @@ class SLAlgo:
                 question_decoded = [self.val_dataset.question_tokenizer.decode(targets[i].cpu().numpy())]
                 num_words = len(question_decoded[0].split(" ")) + 1
                 if self.task == "lm":
-                    dict_questions = self._generate_text(input, temperatures=temperatures, num_words=num_words, write=False)
+                    dict_questions = self._generate_text(input, temperatures=temperatures, num_words=num_words,
+                                                         write=False)
                 elif self.task == "policy":
-                    dict_questions = self._generate_text(input, temperatures=temperatures, img_feats=feats[i].unsqueeze(0), answer=answers[i].view(1), num_words=num_words, write=False)
+                    dict_questions = self._generate_text(input, temperatures=temperatures,
+                                                         img_feats=feats[i].unsqueeze(0), answer=answers[i].view(1),
+                                                         num_words=num_words, write=False)
                 for temp in temperatures:
                     for name, metric in self.language_metrics.items():
                         result, _, _ = metric.get(dict_questions[temp], question_decoded, step_idx=None,
-                                                         done=True)
+                                                  done=True)
                         result_metrics[temp][name] = result_metrics[temp][name] + result
         # getting the average
-        result_metrics = {k:{k_:v_/len(self.val_dataset) for k_, v_ in v.items()} for k,v in result_metrics.items()}
+        result_metrics = {k: {k_: v_ / len(self.val_dataset) for k_, v_ in v.items()} for k, v in
+                          result_metrics.items()}
         df = pd.DataFrame.from_dict(result_metrics)
         df.to_csv(self.out_lm_metrics, index_label="metrics", columns=temperatures)
         return result_metrics
