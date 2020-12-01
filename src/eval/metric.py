@@ -200,6 +200,7 @@ class DialogImageMetric(Metric):
         # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = []
         self.condition_answer = agent.policy.condition_answer
+        self.mode = agent.env.mode
         image_id_file = "clevr" if self.dataset.__class__ == CLEVR_Dataset else "coco"
         image_id_file = os.path.join("data", "drive", image_id_file + ".csv")
         self.list_image_ids = pd.read_csv(image_id_file, index_col="id_image")
@@ -233,16 +234,15 @@ class DialogImageMetric(Metric):
             self.metric.append(dialog)
 
             id = self.get_id_image(kwargs["img_idx"])
-            #if id is not None:
+            # if id is not None:
             url = "https://drive.google.com/uc?export=view&id={}".format(id)
             values["link"] = "<img src={}>".format(url)
             values["closest_question"] = kwargs["closest_question"]
             self.generated_dialog.append(values)
 
-
     def get_name_image(self, img_idx):
         if self.dataset.__class__ == CLEVR_Dataset:
-            img_name = "CLEVR_{}_{:06d}".format(self.env.mode, img_idx)
+            img_name = "CLEVR_{}_{:06d}".format(self.mode, img_idx)
         else:
             # img_name = "COCO_train2014_{:012d}.jpg".format(img_idx)
             # img_name = "{:012d}".format(img_idx)
