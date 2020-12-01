@@ -286,6 +286,8 @@ class Agent:
                 instances_of_metric = [self.metrics[key_mode][key] for key_mode in self.metrics.keys() if
                                        eval_trunc in key_mode and key_mode != "train"]
                 means = [instance.stats[0] for instance in instances_of_metric if instance.stats is not None]
-                trunc_stats[key] = np.round(np.mean(means), decimals=3)
+                means = [x for x in means if str(x) != 'nan']
+                if len(means) > 0:
+                    trunc_stats[key] = np.round(np.mean(means), decimals=3)
 
             write_to_csv(os.path.join(output_path, csv_file), trunc_stats)
