@@ -88,10 +88,15 @@ class Bleu(Reward):
         normalize_function = lambda x: x.replace("?", " ?").split()
         ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
         smoothing_function = SmoothingFunction().method4
-        reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question), smoothing_function=smoothing_function)
-        scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref in
-                  ep_questions_decoded_normalized]
-        closest_question = ep_questions_decoded[np.array(scores).argmax()]
+        try:
+            reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question),
+                                   smoothing_function=smoothing_function)
+            scores = [sentence_bleu([ref], normalize_function(question), smoothing_function=smoothing_function) for ref
+                      in
+                      ep_questions_decoded_normalized]
+            closest_question = ep_questions_decoded[np.array(scores).argmax()]
+        except:
+            reward, closest_question = 0, "N/A"
         return reward, closest_question, None
 
 
