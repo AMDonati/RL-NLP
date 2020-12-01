@@ -332,6 +332,7 @@ class VILBERT(Reward):
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer,
            "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,
+           "bleu_sf7": Bleu_sf7,
            "vilbert": VILBERT}
 
 if __name__ == '__main__':
