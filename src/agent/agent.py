@@ -214,7 +214,7 @@ class Agent:
             logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
             for key_trunc, trunc in self.eval_trunc.items():
-                metrics = self.get_metrics(env.mode,key_trunc, test_mode)
+                metrics = self.get_metrics(env.mode, key_trunc, test_mode)
                 for i in range(env.ref_questions.size(
                         0)):  # loop multiple time over the same image to measure langage diversity.
                     with torch.no_grad():
@@ -284,8 +284,10 @@ class Agent:
             trunc_stats = {}
             for key in self.test_metrics_names:
                 instances_of_metric = [self.metrics[key_mode][key] for key_mode in self.metrics.keys() if
-                                       eval_trunc in key_mode]
+                                       eval_trunc in key_mode and key_mode != "train"]
                 means = [instance.stats[0] for instance in instances_of_metric if instance.stats is not None]
-                trunc_stats[key] = np.round(np.mean(means), decimals=3)
+                means = [x for x in means if str(x) != 'nan']
+                if len(means) > 0:
+                    trunc_stats[key] = np.round(np.mean(means), decimals=3)
 
             write_to_csv(os.path.join(output_path, csv_file), trunc_stats)

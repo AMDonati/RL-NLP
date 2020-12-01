@@ -5,10 +5,9 @@ import h5py
 import numpy as np
 import pandas as pd
 import torch
-from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
-from RL_toolbox.reward import rewards
 
+from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 
@@ -22,6 +21,7 @@ class Metric:
         self.metric_history = []
         self.idx_step = 0
         self.idx_word = 0
+        self.idx_compute = 0
         self.idx_write = 1
         self.dataset = agent.env.dataset
         self.out_path = agent.out_path
@@ -50,6 +50,7 @@ class Metric:
         self.measure = []
         self.idx_word = 0
         self.idx_step = 0
+        self.idx_compute += 1
 
     def reset(self):
         self.idx_word = 0
@@ -75,10 +76,10 @@ class Metric:
 
     def post_treatment(self):
         serie = pd.Series(self.metric_history)
-        serie.to_csv(self.out_csv_file, index=False)
+        serie.to_csv(self.out_csv_file, index=False, header=False)
         if self.type == "scalar":
             self.stats = self.get_stats(serie)
-            pd.Series(self.stats).to_csv(self.stats_path, index=False)
+            pd.Series(self.stats).to_csv(self.stats_path, index=False, header=False)
         self.post_treatment_()
 
 
@@ -214,7 +215,6 @@ class DialogImageMetric(Metric):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
                                                                    ignored=[])
-
             values = {}
             values["img"] = kwargs["img_idx"]
             values["question"] = state_decoded
@@ -356,6 +356,27 @@ class BleuMetric(Metric):
         self.metric.append(np.mean(self.measure))
 
 
+class LvNormMetric(Metric):
+    '''Compute the levenshtein over the ref questions and the generated dialog.'''
+
+    def __init__(self, agent, train_test, id):
+        Metric.__init__(self, agent, train_test, "lv_norm", "scalar", id)
+        self.function = rewards["lv_norm"]()
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                      ignored=["<SOS>"],
+                                                                      stop_at_end=True)
+            ref_questions = kwargs["ref_questions_decoded"]
+            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
+                                            step_idx=kwargs["timestep"], done=True)
+            self.measure.append(score)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
 # ------------------------ DIVERSITY METRICS -------------------------------------------------------------------------------------------------------------------
 
 class RefQuestionsMetric(Metric):
@@ -485,26 +506,19 @@ class UniqueWordsMetric(Metric):
 
     def __init__(self, agent, train_test, id):
         Metric.__init__(self, agent, train_test, "unique_words", "scalar", id)
+        self.measure_history = []
+        self.threshold = 3
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            self.measure.append(list(kwargs["new_state"].text.numpy()[0]))
+            self.measure_history.append(list(kwargs["new_state"].text.squeeze().numpy()[1:]))
 
     def compute_(self, **kwargs):
-        if "sampling" in self.train_test:
-            if len(self.measure) == kwargs["ref_question"].size(0):
-                arr = np.array(self.measure).flatten()
-                unique_tokens = np.unique(arr)
-                diversity_metric = len(unique_tokens) / len(arr)
-                self.metric.append(diversity_metric)
-
-    def compute(self, **kwargs):
-        self.compute_(**kwargs)
-        self.idx_word = 0
-        self.idx_step = 0
-
-    def write(self):
-        pass
+        if self.idx_compute > self.threshold and "sampling" in self.id:
+            arr=[item for sublist in self.measure_history[-self.threshold:] for item in sublist]
+            unique_tokens = np.unique(arr)
+            diversity_metric = len(unique_tokens) / len(arr) if len(arr) > 0 else 0
+            self.metric.append(diversity_metric)
 
 
 # --------------------------------------- OLD METRICS ----------------------------------------------------------------------------------------------------
@@ -655,5 +669,5 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
-           "true_word_prob": TrueWordProbLM}
+           "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated"]
