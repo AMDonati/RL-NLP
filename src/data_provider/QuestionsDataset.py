@@ -4,13 +4,12 @@ Inspired from: https://stanford.edu/~shervine/blog/pytorch-how-to-generate-data-
 '''
 import json
 import os
-
 import h5py
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-
 from preprocessing.text_functions import decode
+from data_provider.tokenizer import Tokenizer
 
 
 # TODO: add a max samples here: select 350,000 questions.
@@ -25,6 +24,7 @@ class QuestionsDataset(Dataset):
         self.idx_to_token = self.get_idx_to_token()
         self.len_vocab = len(self.vocab_questions)
         self.seq_len = self.inp_questions.size(1)
+        self.question_tokenizer = Tokenizer(self.vocab_questions)
 
     def get_vocab(self):
         with open(self.vocab_path, 'r') as f:

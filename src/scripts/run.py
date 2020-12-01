@@ -276,8 +276,6 @@ def get_rl_env(args, device):
 
 
 def run(args):
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.device_id
     # check consistency hparams
     if args.reward == "vqa":
         assert args.condition_answer is not None, "VQA task should be conditioned on the answer"

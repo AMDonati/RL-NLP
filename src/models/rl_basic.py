@@ -184,7 +184,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         embed_text = self._get_embed_text(state_text)
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
-        img_feat_ = img_feat if self.fusion == "average" or self.fusion =="none" else F.relu(self.conv(img_feat))
+        img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text=embed_text, img_feat_=img_feat_, img_feat=img_feat, answer=state_answer, seq_len=seq_len)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
