@@ -52,7 +52,8 @@ def main(args):
                                         fields='nextPageToken, files(id, name)',
                                         pageToken=page_token).execute()
         for file in response.get('files', []):
-            id_coco = file.get("name").split("_")[-1][:-4]
+            #id_coco = file.get("name").split("_")[-1][:-4]
+            id_coco = file.get("name")[:-4]
             data.append([id_coco, file.get('id')])
 
         page_token = response.get('nextPageToken', None)
