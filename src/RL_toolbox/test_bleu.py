@@ -19,12 +19,14 @@ def simple_test(bleu_fn):
     print("BLEU score for sentences with no common words", rew_0)
 
 
-def create_degenerated_text(text, vocab, num_words):
+def create_degenerated_text(text, dataset, num_words):
+    vocab = dataset.vocab_questions
     text_words = text.split()
     new_words_id = random.sample(list(range(0, len(text_words))), k=min(num_words, len(text_words)))
     degenerated_words = []
-    for _ in min(num_words, len(text_words)):
-        degenerated_words.append(random.sample(list(vocab.keys())), k=1)
+    for _ in range(min(num_words, len(text_words))):
+        word_idx = random.sample(list(vocab.values()), k=1)
+        degenerated_words.append(dataset.question_tokenizer.decode(word_idx))
     for i, id in enumerate(new_words_id):
         text_words[id] = degenerated_words[i]
     return " ".join(text_words), min(num_words, len(text_words))
@@ -35,10 +37,11 @@ def test_samples_from_dataset(bleu_fn, dataset, num_words=[1, 2, 3], num_samples
         rand_id = np.random.randint(0, len(dataset.filtered_entries))
         question = dataset.filtered_entries[rand_id]["question"]
         for w in num_words:
-            degen_question, w_ = create_degenerated_text(question, dataset.vocab_question, w)
+            degen_question, w_ = create_degenerated_text(question, dataset, w)
             score, _, _ = bleu_fn.get(question=degen_question,
                         ep_questions_decoded=[question], done=True)
-            print("BLEU score for degenerated question with {} degenerated words".format(w_))
+            print("question:{} - degen question: {}".format(question, degen_question))
+            print("BLEU score for degenerated question with {} degenerated words".format(w_), score)
             dict.update({str(w_): score})
     return dict
 
@@ -73,9 +76,19 @@ if __name__ == '__main__':
                                num_images=None, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
                                filter_entries=True, rl=False)
     sf_ids = [0,1,2,3,4,5,7] # 0 corresponds to function smoothing.
+    print("------------------------------------------------------------------------------------------------")
+    print("simple test")
     for sf_id in sf_ids:
         bleu_fn = Bleu(sf_id=sf_id)
         print("<-------------------------------------------------->")
         print("BLEU scores for smoothing function: {}".format(sf_id))
         simple_test(bleu_fn)
+        print("<-------------------------------------------------->")
+    print("------------------------------------------------------------------------------------------------")
+    print("test degerated sample from VQA dataset")
+    sf_ids = [1, 2, 3, 4]
+    for sf_id in sf_ids:
+        print("<-------------------------smoothing function {}------------------------->".format(sf_id))
+        bleu_fn = Bleu(sf_id=sf_id)
+        results = test_samples_from_dataset(bleu_fn, train_dataset)
         print("<-------------------------------------------------->")

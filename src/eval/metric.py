@@ -338,7 +338,10 @@ class BleuMetric(Metric):
 
     def __init__(self, agent, train_test, id):
         Metric.__init__(self, agent, train_test, "bleu", "scalar", id)
-        self.function = agent.env.reward_func #TODO: change this eventually.
+        if "bleu" in agent.env.reward_type:
+            self.function = agent.env.reward_func
+        else:
+            self.function = rewards["bleu_sf4"]()
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
