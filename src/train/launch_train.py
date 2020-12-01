@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("-data_path", type=str, default='../../data/vqa-v2')
     parser.add_argument("-features_path", type=str, default='../../data/vqa-v2/coco_trainval.lmdb')
     parser.add_argument("-out_path", type=str, default='../../output/temp')
+    parser.add_argument("-model_path", type=str, help="path for loading the model if starting from a pre-trained model")
     # model params.
     parser.add_argument("-model", type=str, default="lstm", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
@@ -63,10 +64,12 @@ if __name__ == '__main__':
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument('-max_samples', type=int,
                         help="number of samples in the dataset - to train on a subset of the full dataset")
+    parser.add_argument("-eval_modes", type=str, nargs='+', default=["sampling"])
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
+    parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
 
 
     ###############################################################################
@@ -161,14 +164,37 @@ if __name__ == '__main__':
                                        fusion=args.fusion,
                                        condition_answer=args.condition_answer,
                                        num_tokens_answer=train_dataset.len_vocab_answer).to(device)
+        if args.model_path is not None:
+            print("Loading trained model...")
+            model_ = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu'))
+            if isinstance(model_, dict):
+                model = model.load_state_dict(model_, strict=False)
+                model = model.to(device)
+            else:
+                model = model_.to(device)
         return model
+
+    def get_temperatures(args):
+        temperatures = []
+        if "sampling" in args.eval_modes:
+            temperatures.append(1)
+        elif "greedy" in args.eval_modes:
+            temperatures.append("greedy")
+        return temperatures
 
     ################################################################################################################################################
         # MAIN
-    ################################################################################################################################################
+################################################################################################################################################
+    if args.model_path is not None:
+        assert args.ep == 0, "if model path is provided, only evaluation should be done."
     model = get_model(args, train_dataset)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args)
     if args.ep > 0:
         sl_algo.train()
     sl_algo.generate_text()
+    temperatures = get_temperatures(args)
+    if args.task != "lm" or args.dataset != "clevr":
+        print("computing langage metrics...")
+        dict_metrics = sl_algo.compute_language_metrics(temperatures=temperatures)
+        sl_algo.logger.info("language metrics: {}".format(dict_metrics))

@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from nltk.translate.bleu_score import sentence_bleu
 from torch.nn.utils.rnn import pad_sequence
+from RL_toolbox.reward import rewards
 
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
@@ -337,6 +338,7 @@ class BleuMetric(Metric):
 
     def __init__(self, agent, train_test, id):
         Metric.__init__(self, agent, train_test, "bleu", "scalar", id)
+        self.function = rewards["bleu_sf7"]()
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -344,9 +346,7 @@ class BleuMetric(Metric):
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
-            ref_questions = [q.split() for q in ref_questions]
-            question_tokens = question_decoded.split()
-            score = sentence_bleu(ref_questions, question_tokens)
+            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded, done=True)
             self.measure.append(score)
 
     def compute_(self, **kwargs):
