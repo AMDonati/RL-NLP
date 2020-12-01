@@ -213,7 +213,6 @@ class DialogImageMetric(Metric):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(text=kwargs["state"].text[:, 1:].numpy()[0],
                                                                    ignored=[])
-
             values = {}
             values["img"] = kwargs["img_idx"]
             values["question"] = state_decoded
