@@ -43,8 +43,9 @@ class GenericEnv(gym.Env):
         SOS_idx = self.dataset.vocab_questions["<SOS>"]
         EOS_idx = self.dataset.vocab_questions["<EOS>"]
         question_mark_idx = self.dataset.vocab_questions["?"]
-        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx"))
-        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx)
+        question_mark_idx2 = None
+        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx", "question_mark_idx2"))
+        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx, question_mark_idx2)
 
     def set_reward_function(self, reward_type, reward_path, reward_vocab, diff_reward):
         self.reward_type = reward_type
@@ -69,7 +70,7 @@ class GenericEnv(gym.Env):
 
     def check_if_done(self, action):
         done = False
-        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
+        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx, self.special_tokens.question_mark_idx2]
         if is_action_terminal or self.step_idx == (self.max_len - 1):
             done = True
         return done
@@ -189,6 +190,14 @@ class VQAEnv(GenericEnv):
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
+
+    def set_special_tokens(self):
+        SOS_idx = self.dataset.vocab_questions["<SOS>"]
+        EOS_idx = self.dataset.vocab_questions["<EOS>"]
+        question_mark_idx = self.dataset.vocab_questions["?"]
+        question_mark_idx2 = self.dataset.question_tokenizer.encode(['?"'])[0]
+        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx", "question_mark_idx2"))
+        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx, question_mark_idx2)
 
     def reset(self, seed=None):
         if seed is not None:
