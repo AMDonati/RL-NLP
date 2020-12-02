@@ -533,7 +533,7 @@ if __name__ == '__main__':
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-vocab_path", type=str)
+    parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
     parser.add_argument("-split", type=str, default="mintrain")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
@@ -555,7 +555,7 @@ if __name__ == '__main__':
         vqa_dataset = VQADataset(split=args.split, dataroot=args.data_path,
                                  question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                                  reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                 num_images=20, vocab_path=args.vocab_path)
+                                 num_images=None, vocab_path=args.vocab_path)
 
     if args.test:
         vocab = vqa_dataset.vocab_questions
