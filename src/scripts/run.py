@@ -296,7 +296,7 @@ def run(args):
 
     # upload env & pretrained lm, policy network.
     env, test_envs = get_rl_env(args, device)
-    pretrained_lm = get_pretrained_lm(args, env)
+    pretrained_lm = get_pretrained_lm(args, env, device)
 
     models = {"lstm": PolicyLSTMBatch}
     # creating the policy model.

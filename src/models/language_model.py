@@ -26,8 +26,8 @@ class LanguageModel:
 
 
 class ClevrLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, dataset, tokenizer=None):
-        LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer)
+    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), tokenizer=None):
+        LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer)
         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
 
     def forward(self, state_text):
@@ -55,8 +55,8 @@ class ClevrLanguageModel(LanguageModel):
 
 
 class GenericLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0):
-        LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer, prefix_tokenizer=prefix_tokenizer)
+    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0):
+        LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer, prefix_tokenizer=prefix_tokenizer)
         self.tokenizer = tokenizer
         self.name = "generic"
         self.dataset_to_lm_trad = {value: self.tokenizer.encoder[key] for

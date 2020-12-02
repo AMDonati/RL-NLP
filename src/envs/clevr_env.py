@@ -87,10 +87,10 @@ class ClevrEnv(GenericEnv):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
                  reward_path=None, max_samples=None, debug=None, mode="train", num_questions=10, diff_reward=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False):
+                 condition_answer=True, reward_vocab=None, mask_answers=False, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super(ClevrEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                        reward_path=reward_path, mode=mode, debug=debug, diff_reward=diff_reward,
-                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False)
+                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False, device=device)
 
         modes = {"train": "train", "test_images": "val", "test_text": "train"}
         h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
@@ -164,11 +164,11 @@ class VQAEnv(GenericEnv):
                  debug=None,
                  reward_path=None, mode="train", diff_reward=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=6,
-                 num_answers=1):
+                 num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                      reward_path=reward_path, debug=debug, mode=mode, diff_reward=diff_reward,
                                      condition_answer=condition_answer, reward_vocab=reward_vocab,
-                                     mask_answers=mask_answers)
+                                     mask_answers=mask_answers, device=device)
 
         # Loading VQA Dataset.
         num_images = int(self.debug[1]) if self.debug is not None else self.debug
