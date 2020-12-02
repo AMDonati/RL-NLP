@@ -12,12 +12,11 @@ from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 
 class PolicyLSTMBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
+    def __init__(self, num_tokens, word_emb_size, hidden_size, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
                  kernel_size=1, stride=5, fusion="cat", env=None,
                  condition_answer="none"):
         super(PolicyLSTMBatch, self).__init__()
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.condition_answer = condition_answer
         self.num_tokens = num_tokens
         self.hidden_size = hidden_size
@@ -70,7 +69,7 @@ class PolicyLSTMBatch(nn.Module):
         probs = F.softmax(logits_exploration, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, self.num_tokens)
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, device=self.device, num_tokens=self.num_tokens)
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         if torch.isnan(policy_dist_truncated.probs).any():
@@ -85,7 +84,7 @@ class PolicyLSTMBatch(nn.Module):
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_) #(1,101,64) #TODO: increase dim size.
+            img_feat__ = self.projection(img_feat_) #(1,101,64)
             img_feat__ = img_feat__.transpose(2,1)
             img_feat__ = self.avg_pooling(img_feat__) #(1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)
@@ -109,11 +108,11 @@ class PolicyLSTMBatch(nn.Module):
 
 
 class PolicyLSTMBatch_SL(nn.Module):
-    def __init__(self, num_tokens, word_emb_size, hidden_size, num_layers=1, num_filters=3,
+    def __init__(self, num_tokens, word_emb_size, hidden_size, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
                  kernel_size=1, stride=5, fusion="cat", condition_answer="none", num_tokens_answer=32):
         super(PolicyLSTMBatch_SL, self).__init__()
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.num_tokens = num_tokens
         self.hidden_size = hidden_size
         self.num_layers = num_layers

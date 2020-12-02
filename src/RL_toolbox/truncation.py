@@ -6,10 +6,8 @@ from torch.distributions import Categorical
 
 from RL_toolbox.RL_functions import masked_softmax
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def mask_truncature(valid_actions, logits, num_tokens=86):
+def mask_truncature(valid_actions, logits, device, num_tokens=86):
     mask = torch.zeros(logits.size(0), num_tokens).to(device)
     mask[:, valid_actions] = 1
     probs_truncated = masked_softmax(logits.clone().detach(), mask)
@@ -24,7 +22,7 @@ def mask_truncature(valid_actions, logits, num_tokens=86):
     return policy_dist_truncated
 
 
-def mask_inf_truncature(valid_actions, logits, num_tokens=87):
+def mask_inf_truncature(valid_actions, logits, device, num_tokens=86):
     mask = (torch.ones(logits.size(0), num_tokens) * -1e32).to(device)
     mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
     probs_truncated = F.softmax(mask, dim=-1)
@@ -40,7 +38,7 @@ class Truncation:
         self.language_model = pretrained_lm
         self.alpha_logits_lm = agent.alpha_logits_lm
         self.dataset = agent.env.dataset
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = agent.device
 
     def get_valid_actions(self, state, truncation):
         if not truncation:

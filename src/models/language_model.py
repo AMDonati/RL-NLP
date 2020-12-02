@@ -3,8 +3,8 @@ import torch
 import numpy as np
 
 class LanguageModel:
-    def __init__(self, pretrained_lm, dataset, tokenizer=None, prefix_tokenizer=""):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), tokenizer=None, prefix_tokenizer=""):
+        self.device = device
         self.tokenizer = tokenizer
         self.language_model = pretrained_lm.to(self.device)
         self.dataset = dataset

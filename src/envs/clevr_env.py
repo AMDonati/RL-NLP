@@ -19,7 +19,7 @@ class GenericEnv(gym.Env):
     """Generic Env"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_path, max_len, reward_type="levenshtein",
+    def __init__(self, data_path, max_len, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), reward_type="levenshtein",
                  reward_path=None, mode="train", diff_reward=False,
                  debug=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False):
@@ -28,6 +28,7 @@ class GenericEnv(gym.Env):
         self.data_path = data_path
         self.mask_answers = mask_answers
         self.max_len = max_len
+        self.device = device
         self.condition_answer = condition_answer
         self.debug = debug.split(",") if debug is not None else debug
 

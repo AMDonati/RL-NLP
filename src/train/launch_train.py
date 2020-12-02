@@ -135,7 +135,7 @@ if __name__ == '__main__':
     ###############################################################################
     # BUILD THE MODEL
     ###############################################################################
-    def get_model(args, train_dataset):
+    def get_model(args, train_dataset, device):
         num_tokens = train_dataset.len_vocab
         if args.task == "lm":
             if args.model == "gru":
@@ -165,7 +165,7 @@ if __name__ == '__main__':
                                        stride=args.stride,
                                        fusion=args.fusion,
                                        condition_answer=args.condition_answer,
-                                       num_tokens_answer=train_dataset.len_vocab_answer).to(device)
+                                       num_tokens_answer=train_dataset.len_vocab_answer, device=device).to(device)
         if args.model_path is not None:
             print("Loading trained model...")
             model_ = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu'))
@@ -189,7 +189,7 @@ if __name__ == '__main__':
 ################################################################################################################################################
     if args.model_path is not None:
         assert args.ep == 0, "if model path is provided, only evaluation should be done."
-    model = get_model(args, train_dataset)
+    model = get_model(args, train_dataset, device)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args)
     if args.ep > 0:

@@ -47,9 +47,9 @@ def get_weights_bleu_score(n_gram=4):
 
 
 class Reward:
-    def __init__(self, path):
+    def __init__(self, path, vocab=None, dataset=None, env=None):
         self.path = path
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if env is None else env.device
 
     def get(self, question, ep_questions_decoded):
         pass
@@ -167,7 +167,7 @@ class VQAAnswer(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         Reward.__init__(self, path)
         self.type = "episode"
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if env is None else env.device
         self.execution_engine, ee_kwargs = load_execution_engine(path)
         self.execution_engine.to(self.device)
         self.execution_engine.eval()
@@ -201,7 +201,7 @@ class VQAAnswer(Reward):
 
 class VILBERT(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if env is None else env.device
         self.dataset = env.dataset if env is not None else None
         self.task_id = 1
         self.env = env

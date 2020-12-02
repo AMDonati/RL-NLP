@@ -141,7 +141,7 @@ def get_parser():
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
-    parser.add_argument('-device_id', type=str, default="1", help="device id when running on a multi-GPU VM.")
+    parser.add_argument('-device_id', type=int, default=0, help="device id when running on a multi-GPU VM.")
 
     return parser
 
@@ -155,18 +155,18 @@ def create_config_file(conf_file, args):
         config.write(fp)
 
 
-def get_pretrained_lm(args, env):
+def get_pretrained_lm(args, env, device):
     if "gpt" == args.lm_path:
         lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                              tokenizer=tokenizer, init_text=args.init_text,
-                                             custom_init=args.custom_init, add_answers=args.add_answers)
+                                             custom_init=args.custom_init, add_answers=args.add_answers, device=device)
     else:
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
         pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
-                                           tokenizer=env.dataset.question_tokenizer)
+                                           tokenizer=env.dataset.question_tokenizer, device=device)
     return pretrained_lm
 
 
@@ -249,28 +249,28 @@ def get_rl_env(args, device):
     if args.env == "clevr":
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
         test_modes = ["test_images", "test_text"] if not args.mask_answers else ["test_images"]
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,
-                              reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                              reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
                      for mode in test_modes]
     elif args.env == "vqa":
         if device.type == "cpu":
             env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
                          reward_type=args.reward, mode="mintrain", max_seq_length=23, debug=args.debug,
                          diff_reward=args.diff_reward, reward_path=args.reward_path,
-                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
             test_envs = [env]
         else:
             env = VQAEnv(args.data_path, features_h5path=args.features_path,
                          max_len=args.max_len, reward_type=args.reward, mode="train", max_seq_length=23,
                          debug=args.debug, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers)
+                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
             test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
                                 reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug,
                                 diff_reward=args.diff_reward, reward_path=args.reward_path,
-                                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers), env]
+                                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device), env]
             test_envs[1].mode = "test_text"
     return env, test_envs
 
@@ -289,7 +289,7 @@ def run(args):
     logger = create_logger(out_file_log, level=args.logger_level)
     writer = SummaryWriter(log_dir=os.path.join(output_path, "runs"))
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
 
     # log hparams:
     log_hparams(logger, args)
@@ -304,12 +304,14 @@ def run(args):
                                 kernel_size=args.conv_kernel,
                                 stride=args.stride, num_filters=args.num_filters,
                                 fusion=args.fusion, env=env,
-                                condition_answer=args.condition_answer)
+                                condition_answer=args.condition_answer,
+                                device=device)
     if args.policy_path is not None:
         pretrained = torch.load(args.policy_path, map_location=device)
         if pretrained.__class__ != OrderedDict:
             pretrained = pretrained.state_dict()
         policy.load_state_dict(pretrained, strict=False)
+        policy.device = device
     agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_=args)
 
     eval_mode = ['sampling', 'greedy']

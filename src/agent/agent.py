@@ -19,7 +19,7 @@ class Agent:
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1.):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.grad_clip = grad_clip
