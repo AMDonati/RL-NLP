@@ -21,7 +21,7 @@ LR=0.001
 WORD_EMB_SIZE=32
 HIDDEN_SIZE=64
 EPS_CLIP=0.01
-REWARD="bleu"
+REWARD="bleu_sf4"
 FUSION="average"
 CONDITION_ANSWER="after_fusion"
 
