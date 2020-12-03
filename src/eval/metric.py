@@ -341,7 +341,7 @@ class BleuMetric(Metric):
         if "bleu" in agent.env.reward_type:
             self.function = agent.env.reward_func
         else:
-            self.function = rewards["bleu_sf4"]()
+            self.function = rewards["bleu_sf2"]()
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
