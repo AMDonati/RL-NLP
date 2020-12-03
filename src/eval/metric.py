@@ -572,11 +572,11 @@ class LMVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            closest_question = self.question_tokenizer.decode(kwargs["closest_question"].split())
+            closest_question = self.dataset.question_tokenizer.encode(kwargs["closest_question"].split())
             if len(closest_question) > self.idx_word:
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
-                    logging.info("+VA")
+                    #logging.info("+VA")
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
@@ -667,8 +667,9 @@ class LMActionProbs(Metric):
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
+           "lm_valid_actions":LMVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric}
-metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated"]
+metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions"]
