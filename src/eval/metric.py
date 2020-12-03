@@ -15,7 +15,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 
 class Metric:
-    def __init__(self, agent, train_test, key, type, id):
+    def __init__(self, agent, train_test, key, type, env_mode, trunc, sampling):
         self.measure = []
         self.metric = []
         self.metric_history = []
@@ -32,11 +32,13 @@ class Metric:
         self.type = type
         self.key = key
         self.train_test = train_test
-        self.id = id
+        self.id = "_".join([env_mode, trunc, sampling])
+        self.env_mode = env_mode
+        self.trunc = trunc
+        self.sampling = sampling
         # self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
-        self.name = train_test + "_" + id + '_' + self.key
+        self.name = train_test + "_" + self.id + '_' + self.key
         self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".csv")
-        self.stats_path = os.path.join(self.out_path, "stats", self.name + '_stats.csv')
         self.stats = None
         self.to_tensorboard = True if key in metrics_to_tensorboard else False
 
@@ -79,7 +81,6 @@ class Metric:
         serie.to_csv(self.out_csv_file, index=False, header=False)
         if self.type == "scalar":
             self.stats = self.get_stats(serie)
-            pd.Series(self.stats).to_csv(self.stats_path, index=False, header=False)
         self.post_treatment_()
 
 
@@ -88,8 +89,8 @@ class Metric:
 class VAMetric(Metric):
     '''Display the valid action space in the training log.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "valid_actions", "text", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "valid_actions", "text", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
@@ -121,8 +122,8 @@ class VAMetric(Metric):
 class SizeVAMetric(Metric):
     '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar", env_mode, trunc, sampling)
         self.counter = 0
 
     def fill_(self, **kwargs):
@@ -136,8 +137,8 @@ class SizeVAMetric(Metric):
 class SumProbsOverTruncated(Metric):
     '''Compute the sum of the probabilities the action space given by the language model.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         sum_over_truncated_space = 1
@@ -154,8 +155,8 @@ class SumProbsOverTruncated(Metric):
 class DialogMetric(Metric):
     """Display the test dialog."""
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "dialog", "text", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "dialog", "text", env_mode, trunc, sampling)
         # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.txt')
         # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
@@ -196,8 +197,8 @@ class DialogMetric(Metric):
 class DialogImageMetric(Metric):
     '''Display the Dialog on a html format at test time.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "dialog_image", "text", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "dialog_image", "text", env_mode, trunc, sampling)
         # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
         # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = []
@@ -275,8 +276,8 @@ class PPLMetric(Metric):
     https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
     """
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "ppl", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ppl", "scalar", env_mode, trunc, sampling)
         self.agent = agent
 
     def get_stats(self, serie):
@@ -308,8 +309,8 @@ class PPLMetric(Metric):
 class PPLDialogfromLM(Metric):
     '''Computes the PPL of the Language Model over the generated dialog'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         if kwargs["log_probas_lm"] is not None:
@@ -322,8 +323,8 @@ class PPLDialogfromLM(Metric):
 
 
 class Return(Metric):
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "return", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "return", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["reward"])
@@ -336,8 +337,8 @@ class Return(Metric):
 class BleuMetric(Metric):
     '''Compute the bleu score over the ref questions and the generated dialog.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "bleu", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "bleu", "scalar", env_mode, trunc, sampling)
         if "bleu" in agent.env.reward_type:
             self.function = agent.env.reward_func
         else:
@@ -359,8 +360,8 @@ class BleuMetric(Metric):
 class LvNormMetric(Metric):
     '''Compute the levenshtein over the ref questions and the generated dialog.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "lv_norm", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "lv_norm", "scalar", env_mode, trunc, sampling)
         self.function = rewards["lv_norm"]()
 
     def fill_(self, **kwargs):
@@ -384,8 +385,8 @@ class RefQuestionsMetric(Metric):
     Compute the ratio of Unique closest questions on all the set of questions generated for the same image.
     '''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -409,8 +410,8 @@ class TTRQuestionMetric(Metric):
     Compute the token-to-token ratio for each question (useful to measure language drift).
     '''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "ttr_question", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ttr_question", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -426,8 +427,8 @@ class TrueWordRankOriginLM(Metric):
     Compute the rank of the true word in the original lm logits
     """
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
@@ -446,8 +447,8 @@ class TrueWordRankLM(Metric):
     Compute the rank of the target word in the lm logits
     """
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
@@ -465,8 +466,8 @@ class ActionRankLM(Metric):
     Compute the rank of the action taken in the original lm logits
     """
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
@@ -486,8 +487,8 @@ class TrueWordProbLM(Metric):
     Compute the probability of the true word in the original lm logits
     """
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "true_word_prob", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "true_word_prob", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
@@ -504,8 +505,8 @@ class TrueWordProbLM(Metric):
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "unique_words", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "unique_words", "scalar", env_mode, trunc, sampling)
         self.measure_history = []
         self.threshold = 10
 
@@ -515,7 +516,7 @@ class UniqueWordsMetric(Metric):
 
     def compute_(self, **kwargs):
         if self.idx_compute > self.threshold and "sampling" in self.id:
-            arr=[item for sublist in self.measure_history[-self.threshold:] for item in sublist]
+            arr = [item for sublist in self.measure_history[-self.threshold:] for item in sublist]
             unique_tokens = np.unique(arr)
             diversity_metric = len(unique_tokens) / len(arr) if len(arr) > 0 else 0
             self.metric.append(diversity_metric)
@@ -524,8 +525,8 @@ class UniqueWordsMetric(Metric):
 # --------------------------------------- OLD METRICS ----------------------------------------------------------------------------------------------------
 
 class PolicyMetric(Metric):
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "policy", "text", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "policy", "text", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         # compute top_k_words from the Policy:
@@ -565,8 +566,8 @@ class PolicyMetric(Metric):
 class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "lm_valid_actions", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "lm_valid_actions", "scalar", env_mode, trunc, sampling)
         self.counter = 0
 
     def fill_(self, **kwargs):
@@ -584,8 +585,8 @@ class LMVAMetric(Metric):
 class PoliciesRatioMetric(Metric):
     '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "policies_discrepancy", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "policies_discrepancy", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         ratios = np.exp(
@@ -599,8 +600,8 @@ class PoliciesRatioMetric(Metric):
 class LMPolicyProbsRatio(Metric):
     '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
 
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "lm_policy_probs_ratio", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "lm_policy_probs_ratio", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
@@ -615,8 +616,8 @@ class LMPolicyProbsRatio(Metric):
 
 
 class ActionProbs(Metric):
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "action_probs", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "action_probs", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["log_probs"])
@@ -631,8 +632,8 @@ class ActionProbs(Metric):
 
 
 class ActionProbsTruncated(Metric):
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["log_probs_truncated"])
@@ -647,8 +648,8 @@ class ActionProbsTruncated(Metric):
 
 
 class LMActionProbs(Metric):
-    def __init__(self, agent, train_test, id):
-        Metric.__init__(self, agent, train_test, "action_probs_lm", "scalar", id)
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "action_probs_lm", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
         if kwargs["action"] in kwargs["valid_actions"]:
