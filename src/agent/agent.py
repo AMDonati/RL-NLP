@@ -6,6 +6,7 @@ import time
 import numpy as np
 import torch
 import torch.optim as optim
+import pandas as pd
 
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
@@ -63,14 +64,17 @@ class Agent:
 
     def init_metrics(self):
         self.metrics = {}
-        self.metrics["train"] = {key: metrics[key](self, train_test="train", id="sampling") for key in
-                                 self.train_metrics_names if key in metrics}
+        self.metrics["train"] = {
+            key: metrics[key](self, train_test="train", env_mode="train", trunc="trunc",
+                              sampling="sampling") for key in
+            self.train_metrics_names if key in metrics}
         for mode in [env_.mode for env_ in self.test_envs]:
             for trunc in self.eval_trunc.keys():
                 for sampling_mode in ["sampling", "greedy"]:
-                    id = "{}_{}_{}".format(mode, trunc, sampling_mode)
-                    self.metrics[id] = {key: metrics[key](self, train_test="test", id=id) for key in
-                                        self.test_metrics_names if key in metrics}
+                    id = "_".join([mode, trunc, sampling_mode])
+                    self.metrics[id] = {key: metrics[key](self, train_test="test", env_mode=mode, trunc=trunc,
+                                                          sampling=sampling_mode) for key in self.test_metrics_names if
+                                        key in metrics}
 
     def get_metrics(self, mode, trunc, sampling_mode):
         id = "{}_{}_{}".format(mode, trunc, sampling_mode)
@@ -278,16 +282,23 @@ class Agent:
         # write to csv test scalar metrics:
         logger.info(
             "------------------------------------- test metrics statistics -----------------------------------------")
-        for eval_trunc in self.eval_trunc:
-            logger.info("computing all metrics for dialog with {} ...".format(eval_trunc))
-            csv_file = "all_metrics_{}.csv".format(eval_trunc)
-            trunc_stats = {}
-            for key in self.test_metrics_names:
-                instances_of_metric = [self.metrics[key_mode][key] for key_mode in self.metrics.keys() if
-                                       eval_trunc in key_mode and key_mode != "train"]
-                means = [instance.stats[0] for instance in instances_of_metric if instance.stats is not None]
+        all_metrics = {trunc: {} for trunc in self.eval_trunc.keys()}
+        for key in self.test_metrics_names:
+            stats_dict = {trunc: {} for trunc in self.eval_trunc.keys()}
+            instances_of_metric = [self.metrics[key_mode][key] for key_mode in self.metrics.keys() if
+                                   key_mode != "train"]
+            # for stats
+            for metric in instances_of_metric:
+                if metric.stats is not None:
+                    stats_dict[metric.trunc]["_".join([metric.env_mode, metric.sampling])] = metric.stats[0]
+            stats_path = os.path.join(self.out_path, "stats", "{}.csv".format(key))
+            pd.DataFrame(data=stats_dict).to_csv(stats_path)
+            # for all metrics
+            for trunc in stats_dict.keys():
+                means = [value for value in stats_dict[trunc].values()]
                 means = [x for x in means if str(x) != 'nan']
                 if len(means) > 0:
-                    trunc_stats[key] = np.round(np.mean(means), decimals=3)
+                    all_metrics[trunc][key] = np.round(np.mean(means), decimals=3)
 
-            write_to_csv(os.path.join(output_path, csv_file), trunc_stats)
+        stats_path = os.path.join(self.out_path, "all_metrics.csv")
+        pd.DataFrame(data=all_metrics).to_csv(stats_path)
