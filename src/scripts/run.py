@@ -1,7 +1,7 @@
-#Try this for selecting the GPU device.
-#device = torch.device(‘cuda:0’) for GPU 0
-#device = torch.device(‘cuda:1’) for GPU 1
-#device = torch.device(‘cuda:2’) for GPU 2
+# Try this for selecting the GPU device.
+# device = torch.device(‘cuda:0’) for GPU 0
+# device = torch.device(‘cuda:1’) for GPU 1
+# device = torch.device(‘cuda:2’) for GPU 2
 
 import argparse
 import datetime
@@ -135,7 +135,7 @@ def get_parser():
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr"],
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage"],
                         help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
