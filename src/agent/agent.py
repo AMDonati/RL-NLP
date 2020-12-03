@@ -212,7 +212,7 @@ class Agent:
         for i_episode in range(num_episodes):
             # dialogs = {key: [] for key in self.eval_trunc.keys()}
             logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
-            seed = np.random.randint(1000000)  # setting the seed to generate the episode with the same image.
+            seed = i_episode
             for key_trunc, trunc in self.eval_trunc.items():
                 metrics = self.get_metrics(env.mode, key_trunc, test_mode)
                 for i in range(env.ref_questions.size(

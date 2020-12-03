@@ -1,8 +1,3 @@
-#Try this for selecting the GPU device.
-#device = torch.device(‘cuda:0’) for GPU 0
-#device = torch.device(‘cuda:1’) for GPU 1
-#device = torch.device(‘cuda:2’) for GPU 2
-
 import argparse
 import datetime
 import os
