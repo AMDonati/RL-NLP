@@ -62,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
     # Evaluation:
     parser.add_argument("-eval_modes", type=str, nargs='+', default=["sampling"])
-    parser.add_argument("-bleu_sf", type=int, default=1)
+    parser.add_argument("-bleu_sf", type=int, default=2)
     # Misc.
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
