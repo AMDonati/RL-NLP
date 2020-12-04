@@ -88,11 +88,24 @@ To extract the image features, run the script src/sh/extract_features.py or the 
   `--output_h5_file data/test_features.h5 --batch_size 128`
 
 ### VQA
-1. First, extract the vocab:
-* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb"
+#### First, extract the vocab:
+##### Extracting full vocab
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "none" -min_split 0`
 > This creates a file "vocab.json" with the vocab.
-2. Once the vocab is extracted, you can create the preprocessed pkl file for each dataset:
-* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -test 1
+##### Extract a reduced vocab (on smaller train and val datasets)
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "none" -min_split 1`
+> This creates a file "vocab_min.json" with the vocab. 
+#### Secondly, get the preprocessed pkl file for each dataset
+##### Full datasets (with vocab.json)
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "train" -min_split 0 -test 1`
+> This will create a file "train_entries.pkl"
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "val" -min_split 0 -test 1`
+> This will create a file "val_entries.pkl"
+##### Reduced datasets on reduced vocab (train_dataset = 20,000 questions & val_dataset = 5,000 questions)
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "train" -min_split 1 -test 1`
+> This will create a file "mintrain_entries.pkl". 
+* `python src/data_provider/vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "val" -min_split 1 -test 1`
+> This will create a file "minval_entries.pkl". 
 
 ## Training the models 
 #### Link to the pre-trained models 
