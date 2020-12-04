@@ -107,7 +107,7 @@ class VQADataset(Dataset):
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
-                logger.info("Loading from %s" % cache_path)
+                print("Loading from %s" % cache_path)
                 self.entries = cPickle.load(open(cache_path, "rb"))
 
             self.len_vocab = len(self.vocab_questions)

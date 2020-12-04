@@ -133,6 +133,9 @@ def get_parser():
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr"],
                         help="test metrics")
+    parser.add_argument('-test_modes', nargs='+', type=str,
+                        default=["test_images"],
+                        help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
@@ -240,13 +243,14 @@ def log_hparams(logger, args):
     logger.info("Number of TEST EPISODES: {}".format(args.num_episodes_test))
 
 
+
 def get_rl_env(args, device):
     # upload env.
     if args.env == "clevr":
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
-        test_modes = ["test_images", "test_text"] if not args.mask_answers else ["test_images"]
+        test_modes = args.test_modes
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
@@ -259,11 +263,16 @@ def get_rl_env(args, device):
             if device.type == "cpu":
                 test_envs = [env]
             else:
-                test_envs = [VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
+                test_envs = []
+                if "test_images" in args.test_modes:
+                    test_envs.append(VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
                                 reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug,
                                 diff_reward=args.diff_reward, reward_path=args.reward_path,
-                                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device, min_data=args.min_data), env]
-                test_envs[1].mode = "test_text"
+                                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device, min_data=args.min_data))
+                if "test_text" in args.test_mode:
+                    test_text_env = env
+                    test_text_env.mode = "test_text"
+                    test_envs.append(test_text_env)
     return env, test_envs
 
 
@@ -289,6 +298,10 @@ def run(args):
     # upload env & pretrained lm, policy network.
     env, test_envs = get_rl_env(args, device)
     pretrained_lm = get_pretrained_lm(args, env, device)
+    # dataset statistics
+    logger.info('-' * 20 + 'Dataset statistics' + '-' * 20)
+    logger.info("number of training questions:{}".format(len(env.dataset)))
+    logger.info("vocab size:{}".format(len(env.dataset.vocab_questions)))
 
     models = {"lstm": PolicyLSTMBatch}
     # creating the policy model.
