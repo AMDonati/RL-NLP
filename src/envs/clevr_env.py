@@ -19,7 +19,8 @@ class GenericEnv(gym.Env):
     """Generic Env"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_path, max_len, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), reward_type="levenshtein",
+    def __init__(self, data_path, max_len, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 reward_type="levenshtein",
                  reward_path=None, mode="train", diff_reward=False,
                  debug=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False):
@@ -70,7 +71,8 @@ class GenericEnv(gym.Env):
 
     def check_if_done(self, action):
         done = False
-        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx, self.special_tokens.question_mark_idx2]
+        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx,
+                                               self.special_tokens.question_mark_idx2]
         if is_action_terminal or self.step_idx == (self.max_len - 1):
             done = True
         return done
@@ -88,10 +90,12 @@ class ClevrEnv(GenericEnv):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
                  reward_path=None, max_samples=None, debug=None, mode="train", num_questions=10, diff_reward=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+                 condition_answer=True, reward_vocab=None, mask_answers=False,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super(ClevrEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                        reward_path=reward_path, mode=mode, debug=debug, diff_reward=diff_reward,
-                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False, device=device)
+                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False,
+                                       device=device)
 
         modes = {"train": "train", "test_images": "val", "test_text": "train"}
         h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
@@ -210,7 +214,7 @@ class VQAEnv(GenericEnv):
         self.ref_question_idx = self.entry["question_id"]
         self.ref_question = self.entry["q_token"][:self.max_len]
         self.ref_questions = self.ref_question.view(1, -1)
-        self.ref_question_decoded = self.entry["question"][:self.max_len]
+        self.ref_question_decoded = self.dataset.question_tokenizer.decode(self.entry["q_token"][:self.max_len].numpy())
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
         self.img_idx = self.entry["image_id"]
