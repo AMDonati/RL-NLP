@@ -102,9 +102,9 @@ To extract the image features, run the script src/sh/extract_features.py or the 
 * `python src/preprocessing/preprocess_vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab.json" -split "val" -min_split 0 -test 1`
 > This will create a file "val_entries.pkl"
 ##### Reduced datasets on reduced vocab (train_dataset = 20,000 questions & val_dataset = 5,000 questions)
-* `python src/preprocessing/preprocess_vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "train" -min_split 1 -test 1`
+* `python src/preprocessing/preprocess_vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "mintrain" -min_split 1 -test 1`
 > This will create a file "mintrain_minvocab_entries.pkl". 
-* `python src/preprocessing/preprocess_vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "val" -min_split 1 -test 1`
+* `python src/preprocessing/preprocess_vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "minval" -min_split 1 -test 1`
 > This will create a file "minval_minvocab_entries.pkl". 
 Other options of split are "mintrain" and "minval". 
 
