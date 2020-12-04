@@ -335,12 +335,12 @@ class VQADataset(Dataset):
         del self.entries
 
     def split_entries(self):
-        percentage_train=2/3
+        percentage_train=3/4
         len_train = int(round(percentage_train * len(self.filtered_entries)))
         shuffled = self.filtered_entries[:]
         random.shuffle(shuffled)
-        self.filtered_entries = shuffled[len_train:]
-        self.test_entries = shuffled[:len_train]
+        self.filtered_entries = shuffled[:len_train]
+        self.test_entries = shuffled[len_train:]
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
 
