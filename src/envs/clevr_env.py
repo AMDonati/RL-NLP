@@ -19,7 +19,8 @@ class GenericEnv(gym.Env):
     """Generic Env"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_path, max_len, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), reward_type="levenshtein",
+    def __init__(self, data_path, max_len, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 reward_type="levenshtein",
                  reward_path=None, mode="train", diff_reward=False,
                  debug=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False):
@@ -43,9 +44,8 @@ class GenericEnv(gym.Env):
         SOS_idx = self.dataset.vocab_questions["<SOS>"]
         EOS_idx = self.dataset.vocab_questions["<EOS>"]
         question_mark_idx = self.dataset.vocab_questions["?"]
-        question_mark_idx2 = None
-        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx", "question_mark_idx2"))
-        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx, question_mark_idx2)
+        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx"))
+        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx)
 
     def set_reward_function(self, reward_type, reward_path, reward_vocab, diff_reward):
         self.reward_type = reward_type
@@ -70,7 +70,7 @@ class GenericEnv(gym.Env):
 
     def check_if_done(self, action):
         done = False
-        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx, self.special_tokens.question_mark_idx2]
+        is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
         if is_action_terminal or self.step_idx == (self.max_len - 1):
             done = True
         return done
@@ -88,10 +88,12 @@ class ClevrEnv(GenericEnv):
 
     def __init__(self, data_path, max_len, reward_type="levenshtein",
                  reward_path=None, max_samples=None, debug=None, mode="train", num_questions=10, diff_reward=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+                 condition_answer=True, reward_vocab=None, mask_answers=False,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super(ClevrEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                        reward_path=reward_path, mode=mode, debug=debug, diff_reward=diff_reward,
-                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False, device=device)
+                                       condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False,
+                                       device=device)
 
         modes = {"train": "train", "test_images": "val", "test_text": "train"}
         h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
@@ -160,12 +162,12 @@ class VQAEnv(GenericEnv):
     """VQA Env"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data_path, features_h5path="../../data/vqa-v2/reduced_coco_train.lmdb", max_len=20,
+    def __init__(self, data_path, features_h5path, max_len=10,
                  reward_type="levenshtein",
                  debug=None,
                  reward_path=None, mode="train", diff_reward=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=6,
-                 num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+                 condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=0,
+                 num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), min_data=0):
         super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                      reward_path=reward_path, debug=debug, mode=mode, diff_reward=diff_reward,
                                      condition_answer=condition_answer, reward_vocab=reward_vocab,
@@ -179,25 +181,28 @@ class VQAEnv(GenericEnv):
         question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=True)
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
-        modes = {"train": "train", "test_images": "val", "test_text": "train", "minval": "minval",
-                 "mintrain": "mintrain"}
+        modes = self.get_modes(device=device, min_data=min_data)
+
+        vocab_path = os.path.join(data_path, "cache", "vocab.json") if not min_data else os.path.join(data_path,
+                                                                                                      "cache",
+                                                                                                      "vocab_min.json")
 
         self.dataset = VQADataset(split=modes[self.mode], dataroot=data_path,
                                   image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
                                   reward_tokenizer=reward_tokenizer, clean_datasets=True,
                                   max_seq_length=max_seq_length, min_len_questions=min_len_questions,
-                                  num_answers=num_answers, num_images=num_images, filter_entries=True)
+                                  num_answers=num_answers, num_images=num_images, filter_entries=True, vocab_path=vocab_path)
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
 
-    def set_special_tokens(self):
-        SOS_idx = self.dataset.vocab_questions["<SOS>"]
-        EOS_idx = self.dataset.vocab_questions["<EOS>"]
-        question_mark_idx = self.dataset.vocab_questions["?"]
-        question_mark_idx2 = self.dataset.question_tokenizer.encode(['?"'])[0]
-        Special_Tokens = namedtuple('Special_Tokens', ('SOS_idx', 'EOS_idx', "question_mark_idx", "question_mark_idx2"))
-        self.special_tokens = Special_Tokens(SOS_idx, EOS_idx, question_mark_idx, question_mark_idx2)
+    def get_modes(self, device, min_data):
+        if min_data or device.type == "cpu":
+            modes = {"train": "mintrain", "test_images": "minval", "test_text": "mintrain"}
+        else:
+            modes = {"train": "train", "test_images": "val", "test_text": "train"}
+        return modes
+
 
     def reset(self, seed=None):
         if seed is not None:
