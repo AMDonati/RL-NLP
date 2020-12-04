@@ -142,7 +142,7 @@ class Bleu_sf4(Reward):
         if not done:
             return 0, "N/A", None
         try:
-            normalize_function = lambda x: x.replace("?", " ?").split()
+            normalize_function = lambda x: x.replace("?", "").split()
             ep_questions_decoded_normalized = [normalize_function(question) for question in ep_questions_decoded]
             reward = sentence_bleu(ep_questions_decoded_normalized, normalize_function(question),
                                    smoothing_function=self.smoothing_function, weights=self.weights)
