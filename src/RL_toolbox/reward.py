@@ -80,7 +80,7 @@ class LevenshteinNorm(Reward):
         self.correct_vocab = correct_vocab
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
-        if question is None:
+        if question is None or not done:
             return 0., "N/A", None
         else:
             distances = np.array([nltk.edit_distance(question.split(), true_question.split()) for true_question in
