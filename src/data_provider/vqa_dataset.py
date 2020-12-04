@@ -16,7 +16,7 @@ from nltk.tokenize import word_tokenize
 from torch.utils.data import Dataset
 import numpy as np
 import time
-
+import random
 from data_provider.tokenizer import Tokenizer
 
 nltk.download('punkt')
@@ -244,7 +244,7 @@ class VQADataset(Dataset):
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
-                logger.info("Loading from %s" % cache_path)
+                logging.info("Loading from %s" % cache_path)
                 self.entries = cPickle.load(open(cache_path, "rb"))
 
             self.len_vocab = len(self.vocab_questions)
@@ -335,16 +335,12 @@ class VQADataset(Dataset):
         del self.entries
 
     def split_entries(self):
-        train_entries, test_entries = [], []
-        for img_idx in self.images_idx:
-            img_entries = [entry for entry in self.filtered_entries if entry["image_id"] == img_idx]
-            if len(img_entries) > 1:
-                test_entries.append(img_entries[-1])
-                img_entries.pop()
-            for l in img_entries:
-                train_entries.append(l)
-        self.filtered_entries = train_entries
-        self.test_entries = test_entries
+        percentage_train=2/3
+        len_train = int(round(percentage_train * len(self.filtered_entries)))
+        shuffled = self.filtered_entries[:]
+        random.shuffle(shuffled)
+        self.filtered_entries = shuffled[len_train:]
+        self.test_entries = shuffled[:len_train]
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
 
