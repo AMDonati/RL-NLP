@@ -1,6 +1,7 @@
 import argparse
 import csv
 import logging
+import logging.config
 import os
 from csv import writer
 
@@ -29,6 +30,7 @@ def write_to_csv(output_dir, dic):
 def create_logger(out_file_log, level="INFO"):
     levels = {"INFO": logging.INFO, "DEBUG": logging.DEBUG, "ERROR": logging.ERROR}
     level = levels[level]
+    logging.config.fileConfig('config/log/logging.conf')
     logging.basicConfig(filename=out_file_log, level=level, filemode='w')
     # create logger
     logger = logging.getLogger('training log')

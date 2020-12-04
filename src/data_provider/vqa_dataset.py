@@ -248,17 +248,23 @@ class VQADataset(Dataset):
                 self.entries = cPickle.load(open(cache_path, "rb"))
 
             self.len_vocab = len(self.vocab_questions)
-            logger.info("vocab size: {}".format(self.len_vocab))
-            logger.info("number of answers: {}".format(self.len_vocab_answer))
+            logging.info("vocab size: {}".format(self.len_vocab))
+            logging.info("number of answers: {}".format(self.len_vocab_answer))
 
             # filter entries if needed.
             if filter_entries:
+                logging.info("before filter")
                 self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
+                logging.info("after filter")
+
                 if rl:
                     if self.split == 'train' or self.split == 'mintrain':
+                        logging.info("before split")
                         self.split_entries()
+                        logging.info("after split")
+
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
                          save_first_words=False):
