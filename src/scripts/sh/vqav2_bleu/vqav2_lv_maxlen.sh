@@ -24,7 +24,7 @@ EPS_CLIP=0.01
 REWARD="lv_norm"
 FUSION="average"
 CONDITION_ANSWER="after_fusion"
-DEBUG="0,10"
+DEBUG="0,1"
 
 if [ -n "$1" ]; then
   OUTPUT_PATH=$1
