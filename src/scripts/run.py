@@ -269,7 +269,7 @@ def get_rl_env(args, device):
                                 reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug,
                                 diff_reward=args.diff_reward, reward_path=args.reward_path,
                                 reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device, min_data=args.min_data))
-                if "test_text" in args.test_mode:
+                if "test_text" in args.test_modes:
                     test_text_env = env
                     test_text_env.mode = "test_text"
                     test_envs.append(test_text_env)
