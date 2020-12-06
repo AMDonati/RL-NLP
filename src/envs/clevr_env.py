@@ -213,9 +213,10 @@ class VQAEnv(GenericEnv):
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)
         labels, _ = self.dataset.get_answer_data(self.entry)
         self.ref_question_idx = self.entry["question_id"]
-        self.ref_question = self.entry["q_token"]
+        self.ref_question = self.entry["q_token"][:self.max_len]
         self.ref_questions = self.ref_question.view(1, -1)
-        self.ref_question_decoded = self.entry["question"]
+        self.ref_question_decoded = self.entry["question"].split()[:self.max_len]
+        self.ref_question_decoded = " ".join(self.ref_question_decoded)
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
         self.img_idx = self.entry["image_id"]
