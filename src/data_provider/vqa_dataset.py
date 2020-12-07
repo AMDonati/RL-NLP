@@ -7,17 +7,15 @@ import _pickle as cPickle
 import json
 import logging
 import os
-
 import nltk
 import pandas as pd
+import numpy as np
 import torch
 from nltk.probability import FreqDist
 from nltk.tokenize import word_tokenize
 from torch.utils.data import Dataset
-import numpy as np
-import time
-
 from data_provider.tokenizer import Tokenizer
+from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, clean_key
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -25,157 +23,9 @@ from data_provider._image_features_reader import ImageFeaturesH5Reader
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
-
-def assert_eq(real, expected):
-    assert real == expected, "%s (true) vs %s (expected)" % (real, expected)
-
-
-def assert_correctness_batch(inputs, targets):
-    assert torch.all(torch.eq(inputs[1:], targets[:-1])) == 1, "error in inputs/targets"
-
-
-def _create_entry(question, answer):
-    answer.pop("image_id")
-    answer.pop("question_id")
-    entry = {
-        "question_id": question["question_id"],
-        "image_id": question["image_id"],
-        "question": question["question"],
-        "answer": answer,
-    }
-    return entry
-
-
-def split_question(question):
-    last_id = question.nonzero()[-1]
-    input_question = torch.cat([question[:last_id], question[last_id+1:]])
-    target_question = question[1:]
-    return input_question, target_question
-
-
-def clean_key(key, tokens_to_remove):
-    bool = False
-    for tok in tokens_to_remove:
-        if tok in key:
-            bool = True
-    return bool
-
-
-def clean_dict_keys(dic, tokens_to_remove):
-    keys_to_remove = []
-    for key in dic.keys():
-        for tok in tokens_to_remove:
-            if tok in key:
-                keys_to_remove.append(key)
-    keys_to_remove = list(set(keys_to_remove))
-    for entry in keys_to_remove:
-        if entry in dic.keys():
-            del dic[entry]
-
-    return dic
-
-
-def _load_dataset(dataroot, name, clean_datasets):
-    """Load entries
-    dataroot: root path of dataset
-    name: 'train', 'val', 'trainval', 'minsval'
-    """
-    if name == "train" or name == "val":
-        question_path = os.path.join(
-            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % name)
-        questions = sorted(
-            json.load(open(question_path))["questions"], key=lambda x: x["question_id"]
-        )
-        answer_path = os.path.join(dataroot, "cache", "%s_target.pkl" % name)
-        answers = cPickle.load(open(answer_path, "rb"))
-        answers = sorted(answers, key=lambda x: x["question_id"])
-
-    elif name == "trainval":
-        question_path_train = os.path.join(
-            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % "train"
-        )
-        questions_train = sorted(
-            json.load(open(question_path_train))["questions"],
-            key=lambda x: x["question_id"],
-        )
-        answer_path_train = os.path.join(dataroot, "cache", "%s_target.pkl" % "train")
-        answers_train = cPickle.load(open(answer_path_train, "rb"))
-        answers_train = sorted(answers_train, key=lambda x: x["question_id"])
-
-        question_path_val = os.path.join(
-            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % "val"
-        )
-        questions_val = sorted(
-            json.load(open(question_path_val))["questions"],
-            key=lambda x: x["question_id"],
-        )
-        answer_path_val = os.path.join(dataroot, "cache", "%s_target.pkl" % "val")
-        answers_val = cPickle.load(open(answer_path_val, "rb"))
-        answers_val = sorted(answers_val, key=lambda x: x["question_id"])
-        questions = questions_train + questions_val
-        answers = answers_train + answers_val
-
-    elif name == "minval":
-        question_path_val = os.path.join(
-            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % "val"
-        )
-        questions_val = sorted(
-            json.load(open(question_path_val))["questions"],
-            key=lambda x: x["question_id"],
-        )
-        answer_path_val = os.path.join(dataroot, "cache", "%s_target.pkl" % "val")
-        answers_val = cPickle.load(open(answer_path_val, "rb"))
-        answers_val = sorted(answers_val, key=lambda x: x["question_id"])
-        questions = questions_val[-3000:]
-        answers = answers_val[-3000:]
-
-    elif name == "mintrain":
-        question_path_val = os.path.join(
-            dataroot, "v2_OpenEnded_mscoco_%s2014_questions.json" % "train"
-        )
-        questions_val = sorted(
-            json.load(open(question_path_val))["questions"],
-            key=lambda x: x["image_id"],
-        )
-        answer_path_val = os.path.join(dataroot, "cache", "%s_target.pkl" % "train")
-        answers_val = cPickle.load(open(answer_path_val, "rb"))
-        answers_val = sorted(answers_val, key=lambda x: x["image_id"])
-        questions = questions_val[70000:80000]
-        answers = answers_val[70000:80000]
-
-    elif name == "test":
-        question_path_test = os.path.join(
-            dataroot, "v2_OpenEnded_mscoco_%s2015_questions.json" % "test"
-        )
-        questions_test = sorted(
-            json.load(open(question_path_test))["questions"],
-            key=lambda x: x["question_id"],
-        )
-        questions = questions_test
-
-    else:
-        assert False, "data split is not recognized."
-
-    if "test" in name:
-        entries = []
-        for question in questions:
-            entries.append(question)
-    else:
-        assert_eq(len(questions), len(answers))
-        entries = []
-        remove_ids = []
-        if clean_datasets:
-            remove_ids = np.load(os.path.join(dataroot, "cache", "coco_test_ids.npy"))
-            remove_ids = [int(x) for x in remove_ids]
-        for question, answer in zip(questions, answers):
-            if "train" in name and int(question["image_id"]) in remove_ids:
-                continue
-            assert_eq(question["question_id"], answer["question_id"])
-            assert_eq(question["image_id"], answer["image_id"])
-            entries.append(_create_entry(question, answer))
-
-    return entries
-
+def assert_match_split_vocab_path_args(split, vocab_path, vocab_path_min):
+    if vocab_path == vocab_path_min:
+        assert split == "minval" or split=="mintrain", "You can't used a reduced vocab on train and val split. used minval and mintrain split instead."
 
 class VQADataset(Dataset):
     def __init__(
@@ -193,14 +43,13 @@ class VQADataset(Dataset):
             num_answers=1,
             filter_yes_no=True,
             num_images=None,
-            vocab_path=None,
-            tokenize=True,
+            vocab_path=os.path.join("data/vqa-v2", "cache", "vocab.json"),
             max_samples=None,
             rl=True):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
-        self.answer_tokenizer= Tokenizer(self.ans2label)
+        self.answer_tokenizer = Tokenizer(self.ans2label)
         self._max_region_num = max_region_num
         self._max_seq_length = max_seq_length
         self._image_features_reader = image_features_reader
@@ -213,29 +62,43 @@ class VQADataset(Dataset):
         self.images_idx = list(map(int, image_features_reader._image_ids[:-1]))
         '''
         '''
-        cache_path = os.path.join(
-            dataroot,
-            "cache",
-            split + "_" + "entries.pkl")
-
+        # Building vocab.
         vocab_path_ = os.path.join(
             dataroot,
             "cache",
             "vocab.json")
-        if not os.path.isfile(vocab_path_):
+        vocab_path_min = os.path.join(
+            dataroot,
+            "cache",
+            "vocab_min.json")
+        if vocab_path == "none":
+            if split =="trainval" and os.path.isfile(vocab_path_):
+                print('WARNING: a vocab.json file already exists and will be replaced')
+            elif split == "mintrainval" and os.path.isfile(vocab_path_min):
+                print('WARNING: a vocab_min.json file already exists and will be replaced')
             print("Building vocab...")
             self.entries = _load_dataset(dataroot, split, clean_datasets)
-            self.build_true_vocab(vocab_path_)
+            vocab_path__ = vocab_path_ if split == "trainval" else vocab_path_min
+            self.build_true_vocab(vocab_path__)
             print("Vocab built...")
         else:
             print("Loading vocab...")
-            self.load_vocab(vocab_path_)
+            self.load_vocab(vocab_path)
 
         # tokenize with vocab & tensorize
         self.question_tokenizer.set_vocab(self.vocab_questions)
         self.set_traduction_dictionnaries()
 
-        if tokenize:
+        if vocab_path != "none":
+            cache_path = os.path.join(
+                dataroot,
+                "cache",
+                split + "_" + "entries.pkl")
+            if vocab_path == vocab_path_min:
+                cache_path = os.path.join(
+                    dataroot,
+                    "cache",
+                    split + "_minvocab_" + "entries.pkl")
             if not os.path.exists(cache_path):
                 self.entries = _load_dataset(dataroot, split, clean_datasets)
                 image_ids = list(map(int, image_features_reader._image_ids[:-1]))
@@ -244,7 +107,7 @@ class VQADataset(Dataset):
                 self.tensorize()
                 cPickle.dump(self.entries, open(cache_path, "wb"))
             else:
-                logger.info("Loading from %s" % cache_path)
+                print("Loading from %s" % cache_path)
                 self.entries = cPickle.load(open(cache_path, "rb"))
 
             self.len_vocab = len(self.vocab_questions)
@@ -260,12 +123,12 @@ class VQADataset(Dataset):
                     if self.split == 'train' or self.split == 'mintrain':
                         self.split_entries()
 
-    def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":"],
+    def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
         true_vocab = self.special_tokens
         first_words = []
         for entry in self.entries:
-            tokens = self.lm_tokenizer.encode(entry["question"])
+            tokens = self.lm_tokenizer.encode(entry["question"], add_prefix_space=True)
             for i, token in enumerate(tokens):
                 key = self.lm_tokenizer.decoder[token]
                 if key not in true_vocab.keys() and not clean_key(key, tokens_to_remove):
@@ -471,7 +334,6 @@ class VQADataset(Dataset):
                 target.scatter_(0, labels, scores)
         return labels, target
 
-
     def __getitem__(self, index, add_sos_token=True):
         entries = self.filtered_entries
         entry = entries[index]
@@ -524,40 +386,33 @@ class VQADataset(Dataset):
 
 if __name__ == '__main__':
     from transformers import BertTokenizer, GPT2Tokenizer
-    import argparse
     from data_provider.vqa_tokenizer import VQATokenizer
     import numpy as np
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-data_path", type=str, default='../../data/vqa-v2',
-                        help="data folder containing questions embeddings and img features")
-    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
-                        help="data folder containing questions embeddings and img features")
-    parser.add_argument("-vocab_path", type=str, default="../../data/vqa-v2/cache/vocab.json")
-    parser.add_argument("-split", type=str, default="mintrain")
-    parser.add_argument("-test", type=int, default=1)
-    args = parser.parse_args()
+    data_path = '../../data/vqa-v2'
+    features_path = "../../data/vqa-v2/coco_trainval.lmdb"
+    vocab_path = "../../data/vqa-v2/cache/vocab.json"
 
     lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    print("test of lm_tokenizer...")
+    ids = lm_tokenizer("The cat is on the mat", add_prefix_space=True)
+    print(ids)
+    decode_ids = lm_tokenizer.decode(ids["input_ids"])
+    print(decode_ids)
+    ids_2 = lm_tokenizer.encode("The cat is on the mat", add_prefix_space=True)
+
     reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-    features_h5path = args.features_path
+    features_h5path = features_path
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
-    if args.vocab_path is None:
-        vqa_dataset = VQADataset(split="trainval", dataroot=args.data_path,
-                                 question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
-                                 reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                 num_images=20, tokenize=False)
-
-    else:
-        print("Building {} dataset...".format(args.split))
-        vqa_dataset = VQADataset(split=args.split, dataroot=args.data_path,
-                                 question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
-                                 reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                 num_images=None, vocab_path=args.vocab_path)
-
-    if args.test:
+    split = "mintrain"
+    vqa_dataset = VQADataset(split=split, dataroot=data_path,
+                             question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
+                             reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
+                             num_images=None, vocab_path=vocab_path)
+    test = 1 if split == "train" else 0
+    if test:
         vocab = vqa_dataset.vocab_questions
         new_d = {}
         for k in sorted(vocab, key=len):

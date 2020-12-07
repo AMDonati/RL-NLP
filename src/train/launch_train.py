@@ -41,6 +41,7 @@ if __name__ == '__main__':
     parser.add_argument("-features_path", type=str, default='../../data/vqa-v2/coco_trainval.lmdb')
     parser.add_argument("-out_path", type=str, default='../../output/temp')
     parser.add_argument("-model_path", type=str, help="path for loading the model if starting from a pre-trained model")
+    parser.add_argument("-min_data", type=int, default=0, help="for VQAv2 train on a subpart of the dataset and a reduced vocabulary.")
     # model params.
     parser.add_argument("-model", type=str, default="lstm", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('-num_workers', type=int, default=0, help="num workers for DataLoader")
     # Evaluation:
     parser.add_argument("-eval_modes", type=str, nargs='+', default=["sampling"])
-    parser.add_argument("-bleu_sf", type=int, default=1)
+    parser.add_argument("-bleu_sf", type=int, default=2)
     # Misc.
     parser.add_argument('-range_samples', type=str, default="0,699000",
                         help="number of samples in the dataset - to train on a subset of the full dataset")
@@ -105,24 +106,32 @@ if __name__ == '__main__':
 
 
         elif args.dataset == "vqa":
+
             lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
             reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
             images_feature_reader = ImageFeaturesH5Reader(args.features_path, False)
             question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
-            train_split = "mintrain" if device.type == "cpu" else "train"
-            val_split = "mintrain" if device.type == "cpu" else "val"
+            if args.min_data:
+                vocab_path = os.path.join(args.data_path, 'cache/vocab_min.json')
+                train_split = "mintrain"
+                val_split = "mintrain" if device.type == "cpu" else "minval"
+            else:
+                vocab_path = os.path.join(args.data_path, 'cache/vocab.json')
+                train_split = "mintrain" if device.type == "cpu" else "train"
+                val_split = "mintrain" if device.type == "cpu" else "val"
+
             train_dataset = VQADataset(split=train_split, dataroot=args.data_path,
                                        question_tokenizer=question_tokenizer,
                                        image_features_reader=images_feature_reader,
                                        reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                       num_images=None, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                       num_images=None, vocab_path=vocab_path,
                                        filter_entries=True, rl=False)
             val_dataset = VQADataset(split=val_split, dataroot=args.data_path,
                                      question_tokenizer=question_tokenizer,
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                     num_images=None, vocab_path=os.path.join(args.data_path, 'cache/vocab.json'),
+                                     num_images=None, vocab_path=vocab_path,
                                      filter_entries=True, rl=False)
             test_dataset = val_dataset
 
