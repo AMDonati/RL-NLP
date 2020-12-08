@@ -254,7 +254,7 @@ class DialogImageMetric(Metric):
     def get_id_image(self, id_image):
         id_image = self.get_name_image(id_image)
         try:
-            id_drive = self.list_image_ids.loc[id_image]
+            id_drive = self.list_image_ids.loc[id_image]["id_google"]
         except KeyError:
             id_drive = None
         finally:
