@@ -228,7 +228,7 @@ class VQADataset(Dataset):
             tokens_vil = self.reward_tokenizer.encode(
                 entry["question"])
             tokens_lm = self.lm_tokenizer.encode(
-                entry["question"])
+                entry["question"], add_prefix_space=True)
 
             tokens_vil = tokens_vil[: self._max_seq_length - 2]
             segment_ids = [0] * len(tokens_vil)
@@ -391,7 +391,7 @@ if __name__ == '__main__':
 
     data_path = '../../data/vqa-v2'
     features_path = "../../data/vqa-v2/coco_trainval.lmdb"
-    vocab_path = "../../data/vqa-v2/cache/vocab.json"
+    vocab_path = "../../data/vqa-v2/cache/vocab_min.json"
 
     lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     print("test of lm_tokenizer...")
@@ -411,7 +411,7 @@ if __name__ == '__main__':
                              question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                              reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                              num_images=None, vocab_path=vocab_path)
-    test = 1 if split == "train" else 0
+    test = 1 if split == "mintrain" else 0
     if test:
         vocab = vqa_dataset.vocab_questions
         new_d = {}
@@ -425,13 +425,13 @@ if __name__ == '__main__':
         print("len vocab answers", vqa_dataset.len_vocab_answer)
 
         # test of translate functions:
-        print("Test of reward tokenizer...")
-        print('Is there a pizza?')
-        lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
-        input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
-        reward_idx = vqa_dataset.translate_for_reward(input_idx)
-        question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
-        print('question decoded', question_decoded)
+        #print("Test of reward tokenizer...")
+        #print('Is there a pizza?')
+        #lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
+        #input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
+        #reward_idx = vqa_dataset.translate_for_reward(input_idx)
+        #question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
+       #print('question decoded', question_decoded)
 
         print("Test of lm_to_dataset_function ...")
         idx = np.random.randint(vqa_dataset.len_vocab)
