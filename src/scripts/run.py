@@ -131,7 +131,7 @@ def get_parser():
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr"],
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
@@ -243,7 +243,6 @@ def log_hparams(logger, args):
     logger.info("Number of TEST EPISODES: {}".format(args.num_episodes_test))
 
 
-
 def get_rl_env(args, device):
     # upload env.
     if args.env == "clevr":
@@ -256,23 +255,26 @@ def get_rl_env(args, device):
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
                      for mode in test_modes]
     elif args.env == "vqa":
-            env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
-                         reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
-                         diff_reward=args.diff_reward, reward_path=args.reward_path,
-                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device, min_data=args.min_data)
-            if device.type == "cpu":
-                test_envs = [env]
-            else:
-                test_envs = []
-                if "test_images" in args.test_modes:
-                    test_envs.append(VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
-                                reward_type=args.reward, mode="test_images", max_seq_length=23, debug=args.debug,
-                                diff_reward=args.diff_reward, reward_path=args.reward_path,
-                                reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device, min_data=args.min_data))
-                if "test_text" in args.test_modes:
-                    test_text_env = env
-                    test_text_env.mode = "test_text"
-                    test_envs.append(test_text_env)
+        env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
+                     reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
+                     diff_reward=args.diff_reward, reward_path=args.reward_path,
+                     reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
+                     min_data=args.min_data)
+        if device.type == "cpu":
+            test_envs = [env]
+        else:
+            test_envs = []
+            if "test_images" in args.test_modes:
+                test_envs.append(VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
+                                        reward_type=args.reward, mode="test_images", max_seq_length=23,
+                                        debug=args.debug,
+                                        diff_reward=args.diff_reward, reward_path=args.reward_path,
+                                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
+                                        min_data=args.min_data))
+            if "test_text" in args.test_modes:
+                test_text_env = env
+                test_text_env.mode = "test_text"
+                test_envs.append(test_text_env)
     return env, test_envs
 
 
