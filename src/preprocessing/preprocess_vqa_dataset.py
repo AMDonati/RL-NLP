@@ -8,13 +8,13 @@ if __name__ == '__main__':
     from data_provider.vqa_dataset import VQADataset
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-data_path", type=str, default='../../data/vqa-v2',
+    parser.add_argument("-data_path", type=str, default='data/vqa-v2',
                         help="data folder containing questions embeddings and img features")
-    parser.add_argument("-features_path", type=str, default="../../data/vqa-v2/coco_trainval.lmdb",
+    parser.add_argument("-features_path", type=str, default="data/vqa-v2/coco_trainval.lmdb",
                         help="data folder containing questions embeddings and img features")
     parser.add_argument("-vocab_path", type=str, default="none")
     parser.add_argument("-split", type=str, default="train", help="train or val splits.")
-    parser.add_argument("-min_split", type=int, default=1,
+    parser.add_argument("-min_split", type=int, default=0,
                         help="if true, build a min+split dataset; or a minimal vocab if vocab_path is none")
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
