@@ -133,7 +133,7 @@ def get_parser():
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr"],
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
