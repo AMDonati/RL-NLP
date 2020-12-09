@@ -187,6 +187,8 @@ class Agent:
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         loss = self.update()
                         logging.info("UPDATING POLICY WEIGHTS...")
+                        self.writer.add_scalar("reward", ep_reward,i_episode)
+
                         self.memory.clear_memory()
                 else:
                     loss = None
