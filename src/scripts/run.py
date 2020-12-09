@@ -122,6 +122,8 @@ def get_parser():
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
     parser.add_argument("-train_seed", type=int, default=0,
                         help="using a seed for the episode generation in training or not...")
+    parser.add_argument("-test_seed", type=int, default=1,
+                        help="using a seed for the episode generation in test or not...")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved checkpoint')
     parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
@@ -341,7 +343,7 @@ def run(args):
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
-        agent.test(num_episodes=args.num_episodes_test, test_mode=mode)
+        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, test_seed=args.test_seed)
     # write to csv test scalar metrics:
     agent.compute_write_all_metrics(output_path=output_path, logger=logger)
     logger.info(

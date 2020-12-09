@@ -255,6 +255,22 @@ if __name__ == '__main__':
     env_vqa.reset()
     env_vqa.mode = "train"
 
+    print("Testing seed for VQA env...")
+    seed = 1
+    env_vqa.reset(seed=seed)
+    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:", env_vqa.ref_answer)
+    env_vqa.reset(seed=seed)
+    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
+          env_vqa.ref_answer)
+    seed = 2
+    env_vqa.reset(seed=seed)
+    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
+          env_vqa.ref_answer)
+    env_vqa.reset(seed=seed)
+    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
+          env_vqa.ref_answer)
+
+    print("---------------------------------------------------------")
     print(len(env.dataset.vocab_questions))
     state = env_vqa.reset()
     print("State idx", env_vqa.env_idx)
