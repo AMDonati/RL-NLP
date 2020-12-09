@@ -143,10 +143,10 @@ class Agent:
         loss = checkpoint['loss']
         return epoch, loss
 
-    def test(self, num_episodes=10, test_mode='sampling'):
+    def test(self, num_episodes=10, test_mode='sampling', test_seed=0):
         for env in self.test_envs:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
-            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode)
+            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed)
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
@@ -205,14 +205,13 @@ class Agent:
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
-    def test_env(self, env, num_episodes=10, test_mode='sampling'):
+    def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0):
         env.reset()  # init env.
         timestep = 1
         self.policy.eval()
         for i_episode in range(num_episodes):
-            # dialogs = {key: [] for key in self.eval_trunc.keys()}
             logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
-            seed = i_episode
+            seed = i_episode if test_seed else np.random.randint(1000000)
             for key_trunc, trunc in self.eval_trunc.items():
                 metrics = self.get_metrics(env.mode, key_trunc, test_mode)
                 for i in range(env.ref_questions.size(
