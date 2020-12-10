@@ -22,7 +22,10 @@ class Agent:
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., optimizer_state=None):
         self.device = policy.device
         self.policy = policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) if optimizer_state is None else optimizer_state
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        if optimizer_state is not None:
+            optimizer_state["param_groups"] = self.optimizer.state_dict()["param_groups"]
+            self.optimizer.load_state_dict(state_dict=optimizer_state)
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval
