@@ -20,7 +20,7 @@ class PPO(Agent):
                  epsilon_truncated=0.,
                  train_seed=0,
                  epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1.):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., optimizer_state=None):
         Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
@@ -35,7 +35,7 @@ class PPO(Agent):
                        train_seed=train_seed,
                        epsilon_truncated_rate=epsilon_truncated_rate,
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
-                       top_p=top_p)
+                       top_p=top_p, optimizer_state=optimizer_state)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs

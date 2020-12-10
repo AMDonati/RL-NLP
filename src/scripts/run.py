@@ -16,7 +16,7 @@ from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
 
 
-def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_):
+def get_agent(pretrained_lm, optimizer_state, writer, output_path, env, test_envs, policy, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
                       "pretrain": args_.pretrain,
                       "update_every": args_.update_every,
@@ -37,7 +37,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_)
                       "is_loss_correction": args_.is_loss_correction,
                       "train_metrics": args_.train_metrics,
                       "test_metrics": args_.test_metrics,
-                      "top_p": args_.top_p
+                      "top_p": args_.top_p,
+                      "optimizer_state": optimizer_state
                       }
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
@@ -315,13 +316,17 @@ def run(args):
                                 fusion=args.fusion, env=env,
                                 condition_answer=args.condition_answer,
                                 device=device)
+    optimizer_state = None
     if args.policy_path is not None:
         pretrained = torch.load(args.policy_path, map_location=device)
-        if pretrained.__class__ != OrderedDict:
-            pretrained = pretrained.state_dict()
+        if pretrained.__class__ == dict:
+            optimizer_state = pretrained["optimizer"]
+            pretrained = pretrained["state_dict"]
+        elif pretrained.__class__ != OrderedDict:
+            pretrained.state_dict()
         policy.load_state_dict(pretrained, strict=False)
         policy.device = device
-    agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_=args)
+    agent = get_agent(pretrained_lm, optimizer_state, writer, output_path, env, test_envs, policy, args_=args)
 
     eval_mode = ['sampling', 'greedy']
 

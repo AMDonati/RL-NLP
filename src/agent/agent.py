@@ -19,10 +19,10 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1.):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., optimizer_state=None):
         self.device = policy.device
         self.policy = policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr) if optimizer_state is None else optimizer_state
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval
