@@ -149,7 +149,12 @@ class SLAlgo:
             # Save the model if the validation loss is the best we've seen so far.
             if not best_val_loss or val_loss < best_val_loss:
                 with open(self.model_path, 'wb') as f:
-                    torch.save(self.model, f)
+                    state = {
+                        'epoch': epoch,
+                        'state_dict': self.model.state_dict(),
+                        'optimizer': self.optimizer.state_dict(),
+                    }
+                    torch.save(state, f)
                 best_val_loss = val_loss
 
         self.logger.info("saving loss and metrics information...")
