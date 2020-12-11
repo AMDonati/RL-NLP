@@ -12,7 +12,7 @@ POLICY_PATH="output/vqa_policy_newvocab/model.pt"
 K_EPOCHS=5
 MAX_LEN=10
 UPDATE_EVERY=32
-NUM_EPISODE_TRAIN=20000
+NUM_EPISODE_TRAIN=30000
 NUM_EPISODE_TEST=100
 ENV_="vqa"
 MODEL="lstm"
@@ -30,12 +30,12 @@ if [ -n "$1" ]; then
   OUTPUT_PATH=$1
 fi
 
+echo "$(date +"%Y_%m_%d_%I_%M_%p")------------------------- sample_va ----------------------------------------------------------------------------------------------------"
+python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -debug $DEBUG -truncate_mode "sample_va" -num_truncated 20
 echo "$(date +"%Y_%m_%d_%I_%M_%p")------------------------- top k ----------------------------------------------------------------------------------------------------"
 python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -debug $DEBUG -truncate_mode "top_k" -num_truncated 10
 echo "$(date +"%Y_%m_%d_%I_%M_%p")------------------------- proba threshold ----------------------------------------------------------------------------------------------------"
 python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -debug $DEBUG -truncate_mode "proba_thr" -p_th 0.005
-echo "$(date +"%Y_%m_%d_%I_%M_%p")------------------------- sample_va ----------------------------------------------------------------------------------------------------"
-python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -debug $DEBUG -truncate_mode "sample_va"
 echo "$(date +"%Y_%m_%d_%I_%M_%p")-------------------------  top p ---------------------------------------------------------------------------------------------------------------"
 python src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -debug $DEBUG -truncate_mode "top_p" -top_p 0.8
 echo "$(date +"%Y_%m_%d_%I_%M_%p")------------------------- no image ----------------------------------------------------------------------------------------------------"
