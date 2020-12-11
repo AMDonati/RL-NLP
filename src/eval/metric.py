@@ -451,10 +451,10 @@ class TrueWordRankLM(Metric):
         Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
-        true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
+        true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
         if kwargs["log_probas_lm"] is not None and true_action != 0:
             sorted, indices = torch.sort(kwargs["log_probas_lm"].squeeze(), descending=True)
-            rank = int((indices.squeeze().cpu() == true_action).nonzero().squeeze().numpy())
+            rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
             self.measure.append(rank)
 
     def compute_(self, **kwargs):
@@ -491,9 +491,9 @@ class TrueWordProbLM(Metric):
         Metric.__init__(self, agent, train_test, "true_word_prob", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
-        true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
+        true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
         if kwargs["origin_log_probs_lm"] is not None and true_action != 0:
-            true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
+            true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
             true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
             prob = kwargs["origin_log_probs_lm"][:, -1, true_lm_action].exp().cpu().numpy()[0]
             self.measure.append(prob)
