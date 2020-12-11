@@ -23,9 +23,11 @@ from data_provider._image_features_reader import ImageFeaturesH5Reader
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
+
 def assert_match_split_vocab_path_args(split, vocab_path, vocab_path_min):
     if vocab_path == vocab_path_min:
-        assert split == "minval" or split=="mintrain", "You can't used a reduced vocab on train and val split. used minval and mintrain split instead."
+        assert split == "minval" or split == "mintrain", "You can't used a reduced vocab on train and val split. used minval and mintrain split instead."
+
 
 class VQADataset(Dataset):
     def __init__(
@@ -72,7 +74,7 @@ class VQADataset(Dataset):
             "cache",
             "vocab_min.json")
         if vocab_path == "none":
-            if split =="trainval" and os.path.isfile(vocab_path_):
+            if split == "trainval" and os.path.isfile(vocab_path_):
                 print('WARNING: a vocab.json file already exists and will be replaced')
             elif split == "mintrainval" and os.path.isfile(vocab_path_min):
                 print('WARNING: a vocab_min.json file already exists and will be replaced')
@@ -172,22 +174,21 @@ class VQADataset(Dataset):
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
         for entry in self.entries:
-            len_q = len(word_tokenize(entry["question"]))
-            number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
-            if len_q >= min_len_questions and number_of_answers == num_answers:
-                if filter_yes_no:
-                    if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
-                        self.filtered_entries.append(entry)
-                else:
+            if entry["answer"]["scores"] is None:
+                continue
+            best_answer_index = torch.argmax(entry["answer"]["scores"])
+            entry["answer"]["labels"] = entry["answer"]["labels"][best_answer_index].view(-1)
+            if filter_yes_no:
+                if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                     self.filtered_entries.append(entry)
             else:
-                if entry["answer"]["labels"] is not None:
-                    self.remaining_entries.append(entry)
+                self.filtered_entries.append(entry)
+
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = np.sort(df.image_id.unique())
             self.images_idx = images_idx[:num_images]
-            self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in images_idx]
+            self.filtered_entries = [entry for entry in self.filtered_entries if entry["image_id"] in self.images_idx]
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries
 
@@ -425,13 +426,13 @@ if __name__ == '__main__':
         print("len vocab answers", vqa_dataset.len_vocab_answer)
 
         # test of translate functions:
-        #print("Test of reward tokenizer...")
-        #print('Is there a pizza?')
-        #lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
-        #input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
-        #reward_idx = vqa_dataset.translate_for_reward(input_idx)
-        #question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
-       #print('question decoded', question_decoded)
+        # print("Test of reward tokenizer...")
+        # print('Is there a pizza?')
+        # lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
+        # input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
+        # reward_idx = vqa_dataset.translate_for_reward(input_idx)
+        # question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
+        # print('question decoded', question_decoded)
 
         print("Test of lm_to_dataset_function ...")
         idx = np.random.randint(vqa_dataset.len_vocab)
