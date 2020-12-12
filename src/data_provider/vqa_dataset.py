@@ -187,10 +187,14 @@ class VQADataset(Dataset):
 
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
+            logging.info("start group by")
             df = df.groupby('image_id').head(self.num_questions)
+            logging.info("end group by")
             images_idx = df.image_id.sort_values().unique()
             self.images_idx = images_idx[:num_images]
+            logging.info("start to dict")
             self.filtered_entries = df.to_dict(orient="records")
+            logging.info("end to dict")
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries
 
