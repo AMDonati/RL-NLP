@@ -29,8 +29,8 @@ def write_to_csv(output_dir, dic):
 def create_logger(out_file_log, level="INFO"):
     levels = {"INFO": logging.INFO, "DEBUG": logging.DEBUG, "ERROR": logging.ERROR}
     level = levels[level]
-    logging.config.fileConfig('config/log/logging.conf')
-    logging.basicConfig(filename=out_file_log, level=level, filemode='w')
+    logging.config.fileConfig('config/log/logging.conf',defaults={'logfilename': out_file_log})
+    #logging.basicConfig(filename=out_file_log, level=level, filemode='w', force=True)
     # create logger
     logger = logging.getLogger('training log')
     logger.setLevel(level)
