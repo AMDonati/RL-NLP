@@ -262,7 +262,7 @@ def get_rl_env(args, device):
                      reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
                      reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                     min_data=args.min_data)
+                     min_data=args.min_data, num_questions=args.num_questions)
         test_envs = [env]
 
     return env, test_envs
