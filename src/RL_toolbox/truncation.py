@@ -56,10 +56,10 @@ class NoTruncation(Truncation):
     def __init__(self, agent, **kwargs):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
 
-    def get_valid_actions(self, state, truncation):
+    def get_valid_actions(self, state, truncation, temperature):
         if self.alpha_logits_lm > 0:
             with torch.no_grad():
-                log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device))
+                log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device), temperature)
         else:
             logits_lm, log_probas_lm, origin_log_probs_lm = 0, None, None
         return None, None, logits_lm, log_probas_lm, origin_log_probs_lm
