@@ -40,11 +40,11 @@ class Truncation:
         self.dataset = agent.env.dataset
         self.device = agent.device
 
-    def get_valid_actions(self, state, truncation):
+    def get_valid_actions(self, state, truncation, temperature):
         if not truncation:
             return None, None, 0, None, None
         with torch.no_grad():
-            log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device))
+            log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device), temperature)
             valid_actions, action_probs = self.truncate(log_probas_lm, logits_lm)
             return valid_actions, action_probs, logits_lm, log_probas_lm, origin_log_probs_lm
 

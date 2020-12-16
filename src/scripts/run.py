@@ -37,7 +37,10 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_)
                       "is_loss_correction": args_.is_loss_correction,
                       "train_metrics": args_.train_metrics,
                       "test_metrics": args_.test_metrics,
-                      "top_p": args_.top_p
+                      "top_p": args_.top_p,
+                      "temperature": args_.temperature,
+                      "temperature_step": args_.temp_step,
+                      "temp_factor": args_.temp_factor
                       }
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
@@ -96,6 +99,7 @@ def get_parser():
                         help="type of answer condition, default to none")
     parser.add_argument("-min_data", type=int, default=0)
     # truncation args.
+    ## truncation mode args.
     parser.add_argument('-lm_path', type=str, default="gpt",
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
     parser.add_argument('-truncate_mode', type=str,
@@ -104,16 +108,24 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
+    ## temperature args.
+    parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
+    parser.add_argument('-temp_step', type=int, default=1, help="temperature step for updating the temperature for the language model")
+    parser.add_argument('-temp_factor', type=float, default=1., help="temperature factor for the language model")
+    ## alpha logits fusion args.
+    parser.add_argument('-temp_min', type=float, default=1., help="temperature min for the language model")
     parser.add_argument('-alpha_logits', default=0., type=float,
                         help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-alpha_decay_rate', default=0., type=float,
                         help="alpha decay rate for the convex logits mixture. if 0, does not decay the alpha")
+    ## epsilon truncation args.
     parser.add_argument('-epsilon_truncated', type=float, default=0.,
                         help="the agent sample from truncated or total action space")
     parser.add_argument('-epsilon_truncated_rate', type=float, default=1,
                         help="number of training iterations before epsilon truncated set to 1")
     parser.add_argument('-is_loss_correction', type=int, default=1,
                         help="adding the importance sampling ratio correction in the rl loss.")
+    # gpt-2 pre-conditioning args.
     parser.add_argument('-init_text', type=str)
     parser.add_argument('-custom_init', type=int, default=0)
     parser.add_argument('-add_answers', type=int, default=0)
@@ -192,6 +204,9 @@ def get_output_path(args):
 
     if "gpt" in args.lm_path:
         out_folder = out_folder + '_gpt-2'
+
+    # temp args
+    out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(args.temp_factor) + '_step{}'.format(args.temp_step)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,

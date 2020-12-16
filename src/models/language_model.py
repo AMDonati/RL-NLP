@@ -30,28 +30,13 @@ class ClevrLanguageModel(LanguageModel):
         LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer)
         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
 
-    def forward(self, state_text):
+    def forward(self, state_text, temperature=1):
         seq_len = state_text.size(1)
         log_probas, logits = self.language_model(state_text.to(self.device))
         logits = logits.view(len(state_text), seq_len, -1)
-        logits = logits[:, -1, :]
-        last_log_probas = log_probas.view(len(state_text), seq_len, -1)
-        last_log_probas = last_log_probas[:, -1, :]
+        logits = logits[:, -1, :] / temperature
+        last_log_probas = F.log_softmax(logits, dim=-1)
         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
-
-# class VQALanguageModel(LanguageModel):
-#     def __init__(self, pretrained_lm, dataset, tokenizer=None):
-#         LanguageModel.__init__(self, pretrained_lm, dataset, tokenizer)
-#         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
-#
-#     def forward(self, state_text):
-#         seq_len = state_text.size(1)
-#         log_probas, logits = self.language_model(state_text.to(self.device))
-#         logits = logits.view(len(state_text), seq_len, -1)
-#         logits = logits[:, -1, :]
-#         last_log_probas = log_probas.view(len(state_text), seq_len, -1)
-#         last_log_probas = last_log_probas[:, -1, :]
-#         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
 
 
 class GenericLanguageModel(LanguageModel):
@@ -86,7 +71,7 @@ class GenericLanguageModel(LanguageModel):
             print("init text for GPT-2 pre-conditioning...", self.init_text)
 
 
-    def forward(self, state_text):
+    def forward(self, state_text, temperature=1):
         text = self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(), stop_at_end=True)
         if self.init_text is not None:
             text = self.init_text + text
@@ -101,6 +86,7 @@ class GenericLanguageModel(LanguageModel):
         logits[list(self.dataset_to_lm_trad.keys())] = origin_logits_lm[:, -1, :][0][
             list(self.dataset_to_lm_trad.values())]
         logits = logits.unsqueeze(dim=0)
+        logits = logits / temperature
         log_probas = F.log_softmax(logits, dim=-1)
         return log_probas, logits, origin_log_probs_lm.view(input_ids.size(0), input_ids.size(1), -1)
 
