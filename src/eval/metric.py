@@ -19,6 +19,8 @@ class Metric:
         self.measure = []
         self.metric = []
         self.metric_history = []
+        self.metric_diversity = []
+        self.metric_diversity_history = []
         self.idx_step = 0
         self.idx_word = 0
         self.idx_compute = 0
@@ -39,7 +41,9 @@ class Metric:
         # self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
         self.name = train_test + "_" + self.id + '_' + self.key
         self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".csv")
+        self.out_div_csv_file = os.path.join(self.out_path, "diversity", self.name + ".csv")
         self.stats = None
+        self.stats_div=None
         self.to_tensorboard = True if key in metrics_to_tensorboard else False
 
     def fill(self, **kwargs):
@@ -65,7 +69,16 @@ class Metric:
                 self.writer.add_text(self.name, '  \n'.join(self.metric[-1:]), self.idx_write)
         self.idx_write += 1
         self.metric_history.extend(self.metric)
+        if self.sampling != "greedy":
+            self.metric_diversity.extend(self.metric)
         self.metric = []
+
+    def write_div(self, **kwargs):
+        if self.type == "scalar" and self.metric_diversity:
+            metric_diversity = [np.mean(self.metric_diversity), np.std(self.metric_diversity),
+                                np.max(self.metric_diversity), np.min(self.metric_diversity)]
+            self.metric_diversity_history.append(metric_diversity)
+            self.metric_diversity = []
 
     def log(self, **kwargs):
         pass
@@ -73,14 +86,22 @@ class Metric:
     def get_stats(self, serie):
         return [serie.mean(), serie.std(), serie.size]
 
+    def get_stats_div(self, df):
+        return df.mean().to_dict()
+
     def post_treatment_(self):
         pass
 
     def post_treatment(self):
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False, header=False)
+
         if self.type == "scalar":
             self.stats = self.get_stats(serie)
+            if self.metric_diversity_history:
+                df = pd.DataFrame(data=self.metric_diversity_history, columns=["mean", "std", "max", "min"])
+                df.to_csv(self.out_div_csv_file)
+                self.stats_div=self.get_stats_div(df)
         self.post_treatment_()
 
 
@@ -435,7 +456,7 @@ class TrueWordRankOriginLM(Metric):
         if kwargs["origin_log_probs_lm"] is not None and true_action != 0:
             true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
             sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
-            rank = int((indices.squeeze().cpu() == true_lm_action).nonzero().squeeze().numpy())
+            rank = int(torch.nonzero(indices.squeeze().cpu() == true_lm_action).squeeze().numpy())
             self.measure.append(rank)
 
     def compute_(self, **kwargs):
@@ -454,7 +475,7 @@ class TrueWordRankLM(Metric):
         true_action = kwargs["ref_question"].squeeze()[kwargs["timestep"]].cpu().numpy().item()
         if kwargs["log_probas_lm"] is not None and true_action != 0:
             sorted, indices = torch.sort(kwargs["log_probas_lm"].squeeze(), descending=True)
-            rank = int((indices.squeeze().cpu() == true_action).nonzero().squeeze().numpy())
+            rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
             self.measure.append(rank)
 
     def compute_(self, **kwargs):
@@ -475,7 +496,7 @@ class ActionRankLM(Metric):
             true_action = kwargs["action"].cpu().numpy().item()
             true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
             sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
-            rank = int((indices.squeeze().cpu() == true_lm_action).nonzero().squeeze().numpy())
+            rank = int(torch.nonzero(indices.squeeze().cpu() == true_lm_action).squeeze().numpy())
             self.measure.append(rank)
 
     def compute_(self, **kwargs):
@@ -576,7 +597,7 @@ class LMVAMetric(Metric):
             if len(closest_question) > self.idx_word:
                 if closest_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
-                    #logging.info("+VA")
+                    # logging.info("+VA")
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
@@ -667,7 +688,7 @@ class LMActionProbs(Metric):
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
-           "lm_valid_actions":LMVAMetric,
+           "lm_valid_actions": LMVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,

@@ -155,6 +155,8 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-device_id', type=int, default=0, help="device id when running on a multi-GPU VM.")
+    parser.add_argument('-num_diversity', type=int, default=1,
+                        help="number of sampling for the same image/answer for test")
 
     return parser
 
@@ -223,10 +225,14 @@ def get_output_path(args):
         os.makedirs(output_path)
     stats_path = os.path.join(output_path, "stats")
     metric_path = os.path.join(output_path, "metrics")
+    diversity_path = os.path.join(output_path, "diversity")
+
     if not os.path.isdir(stats_path):
         os.makedirs(stats_path)
     if not os.path.isdir(metric_path):
         os.makedirs(metric_path)
+    if not os.path.isdir(diversity_path):
+        os.makedirs(diversity_path)
     return output_path
 
 
@@ -293,6 +299,7 @@ def get_rl_env(args, device):
                 test_text_env = env
                 test_text_env.mode = "test_text"
                 test_envs.append(test_text_env)
+
     return env, test_envs
 
 
@@ -359,7 +366,8 @@ def run(args):
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
-        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, test_seed=args.test_seed)
+        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, test_seed=args.test_seed,
+                   num_diversity=args.num_diversity)
     # write to csv test scalar metrics:
     agent.compute_write_all_metrics(output_path=output_path, logger=logger)
     logger.info(

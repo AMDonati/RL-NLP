@@ -159,10 +159,11 @@ class Agent:
         loss = checkpoint['loss']
         return epoch, loss
 
-    def test(self, num_episodes=10, test_mode='sampling', test_seed=0):
+    def test(self, num_episodes=10, test_mode='sampling', test_seed=0,num_diversity=1):
         for env in self.test_envs:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
-            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed)
+            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
+                          num_diversity=num_diversity)
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
@@ -221,7 +222,7 @@ class Agent:
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
-    def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0):
+    def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=10):
         env.reset()  # init env.
         timestep = 1
         self.policy.eval()
@@ -230,8 +231,7 @@ class Agent:
             seed = i_episode if test_seed else np.random.randint(1000000)
             for key_trunc, trunc in self.eval_trunc.items():
                 metrics = self.get_metrics(env.mode, key_trunc, test_mode)
-                for i in range(env.ref_questions.size(
-                        0)):  # loop multiple time over the same image to measure langage diversity.
+                for i in range(num_diversity):  # loop multiple time over the same image to measure langage diversity.
                     with torch.no_grad():
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
@@ -239,6 +239,8 @@ class Agent:
                             truncation=trunc, metrics=metrics)
                     for _, metric in metrics.items():
                         metric.write()
+                for _, metric in metrics.items():
+                    metric.write_div()
         for key_trunc in self.eval_trunc.keys():
             metrics = self.get_metrics(env.mode, key_trunc, test_mode)
             for _, metric in metrics.items():
@@ -296,14 +298,23 @@ class Agent:
         all_metrics = {trunc: {} for trunc in self.eval_trunc.keys()}
         for key in self.test_metrics_names:
             stats_dict = {trunc: {} for trunc in self.eval_trunc.keys()}
+            stats_dict_div = {trunc: {} for trunc in self.eval_trunc.keys()}
+
             instances_of_metric = [self.metrics[key_mode][key] for key_mode in self.metrics.keys() if
                                    key_mode != "train"]
             # for stats
             for metric in instances_of_metric:
                 if metric.stats is not None:
                     stats_dict[metric.trunc]["_".join([metric.env_mode, metric.sampling])] = metric.stats[0]
+                if metric.stats_div is not None:
+                    stats_dict_div[metric.trunc]["_".join([metric.env_mode, metric.sampling])] = metric.stats_div
+
             stats_path = os.path.join(self.out_path, "stats", "{}.csv".format(key))
+            div_path = os.path.join(self.out_path, "stats", "{}_div.csv".format(key))
+
             pd.DataFrame(data=stats_dict).to_csv(stats_path)
+            pd.DataFrame(data=stats_dict_div).to_csv(div_path)
+
             # for all metrics
             for trunc in stats_dict.keys():
                 means = [value for value in stats_dict[trunc].values()]
