@@ -45,7 +45,7 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=os.path.join("data/vqa-v2", "cache", "vocab.json"),
             max_samples=None,
-            rl=True, num_questions=10):
+            rl=True):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
@@ -60,7 +60,6 @@ class VQADataset(Dataset):
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
         self.max_samples = max_samples
         self.images_idx = list(map(int, image_features_reader._image_ids[:-1]))
-        self.num_questions = num_questions
         '''
         '''
         # Building vocab.
@@ -189,7 +188,7 @@ class VQADataset(Dataset):
             images_idx = df.image_id.sort_values().unique()
             self.images_idx = images_idx[:num_images]
             df = df.loc[df['image_id'] <= self.images_idx[-1]]
-            df = df.groupby('image_id').head(self.num_questions)
+            #df = df.groupby('image_id').head(self.num_questions)
             self.filtered_entries = df.to_dict(orient="records")
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries

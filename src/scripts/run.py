@@ -110,8 +110,7 @@ def get_parser():
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
-    parser.add_argument('-temp_step', type=int, default=1,
-                        help="temperature step for updating the temperature for the language model")
+    parser.add_argument('-temp_step', type=int, default=1, help="temperature step for updating the temperature for the language model")
     parser.add_argument('-temp_factor', type=float, default=1., help="temperature factor for the language model")
     ## alpha logits fusion args.
     parser.add_argument('-temp_min', type=float, default=1., help="temperature min for the language model")
@@ -210,8 +209,7 @@ def get_output_path(args):
 
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
-        out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
-            args.temp_factor) + '_step{}'.format(args.temp_step)
+        out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(args.temp_factor) + '_step{}'.format(args.temp_step)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
@@ -285,7 +283,7 @@ def get_rl_env(args, device):
                      reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
                      reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                     min_data=args.min_data, num_questions=args.num_questions)
+                     min_data=args.min_data)
         if device.type == "cpu":
             test_envs = [env]
         else:
@@ -296,7 +294,7 @@ def get_rl_env(args, device):
                                         debug=args.debug,
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                                        min_data=args.min_data, num_questions=args.num_questions))
+                                        min_data=args.min_data))
             if "test_text" in args.test_modes:
                 test_text_env = env
                 test_text_env.mode = "test_text"

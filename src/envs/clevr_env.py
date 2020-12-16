@@ -167,8 +167,7 @@ class VQAEnv(GenericEnv):
                  debug=None,
                  reward_path=None, mode="train", diff_reward=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=0,
-                 num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), min_data=0,
-                 num_questions=10):
+                 num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), min_data=0):
         super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                      reward_path=reward_path, debug=debug, mode=mode, diff_reward=diff_reward,
                                      condition_answer=condition_answer, reward_vocab=reward_vocab,
@@ -192,8 +191,7 @@ class VQAEnv(GenericEnv):
                                   image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
                                   reward_tokenizer=reward_tokenizer, clean_datasets=True,
                                   max_seq_length=max_seq_length, min_len_questions=min_len_questions,
-                                  num_answers=num_answers, num_images=num_images, filter_entries=True,
-                                  vocab_path=vocab_path, num_questions=num_questions)
+                                  num_answers=num_answers, num_images=num_images, filter_entries=True, vocab_path=vocab_path)
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
@@ -204,6 +202,7 @@ class VQAEnv(GenericEnv):
         else:
             modes = {"train": "train", "test_images": "val", "test_text": "train"}
         return modes
+
 
     def reset(self, seed=None):
         if seed is not None:
@@ -259,8 +258,7 @@ if __name__ == '__main__':
     print("Testing seed for VQA env...")
     seed = 1
     env_vqa.reset(seed=seed)
-    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
-          env_vqa.ref_answer)
+    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:", env_vqa.ref_answer)
     env_vqa.reset(seed=seed)
     print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
           env_vqa.ref_answer)
