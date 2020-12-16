@@ -206,7 +206,8 @@ def get_output_path(args):
         out_folder = out_folder + '_gpt-2'
 
     # temp args
-    out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(args.temp_factor) + '_step{}'.format(args.temp_step)
+    if args.temperature != 1 and args.temp_factor != 1:
+        out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(args.temp_factor) + '_step{}'.format(args.temp_step)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
