@@ -14,10 +14,13 @@ from envs.clevr_env import ClevrEnv, VQAEnv
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
+from torch import optim
+from torch.optim import lr_scheduler
 
 
-def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_):
+def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimizer, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
+                      "optimizer": optimizer,
                       "pretrain": args_.pretrain,
                       "update_every": args_.update_every,
                       "lr": args_.lr,
@@ -79,6 +82,9 @@ def get_parser():
     parser.add_argument('-update_every', type=int, default=20, help="update_every episode/timestep")
     parser.add_argument('-entropy_coeff', type=float, default=0.01, help="entropy coeff")
     parser.add_argument('-eps_clip', type=float, default=0.02, help="eps clip")
+    parser.add_argument('-optimizer', type=str, default="adam")
+    parser.add_argument('-opt_schedule', type=str)
+    parser.add_argument('-div_factor', type=int, default=25, help="div factor for OneCycleLR scheduler.")
     parser.add_argument('-lr', type=float, default=0.001, help="learning rate")
     parser.add_argument('-grad_clip', type=float, help="value of gradient norm clipping")
     parser.add_argument('-policy_path', type=str, default=None,
@@ -196,7 +202,7 @@ def get_output_path(args):
     elif args.truncate_mode == "top_p":
         algo = "{}{}".format(args.truncate_mode, args.top_p)
 
-    out_folder = '{}_{}'.format(args.env, args.reward)
+    out_folder = '{}_{}_{}'.format(args.env, args.reward, args.agent)
     if args.policy_path is not None:
         out_folder = out_folder + '_' + "pretrain"
     out_folder = out_folder + '_' + algo
@@ -207,6 +213,12 @@ def get_output_path(args):
 
     if "gpt" in args.lm_path:
         out_folder = out_folder + '_gpt-2'
+
+    # optimization params
+    out_folder = out_folder + '_{}_{}'.format(args.optimizer, args.lr)
+    if args.opt_schedule is not None:
+        out_folder = out_folder + '_{}{}'.format(args.opt_schedule, args.div_factor)
+
 
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
@@ -236,6 +248,26 @@ def get_output_path(args):
     if not os.path.isdir(diversity_path):
         os.makedirs(diversity_path)
     return output_path
+
+
+def get_optimizer(policy, args):
+    if args.optimizer == "adam":
+        optimizer = optim.Adam(policy.parameters(), lr=args.lr)
+    elif args.optimizer == "sgd":
+        optimizer = optim.SGD(policy.parameters(), lr=args.lr)
+    elif args.optimizer == "rmsprop":
+        optimizer = optim.RMSprop(policy.parameters(), lr=args.lr)
+    scheduler = args.opt_schedule
+    if scheduler == "cyclic":
+        scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=args.div_factor * args.lr,
+                                            total_steps=args.num_episodes_train)
+    elif scheduler == "cyclic_multi":
+        scheduler = lr_scheduler.CyclicLR(optimizer=optimizer, base_lr=args.lr, max_lr=args.div_factor * args.lr)
+    elif scheduler == "WR":
+        T_0 = max(1, int(args.num_episodes_train / 1000))
+        scheduler = lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=T_0)
+
+    return optimizer, scheduler
 
 
 def log_hparams(logger, args):
@@ -346,7 +378,9 @@ def run(args):
             pretrained = pretrained.state_dict()
         policy.load_state_dict(pretrained, strict=False)
         policy.device = device
-    agent = get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, args_=args)
+    optimizer, scheduler = get_optimizer(policy, args)
+    agent = get_agent(pretrained_lm=pretrained_lm, writer=writer, output_path=output_path, env=env, test_envs=test_envs,
+                      policy=policy, optimizer=optimizer, args_=args)
 
     eval_mode = ['sampling', 'greedy']
 

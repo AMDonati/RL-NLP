@@ -15,14 +15,16 @@ from utils.utils_train import write_to_csv
 
 
 class Agent:
-    def __init__(self, policy, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
+    def __init__(self, policy, optimizer, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
+                 scheduler=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1):
         self.device = policy.device
         self.policy = policy.to(self.device)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         self.grad_clip = grad_clip
         self.gamma = gamma
         self.log_interval = log_interval

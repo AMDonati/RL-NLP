@@ -7,8 +7,9 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2,
+    def __init__(self, policy, optimizer, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2,
                  grad_clip=None,
+                 scheduler=None,
                  truncate_mode="top_k",
                  update_every=100, num_truncated=10,
                  p_th=None,
@@ -21,9 +22,10 @@ class PPO(Agent):
                  train_seed=0,
                  epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1, temp_factor=1, temperature_min=1.):
-        Agent.__init__(self, policy=policy, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
+        Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
+                       scheduler=scheduler,
                        pretrain=pretrain, update_every=update_every,
                        num_truncated=num_truncated,
                        p_th=p_th,
@@ -113,6 +115,10 @@ class PPO(Agent):
             grad_norm = compute_grad_norm(self.policy)
             self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
             self.writer_iteration += 1
+
+        #TODO: add scheduler step here
+        if self.scheduler is not None:
+            self.scheduler.step()
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
