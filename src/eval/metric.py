@@ -367,7 +367,7 @@ class BleuMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             ref_questions = kwargs["ref_questions_decoded"]
@@ -392,7 +392,7 @@ class SelfBleuMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             self.questions.append(question_decoded)
