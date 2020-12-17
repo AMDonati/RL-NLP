@@ -188,7 +188,6 @@ class VQADataset(Dataset):
             images_idx = df.image_id.sort_values().unique()
             self.images_idx = images_idx[:num_images]
             df = df.loc[df['image_id'] <= self.images_idx[-1]]
-            #df = df.groupby('image_id').head(self.num_questions)
             self.filtered_entries = df.to_dict(orient="records")
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries
