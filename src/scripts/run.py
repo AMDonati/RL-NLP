@@ -231,6 +231,8 @@ def get_optimizer(policy, args):
         optimizer = optim.Adam(policy.parameters(), lr=args.lr)
     elif args.optimizer == "sgd":
         optimizer = optim.SGD(policy.parameters(), lr=args.lr)
+    elif args.optimizer == "rmsprop":
+        optimizer = optim.RMSprop(policy.parameters(), lr=args.lr)
     scheduler = args.opt_schedule
     if scheduler == "cyclic":
         scheduler = lr_scheduler.OneCycleLR(optimizer=optimizer, max_lr=args.div_factor * args.lr,
