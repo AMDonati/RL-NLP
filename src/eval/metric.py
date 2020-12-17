@@ -43,7 +43,7 @@ class Metric:
         self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".csv")
         self.out_div_csv_file = os.path.join(self.out_path, "diversity", self.name + ".csv")
         self.stats = None
-        self.stats_div=None
+        self.stats_div = None
         self.to_tensorboard = True if key in metrics_to_tensorboard else False
 
     def fill(self, **kwargs):
@@ -93,6 +93,7 @@ class Metric:
         pass
 
     def post_treatment(self):
+        self.post_treatment_()
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False, header=False)
 
@@ -101,8 +102,7 @@ class Metric:
             if self.metric_diversity_history:
                 df = pd.DataFrame(data=self.metric_diversity_history, columns=["mean", "std", "max", "min"])
                 df.to_csv(self.out_div_csv_file)
-                self.stats_div=self.get_stats_div(df)
-        self.post_treatment_()
+                self.stats_div = self.get_stats_div(df)
 
 
 # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
@@ -376,6 +376,39 @@ class BleuMetric(Metric):
 
     def compute_(self, **kwargs):
         self.metric.append(np.mean(self.measure))
+
+
+class SelfBleuMetric(Metric):
+    '''Compute the self bleu score on all generated sentences'''
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "selfbleu", "scalar", env_mode, trunc, sampling)
+        if "bleu" in agent.env.reward_type:
+            self.function = agent.env.reward_func
+        else:
+            self.function = rewards["bleu_sf2"]()
+        self.questions = []
+        self.out_questions_csv_file = os.path.join(self.out_path, "metrics", self.name +  "_questions.csv")
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                      ignored=["<SOS>"],
+                                                                      stop_at_end=True)
+            self.questions.append(question_decoded)
+
+    def compute_(self, **kwargs):
+        self.metric = self.measure
+
+    def post_treatment_(self):
+        pd.Series(self.questions).to_csv(self.out_questions_csv_file, header=False, index=False)
+        scores = []
+        for i, question in enumerate(self.questions):
+            ref_questions = np.delete(self.questions, i)
+            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
+            scores.append(score)
+        self.metric_history.extend(scores)
+
 
 
 class LvNormMetric(Metric):
@@ -692,5 +725,6 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
-           "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric}
+           "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
+           "selfbleu": SelfBleuMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr_question"]

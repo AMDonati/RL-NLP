@@ -110,7 +110,8 @@ def get_parser():
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
-    parser.add_argument('-temp_step', type=int, default=1, help="temperature step for updating the temperature for the language model")
+    parser.add_argument('-temp_step', type=int, default=1,
+                        help="temperature step for updating the temperature for the language model")
     parser.add_argument('-temp_factor', type=float, default=1., help="temperature factor for the language model")
     ## alpha logits fusion args.
     parser.add_argument('-temp_min', type=float, default=1., help="temperature min for the language model")
@@ -145,7 +146,7 @@ def get_parser():
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage"],
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage", "selfbleu"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
@@ -209,7 +210,8 @@ def get_output_path(args):
 
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
-        out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(args.temp_factor) + '_step{}'.format(args.temp_step)
+        out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
+            args.temp_factor) + '_step{}'.format(args.temp_step)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
