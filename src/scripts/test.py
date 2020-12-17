@@ -9,6 +9,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-models_path", type=str, required=True,
                         help="data folder containing models")
+    parser.add_argument("-num_diversity", type=int, default=None, help="repeating on test the same image/answer")
     return parser
 
 
@@ -42,6 +43,8 @@ def eval(args):
             defaults["K_epochs"] = defaults["k_epochs"]
             defaults["old_policy_path"] = defaults["policy_path"]
             defaults["policy_path"] = os.path.join(dir, "model.pth")
+            if args.num_diversity is not None:
+                defaults["num_diversity"] = args.num_diversity
 
             conf_parser = get_run_parser()
             conf_parser.set_defaults(**defaults)
