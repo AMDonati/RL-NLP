@@ -94,7 +94,7 @@ class PPO(Agent):
             advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
-            surr = -torch.min(surr2, surr2)
+            surr = -torch.min(surr1, surr2)
             entropy_loss = self.entropy_coeff * dist_entropy
 
             vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards)
