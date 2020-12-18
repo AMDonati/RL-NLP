@@ -175,7 +175,7 @@ class VQAEnv(GenericEnv):
                                      mask_answers=mask_answers, device=device)
 
         # Loading VQA Dataset.
-        num_images = int(self.debug[1]) if self.debug is not None else self.debug
+        num_images = [int(self.debug[0]),int(self.debug[1])] if self.debug is not None else self.debug
         if self.mode == "test_images":
             num_images = None
         lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")

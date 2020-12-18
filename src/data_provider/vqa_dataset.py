@@ -187,7 +187,7 @@ class VQADataset(Dataset):
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = df.image_id.sort_values().unique()
-            self.images_idx = images_idx[:num_images]
+            self.images_idx = images_idx[num_images[0]:num_images[1]]
             df = df.loc[df['image_id'] <= self.images_idx[-1]]
             df = df.groupby('image_id').head(self.num_questions)
             self.filtered_entries = df.to_dict(orient="records")
