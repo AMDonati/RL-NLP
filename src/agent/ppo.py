@@ -7,7 +7,8 @@ from agent.agent import Agent
 
 
 class PPO(Agent):
-    def __init__(self, policy, optimizer, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2, eps_clip=0.2,
+    def __init__(self, policy, optimizer, env, test_envs, pretrained_lm, writer, out_path, gamma=1., lr=1e-2,
+                 eps_clip=0.2,
                  grad_clip=None,
                  scheduler=None,
                  truncate_mode="top_k",
@@ -21,8 +22,10 @@ class PPO(Agent):
                  epsilon_truncated=0.,
                  train_seed=0,
                  epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1, temp_factor=1, temperature_min=1.):
-        Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, pretrained_lm=pretrained_lm, out_path=out_path,
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1,
+                 temp_factor=1, temperature_min=1.):
+        Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, pretrained_lm=pretrained_lm,
+                       out_path=out_path,
                        gamma=gamma, lr=lr,
                        grad_clip=grad_clip,
                        scheduler=scheduler,
@@ -91,7 +94,10 @@ class PPO(Agent):
                 ratios = ratios * is_ratios
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
+            advantages = rewards - state_values.detach().squeeze()
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
+            if self.pretrain:
+                advantages = 1.
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)
@@ -121,7 +127,7 @@ class PPO(Agent):
 
             self.writer_iteration += 1
 
-        #TODO: add scheduler step here
+        # TODO: add scheduler step here
         if self.scheduler is not None:
             self.scheduler.step()
 
