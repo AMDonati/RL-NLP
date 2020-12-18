@@ -4,10 +4,10 @@ echo "--------------------------------------------------------------------------
 echo "------------------------- VQAv2 -------------------------------------------------------------------------------------------------"
 echo "---------------------------------------------------------------------------------------------------------------------------------"
 
-DATA_PATH="data/vqa-v2_2/"
+DATA_PATH="data/vqa-v2/"
 FEATURES_PATH="data/vqa-v2/coco_trainval.lmdb/"
 LM_PATH="output/vqa_lm_model_smallvocab/model.pt"
-OUTPUT_PATH="output/RL/VQAv2/"
+OUTPUT_PATH="output/RL/VQAv2_2/"
 POLICY_PATH="output/VQAv2_SL_32_64/model.pt"
 K_EPOCHS=5
 MAX_LEN=5
