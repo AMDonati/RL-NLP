@@ -115,8 +115,9 @@ class PPO(Agent):
             grad_norm = compute_grad_norm(self.policy)
             if old_states_img.grad is not None:
                 img_grad = torch.norm(old_states_img.grad.data)
+                self.writer.add_scalar('img_grad', img_grad, self.writer_iteration + 1)
+
             self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
-            self.writer.add_scalar('img_grad', img_grad, self.writer_iteration + 1)
 
             self.writer_iteration += 1
 
