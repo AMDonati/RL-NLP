@@ -122,9 +122,6 @@ cd refer
 make
 cd ../../
 python -m pip install -e . 
-# if you have problems with tensorboardX 
-#python -m pip install tensorboardX --upgrade
-
 ```
 
 

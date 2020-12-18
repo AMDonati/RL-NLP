@@ -2,7 +2,7 @@ import random
 from collections import namedtuple
 
 import gym
-from pytorch_transformers import BertTokenizer
+from pytorch_transformers.tokenization_bert import BertTokenizer
 from transformers import GPT2Tokenizer
 
 from RL_toolbox.reward import rewards, Differential
