@@ -45,7 +45,7 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=os.path.join("data/vqa-v2", "cache", "vocab.json"),
             max_samples=None,
-            rl=True):
+            rl=True, num_questions=None):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
@@ -60,6 +60,7 @@ class VQADataset(Dataset):
         self._padding_index = question_tokenizer.special_tokens['<PAD>']
         self.max_samples = max_samples
         self.images_idx = list(map(int, image_features_reader._image_ids[:-1]))
+        self.num_questions = num_questions
         '''
         '''
         # Building vocab.
