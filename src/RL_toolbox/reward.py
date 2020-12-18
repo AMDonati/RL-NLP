@@ -7,8 +7,8 @@ import torch
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-# from vilbert.task_utils import compute_score_with_logits
-# from vilbert.vilbert import VILBertForVLTasks, BertConfig
+from vilbert.task_utils import compute_score_with_logits
+from vilbert.vilbert import VILBertForVLTasks, BertConfig
 from vr.utils import load_execution_engine, load_program_generator
 
 
