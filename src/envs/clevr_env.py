@@ -175,7 +175,7 @@ class VQAEnv(GenericEnv):
                                      mask_answers=mask_answers, device=device)
 
         # Loading VQA Dataset.
-        num_images = [int(self.debug[0]),int(self.debug[1])] if self.debug is not None else self.debug
+        num_images = [int(self.debug[0]), int(self.debug[1])] if self.debug is not None else self.debug
         if self.mode == "test_images":
             num_images = None
         lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -205,7 +205,6 @@ class VQAEnv(GenericEnv):
             modes = {"train": "train", "test_images": "val", "test_text": "train"}
         return modes
 
-
     def reset(self, seed=None):
         if seed is not None:
             np.random.seed(seed)
@@ -217,7 +216,7 @@ class VQAEnv(GenericEnv):
         self.ref_question_idx = self.entry["question_id"]
         self.ref_question = self.entry["q_token"][:self.max_len]
         self.ref_questions = self.ref_question.view(1, -1)
-        self.ref_question_decoded = self.entry["question"].split()[:self.max_len]
+        self.ref_question_decoded = self.dataset.question_tokenizer.decode(self.entry["q_token"][:self.max_len].numpy())
         self.ref_question_decoded = " ".join(self.ref_question_decoded)
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
@@ -260,7 +259,8 @@ if __name__ == '__main__':
     print("Testing seed for VQA env...")
     seed = 1
     env_vqa.reset(seed=seed)
-    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:", env_vqa.ref_answer)
+    print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
+          env_vqa.ref_answer)
     env_vqa.reset(seed=seed)
     print("seed {}".format(seed), "env_idx:{}".format(env_vqa.env_idx), env_vqa.ref_question_decoded, "answer:",
           env_vqa.ref_answer)
