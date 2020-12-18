@@ -149,7 +149,8 @@ def get_parser():
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions",
                                  "valid_actions", "dialog", "eps_truncation",
-                                 "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
+                                 "ttr_question", "sum_probs", "true_word_rank", "true_word_prob", "dialogimage"],
+                        help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage", "selfbleu"],
@@ -218,7 +219,6 @@ def get_output_path(args):
     out_folder = out_folder + '_{}_{}'.format(args.optimizer, args.lr)
     if args.opt_schedule is not None:
         out_folder = out_folder + '_{}{}'.format(args.opt_schedule, args.div_factor)
-
 
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
