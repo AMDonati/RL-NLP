@@ -110,7 +110,7 @@ def get_parser():
                         help="the language model path (used for truncating the action space if truncate_mode is not None).Else, used only at test time")
     parser.add_argument('-truncate_mode', type=str,
                         help="truncation mode")  # arg that says now if are truncating the action space or not.
-    parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
+    parser.add_argument('-num_truncated', type=int, default=20, help="number of words from lm")
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
