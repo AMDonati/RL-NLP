@@ -25,7 +25,7 @@ REWARD="lv_norm"
 FUSION="average"
 CONDITION_ANSWER="none"
 MIN_DATA=1
-DEBUG="0,"
+DEBUG="0,5"
 NUM_QUESTIONS=1
 
 if [ -n "$1" ]; then
