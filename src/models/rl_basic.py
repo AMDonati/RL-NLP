@@ -10,6 +10,37 @@ from torchcontrib import nn as contrib_nn
 from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 
 
+class BertImagePooler(nn.Module):
+    def __init__(self, start_size, end_size):
+        super(BertImagePooler, self).__init__()
+        self.dense = nn.Linear(start_size, end_size)
+        self.activation = nn.ReLU()
+
+    def forward(self, hidden_states):
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+
+class BertLayerNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-12):
+        """Construct a layernorm module in the TF style (epsilon inside the square root).
+        """
+        super(BertLayerNorm, self).__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, x):
+        u = x.mean(-1, keepdim=True)
+        s = (x - u).pow(2).mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
+        return self.weight * x + self.bias
+
+
 class PolicyLSTMBatch(nn.Module):
 
     def __init__(self, num_tokens, word_emb_size, hidden_size,
@@ -41,15 +72,26 @@ class PolicyLSTMBatch(nn.Module):
             self.film = contrib_nn.FiLM()
             self.fusion_dim = self.num_filters * h_out ** 2
         elif self.fusion == "pool":
-            projection_size=2
+            projection_size = 2
             self.avg_pooling = nn.AvgPool1d(kernel_size=8)
             self.projection = nn.Linear(256, projection_size)
-            self.merge = nn.Linear(101*projection_size, hidden_size)
+            self.merge = nn.Linear(101 * projection_size, hidden_size)
+            self.fusion_dim = 2 * hidden_size
+        elif self.fusion == "bert":
+            self.image_embeddings = nn.Linear(2048, 1024)
+            self.image_location_embeddings = nn.Linear(5, 1024)
+            self.LayerNorm = BertLayerNorm(1024, eps=1e-12)
             self.fusion_dim = 2 * hidden_size
         elif self.fusion == "average":
             self.projection = nn.Linear(2048, hidden_size)
             self.avg_pooling = nn.AvgPool1d(kernel_size=101)
             self.fusion_dim = 2 * hidden_size
+        elif self.fusion == "lstm":
+            self.image_embeddings = nn.Linear(2048, 256)
+            self.image_location_embeddings = nn.Linear(5, 256)
+            self.img_lstm = nn.LSTM(256, hidden_size, batch_first=True)
+            self.fusion_dim = 2 * hidden_size
+
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
 
@@ -62,10 +104,8 @@ class PolicyLSTMBatch(nn.Module):
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
         embed_text = self._get_embed_text(state_text, state_answer)
         state_answer = state_answer if state_answer is None else state_answer.to(self.device)
-        img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
-        img_feat_ = img_feat if self.fusion in ["average", "none", "pool"] else F.relu(
-            self.conv(img_feat))  # shape (1,3,7,7)
-        embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
+        # img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
+        embedding = self.process_fusion(embed_text, state_img, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
@@ -85,27 +125,47 @@ class PolicyLSTMBatch(nn.Module):
             print("policy dist truncated with nan")
         return policy_dist, policy_dist_truncated
 
-    def process_fusion(self, embed_text, img_feat_, img_feat, answer):
+    def process_fusion(self, embed_text, img, answer):
         if self.fusion == "none":
             embedding = embed_text
         elif self.fusion == "film":
+            img = img.to(self.device)
             gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
-            embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
+            embedding = self.film(img, gamma, beta).view(img.size(0), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_)  # (1,101,64)
+            (features, image_mask, spatials) = img
+            img_feat__ = self.projection(features)  # (1,101,64)
             img_feat__ = img_feat__.transpose(2, 1)
             img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+        elif self.fusion == "bert":
+            (features, image_mask, spatials) = img
+            img_embeddings = self.image_embeddings(features)
+            loc_embeddings = self.image_location_embeddings(spatials)
+
+            # TODO: we want to make the padding_idx == 0, however, with custom initilization, it seems it will have a bias.
+            # Let's do masking for now
+            embeddings = self.LayerNorm(img_embeddings + loc_embeddings)
+        elif self.fusion == "lstm":
+            (features, image_mask, spatials) = img
+            img_embeddings = self.image_embeddings(features)
+            loc_embeddings = self.image_location_embeddings(spatials)
+            output, (ht, ct) = self.img_lstm(img_embeddings + loc_embeddings)
+            img_embedding=ht.view(ht.size(0),-1)
+            embedding=torch.cat((img_embedding, embed_text), dim=-1)
+
         elif self.fusion == "pool":
-            img_feat__ = self.avg_pooling(img_feat_)
+            (features, image_mask, spatials) = img
+            img_feat__ = self.avg_pooling(features)
             img_projected = self.projection(img_feat__)
             img_merged = self.merge(img_projected.view(img_projected.size(0), -1))
             img_feat__ = img_merged.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
-            img_feat__ = img_feat_.view(img_feat.size(0), -1)
+            img_feat = F.relu(self.conv(img))
+            img_feat__ = img.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         if self.condition_answer == "after_fusion" and answer is not None:
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
