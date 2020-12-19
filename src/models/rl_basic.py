@@ -153,7 +153,7 @@ class PolicyLSTMBatch(nn.Module):
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
             output, (ht, ct) = self.img_lstm(img_embeddings + loc_embeddings)
-            img_embedding = ht.view(ht.size(0), -1)
+            img_embedding = ht.view(img.size(0), -1)
             embedding = torch.cat((img_embedding, embed_text), dim=-1)
 
         elif self.fusion == "pool":
