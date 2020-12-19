@@ -164,7 +164,7 @@ class PolicyLSTMBatch(nn.Module):
             features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
-            cat_embeddings=torch.cat([img_embeddings ,loc_embeddings], dim=2)
+            cat_embeddings=torch.cat([img_embeddings ,loc_embeddings], dim=-1)
             output, (ht, ct) = self.img_lstm(cat_embeddings)
             img_embedding = ht.view(img.size(0), -1)
             embedding = torch.cat((img_embedding, embed_text), dim=-1)
