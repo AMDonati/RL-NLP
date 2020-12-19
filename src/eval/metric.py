@@ -233,8 +233,11 @@ class DialogImageMetric(Metric):
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]]
-            measure=true_action in kwargs["valid_actions"]
-            self.measure.append(measure)
+            in_va=true_action in kwargs["valid_actions"]
+            _,indices=torch.sort(kwargs["log_probas_lm"], descending=True)
+            rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
+
+            self.measure.append([in_va,rank])
 
     def compute_(self, **kwargs):
         with torch.no_grad():
