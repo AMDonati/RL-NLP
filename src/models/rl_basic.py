@@ -62,7 +62,7 @@ class PolicyLSTMBatch(nn.Module):
         embed_text = self._get_embed_text(state_text, state_answer)
         state_answer = state_answer if state_answer is None else state_answer.to(self.device)
         img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
-        img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(
+        img_feat_ = img_feat if self.fusion in ["average", "none", "pool"] else F.relu(
             self.conv(img_feat))  # shape (1,3,7,7)
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
