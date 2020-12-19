@@ -223,12 +223,13 @@ class VQAEnv(GenericEnv):
         self.ref_answer = labels
         self.img_idx = self.entry["image_id"]
         self.img_feats = features
-        self.img = (features.unsqueeze(0), image_mask, spatials)
+        self.img = (features, image_mask, spatials)
+        state_img=torch.cat((features,spatials), dim=1).unsqueeze(dim=0)
 
         # initializing the state.
         state_question = [self.special_tokens.SOS_idx]
         self.state = self.State(torch.LongTensor(state_question).view(1, len(state_question)),
-                                self.img, self.ref_answer)
+                                state_img, self.ref_answer)
         self.step_idx = 0
         self.dialog = None
 

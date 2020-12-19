@@ -149,9 +149,7 @@ class PolicyLSTMBatch(nn.Module):
             # Let's do masking for now
             embeddings = self.LayerNorm(img_embeddings + loc_embeddings)
         elif self.fusion == "lstm":
-            (features, image_mask, spatials) = img
-            features = features.to(self.device)
-            spatials = spatials.to(self.device)
+            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
             output, (ht, ct) = self.img_lstm(img_embeddings + loc_embeddings)
