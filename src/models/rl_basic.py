@@ -92,7 +92,9 @@ class PolicyLSTMBatch(nn.Module):
             self.img_lstm = nn.LSTM(256, hidden_size, batch_first=True)
             self.fusion_dim = 2 * hidden_size
         elif self.fusion=="lstm1":
-            self.img_lstm = nn.LSTM(2048+5, hidden_size, batch_first=True)
+            self.image_embeddings = nn.Linear(2048, 128)
+            self.image_location_embeddings = nn.Linear(5, 128)
+            self.img_lstm = nn.LSTM(256, hidden_size, batch_first=True)
             self.fusion_dim = 2 * hidden_size
 
         else:
@@ -159,10 +161,11 @@ class PolicyLSTMBatch(nn.Module):
             img_embedding = ht.view(img.size(0), -1)
             embedding = torch.cat((img_embedding, embed_text), dim=-1)
         elif self.fusion == "lstm1":
-            #features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
-            #img_embeddings = self.image_embeddings(features)
-            #loc_embeddings = self.image_location_embeddings(spatials)
-            output, (ht, ct) = self.img_lstm(img)
+            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
+            img_embeddings = self.image_embeddings(features)
+            loc_embeddings = self.image_location_embeddings(spatials)
+            cat_embeddings=torch.cat([img_embeddings ,loc_embeddings], dim=2)
+            output, (ht, ct) = self.img_lstm(img_embeddings + loc_embeddings)
             img_embedding = ht.view(img.size(0), -1)
             embedding = torch.cat((img_embedding, embed_text), dim=-1)
         elif self.fusion == "pool":
