@@ -92,9 +92,9 @@ class PolicyLSTMBatch(nn.Module):
             self.img_lstm = nn.LSTM(256, hidden_size, batch_first=True)
             self.fusion_dim = 2 * hidden_size
         elif self.fusion=="lstm1":
-            self.image_embeddings = nn.Linear(2048, 128)
-            self.image_location_embeddings = nn.Linear(5, 128)
-            self.img_lstm = nn.LSTM(256, hidden_size, batch_first=True)
+            self.image_embeddings = nn.Linear(2048, 32)
+            self.image_location_embeddings = nn.Linear(5, 32)
+            self.img_lstm = nn.LSTM(64, hidden_size, batch_first=True)
             self.fusion_dim = 2 * hidden_size
 
         else:
