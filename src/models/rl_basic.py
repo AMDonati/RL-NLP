@@ -40,10 +40,10 @@ class PolicyLSTMBatch(nn.Module):
             self.film = contrib_nn.FiLM()
             self.fusion_dim = self.num_filters * h_out ** 2
         elif self.fusion == "average":
-            self.projection = nn.Linear(2048, 32)
+            self.projection = nn.Linear(2048, 64)
             self.merge = nn.Linear(32*101, hidden_size)
 
-            self.avg_pooling = nn.AvgPool1d(kernel_size=101)
+            self.avg_pooling = nn.AvgPool1d(kernel_size=32)
             self.fusion_dim = 2 * hidden_size
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
@@ -86,7 +86,9 @@ class PolicyLSTMBatch(nn.Module):
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_) #(1,101,64)
+
+            #img_feat__ = self.projection(img_feat_) #(1,101,64)
+            img_feat__=self.avg_pooling(img_feat_)
             img_merged=self.merge(img_feat__.view(img_feat__.size(0),-1))
             #img_feat__ = img_feat__.transpose(2,1)
             #img_feat__ = self.avg_pooling(img_feat__) #(1,64,1)
