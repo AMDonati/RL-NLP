@@ -139,14 +139,14 @@ class PolicyLSTMBatch(nn.Module):
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img, gamma, beta).view(img.size(0), -1)
         elif self.fusion == "average":
-            (features, image_mask, spatials) = img
+            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
             img_feat__ = self.projection(features)  # (1,101,64)
             img_feat__ = img_feat__.transpose(2, 1)
             img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         elif self.fusion == "bert":
-            (features, image_mask, spatials) = img
+            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
 
