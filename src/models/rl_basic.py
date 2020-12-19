@@ -90,11 +90,9 @@ class PolicyLSTMBatch(nn.Module):
             #img_feat__ = self.projection(img_feat_) #(1,101,64)
             img_feat__=self.avg_pooling(img_feat_)
             img_merged=self.projection(img_feat__)
-            img_merged=self.merge(img_feat__.view(img_feat__.size(0),-1))
-            img_feat__ = img_feat__.transpose(2,1)
+            img_merged=self.merge(img_merged.view(img_merged.size(0),-1))
 
 
-            #img_feat__ = self.avg_pooling(img_feat__) #(1,64,1)
             img_feat__ = img_merged.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
