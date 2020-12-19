@@ -40,8 +40,8 @@ class PolicyLSTMBatch(nn.Module):
             self.film = contrib_nn.FiLM()
             self.fusion_dim = self.num_filters * h_out ** 2
         elif self.fusion == "average":
-            self.projection = nn.Linear(128, 2)
-            self.merge = nn.Linear(2*101, hidden_size)
+            self.projection = nn.Linear(128, 1)
+            self.merge = nn.Linear(101, hidden_size)
 
             self.avg_pooling = nn.AvgPool1d(kernel_size=16)
             self.fusion_dim = 2 * hidden_size
