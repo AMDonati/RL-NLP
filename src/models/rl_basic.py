@@ -150,11 +150,13 @@ class PolicyLSTMBatch(nn.Module):
             embeddings = self.LayerNorm(img_embeddings + loc_embeddings)
         elif self.fusion == "lstm":
             (features, image_mask, spatials) = img
+            features = features.to(self.device)
+            spatials = spatials.to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
             output, (ht, ct) = self.img_lstm(img_embeddings + loc_embeddings)
-            img_embedding=ht.view(ht.size(0),-1)
-            embedding=torch.cat((img_embedding, embed_text), dim=-1)
+            img_embedding = ht.view(ht.size(0), -1)
+            embedding = torch.cat((img_embedding, embed_text), dim=-1)
 
         elif self.fusion == "pool":
             (features, image_mask, spatials) = img
