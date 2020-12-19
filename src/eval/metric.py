@@ -231,7 +231,10 @@ class DialogImageMetric(Metric):
         self.out_html_file = os.path.join(self.out_path, "metrics", self.name + ".html")
 
     def fill_(self, **kwargs):
-        pass
+        if kwargs["valid_actions"] is not None:
+            true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]]
+            measure=true_action in kwargs["valid_actions"]
+            self.measure.append(measure)
 
     def compute_(self, **kwargs):
         with torch.no_grad():
@@ -242,6 +245,8 @@ class DialogImageMetric(Metric):
             values["question"] = state_decoded
             values["reward"] = round(kwargs["reward"], 3)
             values["ref_questions"] = kwargs["ref_questions_decoded"]
+            values["in_valid_actions"] = self.measure
+
             if self.condition_answer != "none":
                 ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
                 values["ref_answer"] = ref_answer_decoded
