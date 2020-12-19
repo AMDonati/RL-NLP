@@ -229,11 +229,12 @@ class DialogImageMetric(Metric):
         image_id_file = os.path.join("data", "drive", image_id_file + ".csv")
         self.list_image_ids = pd.read_csv(image_id_file, index_col="id_image")
         self.out_html_file = os.path.join(self.out_path, "metrics", self.name + ".html")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]]
-            in_va=true_action in kwargs["valid_actions"]
+            in_va=true_action.cpu() in kwargs["valid_actions"].cpu()
             _,indices=torch.sort(kwargs["log_probas_lm"], descending=True)
             rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
 
