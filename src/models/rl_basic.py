@@ -54,6 +54,7 @@ class PolicyLSTMBatch(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
+        self.word_emb_size=word_emb_size
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
@@ -91,12 +92,20 @@ class PolicyLSTMBatch(nn.Module):
             self.image_location_embeddings = nn.Linear(5, 256)
             self.img_lstm = nn.LSTM(256, hidden_size, batch_first=True)
             self.fusion_dim = 2 * hidden_size
-        elif self.fusion=="lstm1":
+        elif self.fusion == "lstm1":
             self.image_embeddings = nn.Linear(2048, 32)
             self.image_location_embeddings = nn.Linear(5, 32)
             self.img_lstm = nn.LSTM(64, hidden_size, batch_first=True)
             self.fusion_dim = 2 * hidden_size
-
+        elif self.fusion == "lstm2":
+            self.image_embeddings = nn.Linear(2048, 32)
+            self.image_location_embeddings = nn.Linear(5, 32)
+            self.img_lstm = nn.LSTM(64, hidden_size, batch_first=True)
+            self.fusion_dim = 2 * hidden_size
+        elif self.fusion == "before_lstm":
+            self.image_embeddings = nn.Linear(2048, self.word_emb_size)
+            self.relu = nn.ReLU()
+            self.fusion_dim = hidden_size
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
 
@@ -107,7 +116,7 @@ class PolicyLSTMBatch(nn.Module):
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
-        embed_text = self._get_embed_text(state_text, state_answer)
+        embed_text = self._get_embed_text(state_text, state_img, state_answer)
         state_answer = state_answer if state_answer is None else state_answer.to(self.device)
         # img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
         embedding = self.process_fusion(embed_text, state_img, state_answer)
@@ -131,22 +140,21 @@ class PolicyLSTMBatch(nn.Module):
         return policy_dist, policy_dist_truncated
 
     def process_fusion(self, embed_text, img, answer):
-        if self.fusion == "none":
-            embedding = embed_text
-        elif self.fusion == "film":
+
+        if self.fusion == "film":
             img = img.to(self.device)
             gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img, gamma, beta).view(img.size(0), -1)
         elif self.fusion == "average":
-            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
+            features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             img_feat__ = self.projection(features)  # (1,101,64)
             img_feat__ = img_feat__.transpose(2, 1)
             img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         elif self.fusion == "bert":
-            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
+            features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
 
@@ -154,17 +162,17 @@ class PolicyLSTMBatch(nn.Module):
             # Let's do masking for now
             embeddings = self.LayerNorm(img_embeddings + loc_embeddings)
         elif self.fusion == "lstm":
-            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
+            features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
             output, (ht, ct) = self.img_lstm(img_embeddings + loc_embeddings)
             img_embedding = ht.view(img.size(0), -1)
             embedding = torch.cat((img_embedding, embed_text), dim=-1)
         elif self.fusion == "lstm1":
-            features,spatials=img[:,:,:2048].to(self.device),img[:,:,2048:].to(self.device)
+            features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
             loc_embeddings = self.image_location_embeddings(spatials)
-            cat_embeddings=torch.cat([img_embeddings ,loc_embeddings], dim=-1)
+            cat_embeddings = torch.cat([img_embeddings, loc_embeddings], dim=-1)
             output, (ht, ct) = self.img_lstm(cat_embeddings)
             img_embedding = ht.view(img.size(0), -1)
             embedding = torch.cat((img_embedding, embed_text), dim=-1)
@@ -176,16 +184,24 @@ class PolicyLSTMBatch(nn.Module):
             img_feat__ = img_merged.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
-            img_feat = F.relu(self.conv(img))
-            img_feat__ = img.view(img_feat.size(0), -1)
-            embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+            embedding = embed_text
+            #img_feat = F.relu(self.conv(img))
+            #img_feat__ = img.view(img_feat.size(0), -1)
+            #embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+
         if self.condition_answer == "after_fusion" and answer is not None:
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
 
-    def _get_embed_text(self, text, answer):
+    def _get_embed_text(self, text, img, answer):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
+        if self.fusion == "before_lstm":
+            features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
+            img_embeddings = self.image_embeddings(features[:, 0:1, :])
+            img_embeddings = self.relu(img_embeddings)
+            pad_embed = torch.cat((img_embeddings, pad_embed), dim=1)
+
         if self.condition_answer == "before_lstm" and answer is not None:
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
