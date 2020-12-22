@@ -6,39 +6,11 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
+import copy
 
 from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
-
-
-class BertImagePooler(nn.Module):
-    def __init__(self, start_size, end_size):
-        super(BertImagePooler, self).__init__()
-        self.dense = nn.Linear(start_size, end_size)
-        self.activation = nn.ReLU()
-
-    def forward(self, hidden_states):
-        # We "pool" the model by simply taking the hidden state corresponding
-        # to the first token.
-        first_token_tensor = hidden_states[:, 0]
-        pooled_output = self.dense(first_token_tensor)
-        pooled_output = self.activation(pooled_output)
-        return pooled_output
-
-
-class BertLayerNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-12):
-        """Construct a layernorm module in the TF style (epsilon inside the square root).
-        """
-        super(BertLayerNorm, self).__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.bias = nn.Parameter(torch.zeros(hidden_size))
-        self.variance_epsilon = eps
-
-    def forward(self, x):
-        u = x.mean(-1, keepdim=True)
-        s = (x - u).pow(2).mean(-1, keepdim=True)
-        x = (x - u) / torch.sqrt(s + self.variance_epsilon)
-        return self.weight * x + self.bias
+from models.vilbert_models import BertImageLayer, BertLayerNorm, BertConfig, BertImageEmbeddings, BertEncoder, \
+    BertImagePooler
 
 
 class PolicyLSTMBatch(nn.Module):
@@ -54,7 +26,7 @@ class PolicyLSTMBatch(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
-        self.word_emb_size=word_emb_size
+        self.word_emb_size = word_emb_size
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
@@ -79,10 +51,19 @@ class PolicyLSTMBatch(nn.Module):
             self.merge = nn.Linear(101 * projection_size, hidden_size)
             self.fusion_dim = 2 * hidden_size
         elif self.fusion == "bert":
-            self.image_embeddings = nn.Linear(2048, 1024)
-            self.image_location_embeddings = nn.Linear(5, 1024)
-            self.LayerNorm = BertLayerNorm(1024, eps=1e-12)
-            self.fusion_dim = 2 * hidden_size
+            config = BertConfig.from_json_file(
+                "output/vilbert_vqav2/bert_base_6layer_6conect.json")
+            self.v_embeddings = BertImageEmbeddings(config)
+            #self.encoder = BertEncoder(config)
+            v_layer = BertImageLayer(config)
+            self.v_layer = nn.ModuleList(
+                [copy.deepcopy(v_layer) for _ in range(config.v_num_hidden_layers)])
+            self.v_pooler = BertImagePooler(config)
+
+            #self.image_embeddings = nn.Linear(2048, 1024)
+            #self.image_location_embeddings = nn.Linear(5, 1024)
+            #self.LayerNorm = BertLayerNorm(1024, eps=1e-12)
+            self.fusion_dim = 1024+hidden_size
         elif self.fusion == "average":
             self.projection = nn.Linear(2048, hidden_size)
             self.avg_pooling = nn.AvgPool1d(kernel_size=101)
@@ -155,12 +136,19 @@ class PolicyLSTMBatch(nn.Module):
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         elif self.fusion == "bert":
             features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
-            img_embeddings = self.image_embeddings(features)
-            loc_embeddings = self.image_location_embeddings(spatials)
+            image_embedding = self.v_embeddings(features, spatials)
+            for idx in range(0, len(self.v_layer)):
+                image_embedding, image_attention_probs = self.v_layer[idx](
+                    image_embedding,
+                    None,
+                    None,
+                    None,
+                )
 
-            # TODO: we want to make the padding_idx == 0, however, with custom initilization, it seems it will have a bias.
-            # Let's do masking for now
-            embeddings = self.LayerNorm(img_embeddings + loc_embeddings)
+            pooled_output_v = self.v_pooler(image_embedding)
+            embedding = torch.cat((pooled_output_v, embed_text), dim=-1)
+
+
         elif self.fusion == "lstm":
             features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             img_embeddings = self.image_embeddings(features)
@@ -185,9 +173,9 @@ class PolicyLSTMBatch(nn.Module):
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
             embedding = embed_text
-            #img_feat = F.relu(self.conv(img))
-            #img_feat__ = img.view(img_feat.size(0), -1)
-            #embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+            # img_feat = F.relu(self.conv(img))
+            # img_feat__ = img.view(img_feat.size(0), -1)
+            # embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
 
         if self.condition_answer == "after_fusion" and answer is not None:
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
