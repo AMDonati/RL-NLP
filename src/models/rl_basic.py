@@ -53,6 +53,7 @@ class PolicyLSTMBatch(nn.Module):
         elif self.fusion == "bert":
             config = BertConfig.from_json_file(
                 "output/vilbert_vqav2/bert_base_6layer_6conect.json")
+            self.v_layer=1
             self.v_embeddings = BertImageEmbeddings(config)
             #self.encoder = BertEncoder(config)
             v_layer = BertImageLayer(config)
