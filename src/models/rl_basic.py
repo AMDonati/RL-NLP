@@ -53,7 +53,6 @@ class PolicyLSTMBatch(nn.Module):
         elif self.fusion == "bert":
             config = BertConfig.from_json_file(
                 "output/vilbert_vqav2/bert_base_6layer_6conect.json")
-            self.v_layer=1
             self.v_embeddings = BertImageEmbeddings(config)
             #self.encoder = BertEncoder(config)
             v_layer = BertImageLayer(config)
@@ -138,7 +137,7 @@ class PolicyLSTMBatch(nn.Module):
         elif self.fusion == "bert":
             features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             image_embedding = self.v_embeddings(features, spatials)
-            for idx in range(0, len(self.v_layer)):
+            for idx in range(0, 1):
                 image_embedding, image_attention_probs = self.v_layer[idx](
                     image_embedding,
                     None,
