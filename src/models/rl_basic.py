@@ -137,7 +137,7 @@ class PolicyLSTMBatch(nn.Module):
         elif self.fusion == "bert":
             features, spatials = img[:, :, :2048].to(self.device), img[:, :, 2048:].to(self.device)
             image_embedding = self.v_embeddings(features, spatials)
-            for idx in range(0, 1):
+            for idx in range(0, len(self.v_layer)):
                 image_embedding, image_attention_probs = self.v_layer[idx](
                     image_embedding,
                     None,
