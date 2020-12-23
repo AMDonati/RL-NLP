@@ -56,6 +56,7 @@ class PolicyLSTMBatch(nn.Module):
             self.v_embeddings = BertImageEmbeddings(config)
             #self.encoder = BertEncoder(config)
             v_layer = BertImageLayer(config)
+            config.v_num_hidden_layers=0
             self.v_layer = nn.ModuleList(
                 [copy.deepcopy(v_layer) for _ in range(config.v_num_hidden_layers)])
             self.v_pooler = BertImagePooler(config)
