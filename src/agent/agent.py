@@ -98,10 +98,7 @@ class Agent:
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
         if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min:
-            print("old temperature", self.temperature)
             self.temperature *= self.temp_factor
-            print("step", i_episode)
-            print("updated temperature", self.temperature)
 
         self.writer.add_scalar('temperature', self.temperature, i_episode)
 
