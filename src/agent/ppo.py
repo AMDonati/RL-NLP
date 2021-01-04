@@ -76,6 +76,7 @@ class PPO(Agent):
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values:
+            old_states_img.requires_grad = True
             logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_states_answer,
                                                                  old_actions)
 
@@ -113,10 +114,15 @@ class PPO(Agent):
             self.optimizer.step()
             # compute grad norm:
             grad_norm = compute_grad_norm(self.policy)
+            if old_states_img.grad is not None:
+                img_grad = torch.norm(old_states_img.grad.data)
+                self.writer.add_scalar('img_grad', img_grad, self.writer_iteration + 1)
+
             self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
+
             self.writer_iteration += 1
 
-        #TODO: add scheduler step here
+        # TODO: add scheduler step here
         if self.scheduler is not None:
             self.scheduler.step()
 

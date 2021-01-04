@@ -215,8 +215,8 @@ class VQAEnv(GenericEnv):
         self.ref_question_idx = self.entry["question_id"]
         self.ref_question = self.entry["q_token"][:self.max_len]
         self.ref_questions = self.ref_question.view(1, -1)
-        self.ref_question_decoded = self.entry["question"].split()[:self.max_len]
-        self.ref_question_decoded = " ".join(self.ref_question_decoded)
+        self.ref_question_decoded = self.dataset.question_tokenizer.decode(self.entry["q_token"][:self.max_len].numpy())
+        #self.ref_question_decoded = " ".join(self.ref_question_decoded)
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
         self.img_idx = self.entry["image_id"]
