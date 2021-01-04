@@ -92,7 +92,10 @@ class PPO(Agent):
                 ratios = ratios * is_ratios
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach().squeeze() if not self.pretrain else 1
+            advantages = rewards - state_values.detach().squeeze()
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
+            if self.pretrain:
+                advantages = 1.
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
             surr = -torch.min(surr1, surr2)
