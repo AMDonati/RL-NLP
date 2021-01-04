@@ -10,6 +10,8 @@ from torch.nn.utils.rnn import pad_sequence
 from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
+from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
+import torch.nn.functional as F
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -343,6 +345,31 @@ class PPLDialogfromLM(Metric):
             self.metric.append(ppl)
 
 
+class LanguageScore(Metric):
+    '''Compute the perplexity of a pretrained language model (GPT) on the generated dialog.'''
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
+        self.tokenizer = OpenAIGPTTokenizer.from_pretrained('openai-gpt')
+        self.lm_model = OpenAIGPTLMHeadModel.from_pretrained('openai-gpt')
+
+    def fill_(self, **kwargs):
+        if kwargs["state"].text.shape[-1] > 1:
+            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
+            inputs = self.tokenizer(state_decoded, return_tensors="pt")
+            _, logits = self.lm_model(**inputs, labels=inputs["input_ids"])
+            scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
+            action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
+            action_id = self.tokenizer(action_decoded)
+            log_prob = scores[:, -1, action_id["input_ids"][0]]
+            self.measure.append(log_prob.squeeze())
+
+    def compute_(self, **kwargs):
+        if len(self.measure) > 0:
+            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
+            self.metric.append(ppl)
+
+
 class Return(Metric):
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "return", "scalar", env_mode, trunc, sampling)
@@ -388,7 +415,7 @@ class SelfBleuMetric(Metric):
         else:
             self.function = rewards["bleu_sf2"]()
         self.questions = []
-        self.out_questions_csv_file = os.path.join(self.out_path, "metrics", self.name +  "_questions.csv")
+        self.out_questions_csv_file = os.path.join(self.out_path, "metrics", self.name + "_questions.csv")
 
     def fill_(self, **kwargs):
         if kwargs["done"]:
@@ -408,7 +435,6 @@ class SelfBleuMetric(Metric):
             score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
             scores.append(score)
         self.metric_history.extend(scores)
-
 
 
 class LvNormMetric(Metric):
@@ -726,5 +752,5 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuMetric}
+           "selfbleu": SelfBleuMetric, "language_score": LanguageScore}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr_question"]
