@@ -111,6 +111,23 @@ To extract the image features, run the script src/sh/extract_features.py or the 
 * `python src/preprocessing/preprocess_vqa_dataset.py -data_path "data/vqa-v2" -features_path "data/vqa-v2/coco_trainval.lmdb" -vocab_path "data/vqa-v2/cache/vocab_min.json" -split "val" -min_split 1 -test 0`
 > This will create a file "minval_minvocab_entries.pkl". 
 
+#### if you want to use vilbert: 
+
+```text 
+cd ..
+git clone https://github.com/gqkc/vilbert-multi-task.git
+cd vilbert-multi-task/tools/
+git clone -b python3 https://github.com/lichengunc/refer.git
+cd refer
+make
+cd ../../
+python -m pip install -e . 
+
+#if problem with python : 
+python -m pip install --upgrade cython 
+```
+
+
 ## Training the models 
 #### Link to the pre-trained models 
 #### CLEVR
