@@ -160,6 +160,7 @@ class Agent:
         return epoch, loss
 
     def test(self, num_episodes=10, test_mode='sampling', test_seed=0,num_diversity=1):
+        self.temperature = 1
         for env in self.test_envs:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
