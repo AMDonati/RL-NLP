@@ -179,7 +179,7 @@ class VQAEnv(GenericEnv):
             num_images = None
         lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
-        reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=True)
+        reward_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
         modes = self.get_modes(device=device, min_data=min_data)
 
