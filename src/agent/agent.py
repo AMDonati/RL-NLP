@@ -20,7 +20,7 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1, temperature_max=10):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -36,6 +36,7 @@ class Agent:
         self.temp_factor = temp_factor
         self.temperature_step = temperature_step
         self.temperature_min = temperature_min
+        self.temperature_max = temperature_max
         self.env = env
         self.pretrain = pretrain
         self.update_every = update_every
@@ -97,7 +98,7 @@ class Agent:
             self.epsilon_truncated = 1
             logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
-        if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min:
+        if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min and self.temperature < self.temperature_max:
             self.temperature *= self.temp_factor
 
         self.writer.add_scalar('temperature', self.temperature, i_episode)

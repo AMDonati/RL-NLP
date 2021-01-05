@@ -43,7 +43,9 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "top_p": args_.top_p,
                       "temperature": args_.temperature,
                       "temperature_step": args_.temp_step,
-                      "temp_factor": args_.temp_factor
+                      "temp_factor": args_.temp_factor,
+                      "temperature_min": args_.temp_min,
+                      "temperature_max": args_.temp_max
                       }
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
@@ -121,6 +123,7 @@ def get_parser():
     parser.add_argument('-temp_factor', type=float, default=1., help="temperature factor for the language model")
     ## alpha logits fusion args.
     parser.add_argument('-temp_min', type=float, default=1., help="temperature min for the language model")
+    parser.add_argument('-temp_max', type=float, default=10, help="temperature max for the language model")
     parser.add_argument('-alpha_logits', default=0., type=float,
                         help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-alpha_decay_rate', default=0., type=float,
@@ -150,9 +153,13 @@ def get_parser():
                         default=["return", "size_valid_actions",
                                  "valid_actions", "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
+    #parser.add_argument('-test_metrics', nargs='+', type=str,
+                        #default=["return", "dialog", "bleu", "ppl_dialog_lm",
+                                 #"ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage", "selfbleu"],
+                        #help="test metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "dialogimage", "selfbleu"],
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
@@ -223,7 +230,7 @@ def get_output_path(args):
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
-            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min)
+            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
