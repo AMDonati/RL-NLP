@@ -159,7 +159,7 @@ def get_parser():
                         #help="test metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu"],
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
