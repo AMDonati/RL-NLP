@@ -120,6 +120,8 @@ cd vilbert-multi-task/tools/
 git clone -b python3 https://github.com/lichengunc/refer.git
 cd refer
 make
+# if problem, do instead: 
+python setup.py install
 cd ../../
 python -m pip install -e . 
 
