@@ -7,6 +7,7 @@ import torch
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import torch.nn.functional as F
 
 try:
     from vilbert.task_utils import compute_score_with_logits
@@ -223,9 +224,7 @@ class VILBERT(Reward):
         config = BertConfig.from_json_file(vocab)
         self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
 
-    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
-        if not done:
-            return 0, "N/A", None
+    def get_preds(self, question):
         (features,
          spatials,
          image_mask,
@@ -243,7 +242,6 @@ class VILBERT(Reward):
         segment_ids, input_mask, encoded_question = torch.tensor(segment_ids), torch.tensor(input_mask), torch.tensor(
             encoded_question).view(-1)
         task_tokens = encoded_question.new().resize_(encoded_question.size(0), 1).fill_(int(self.task_id))
-        start_time = time.time()
         vil_prediction, vil_prediction_gqa, vil_logit, vil_binary_prediction, vil_tri_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, _ = self.model(
             encoded_question.unsqueeze(dim=0),
             features.unsqueeze(dim=0),
@@ -254,6 +252,14 @@ class VILBERT(Reward):
             co_attention_mask.unsqueeze(dim=0),
             task_tokens
         )
+
+        return vil_prediction, target
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
+        if not done:
+            return 0, "N/A", None
+        start_time = time.time()
+        vil_prediction, target = self.get_preds(question)
         print("--- %s seconds ---" % (time.time() - start_time))
         _, sorted_indices = torch.sort(vil_prediction, descending=True)
         reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0), device=self.device)
@@ -261,6 +267,46 @@ class VILBERT(Reward):
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
         print("reward {}".format(reward))
+        print("rank {}".format(rank))
+        print("number of target {}".format((target != 0).nonzero().numpy()))
+        return reward, "N/A", None
+
+
+class VILBERT_rank(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
+        if not done:
+            return 0, "N/A", None
+        start_time = time.time()
+        vil_prediction, target = self.get_preds(question)
+        print("--- %s seconds ---" % (time.time() - start_time))
+        _, sorted_indices = torch.sort(vil_prediction, descending=True)
+
+        ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
+        rank = ranks.min().item()
+        reward = -np.log(rank + 1)
+        print("rank {}".format(rank))
+        print("number of target {}".format((target != 0).nonzero().numpy()))
+        return reward, "N/A", None
+
+
+class VILBERT_proba(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
+        if not done:
+            return 0, "N/A", None
+        start_time = time.time()
+        vil_prediction, target = self.get_preds(question)
+        print("--- %s seconds ---" % (time.time() - start_time))
+        probs_pred = F.softmax(vil_prediction, dim=1)
+        sorted_preds, sorted_indices = torch.sort(probs_pred, descending=True)
+        ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
+        rank = ranks.min().item()
+        reward = sorted_preds[:, rank]
         print("rank {}".format(rank))
         print("number of target {}".format((target != 0).nonzero().numpy()))
         return reward, "N/A", None
@@ -363,7 +409,7 @@ rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": Levenshtein
            "bleu": Bleu_sf2,
            "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,
            "bleu_sf7": Bleu_sf7,
-           "vilbert": VILBERT}
+           "vilbert": VILBERT, "vilbert_rank": VILBERT_rank, "vilbert_proba": VILBERT_proba}
 
 if __name__ == '__main__':
     print("testing of BLEU score with sf7 smoothing function")
