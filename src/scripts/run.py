@@ -154,7 +154,7 @@ def get_parser():
                                  "valid_actions", "dialog", "eps_truncation",
                                  "ttr_question", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["return", "dialog", "bleu", "ppl_dialog_lm",
+                        default=["return", "dialog", "bleu", "language_score", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,

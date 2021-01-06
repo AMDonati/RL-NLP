@@ -16,9 +16,9 @@ class VQATokenizer:
         return question_decoded
 
     def encode(self, text):
-        lm_question_idx = self.lm_tokenizer.encode(text)
-        if lm_question_idx[-1] == 50256:
-            lm_question_idx = lm_question_idx[:-1]
+        lm_question_idx = self.lm_tokenizer.encode(text, add_prefix_space=True)
+        #if lm_question_idx[-1] == 50256:
+            #lm_question_idx = lm_question_idx[:-1]
         question_idx = [self.lm_to_dataset_trad[idx] for idx in lm_question_idx]
         return question_idx
 
