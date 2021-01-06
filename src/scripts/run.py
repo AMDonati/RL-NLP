@@ -221,6 +221,7 @@ def get_output_path(args):
     out_folder = out_folder + '_{}_{}'.format(args.optimizer, args.lr)
     if args.opt_schedule is not None:
         out_folder = out_folder + '_{}{}'.format(args.opt_schedule, args.div_factor)
+    out_folder = out_folder + '_ent{}'.format(args.entropy_coeff)
 
 
     # temp args
