@@ -112,7 +112,7 @@ class TopP(Truncation):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.top_p = kwargs["top_p"]
         self.filter_value = -float("Inf")
-        self.min_tokens_to_keep = 1
+        self.max_tokens_to_keep = kwargs["num_truncated"]
 
     def truncate(self, log_probas, logits):
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)
@@ -121,6 +121,8 @@ class TopP(Truncation):
         sorted_indices_to_remove = cumulative_probs > self.top_p
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = 0
+        #for top k
+        sorted_indices_to_remove[:, self.max_tokens_to_keep:] = True
         # scatter sorted tensors to original indexing
         indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
         _, valid_actions = torch.where(indices_to_remove == False)
