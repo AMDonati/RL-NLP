@@ -183,6 +183,8 @@ class Agent:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
                                      value, state.answer)
+                if self.env.reward_type == "vilbert" and done:
+                    self.writer.add_scalar("vilbert_rank", pred_answer, i_episode)
             timestep += 1
             for key, metric in metrics.items():
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
