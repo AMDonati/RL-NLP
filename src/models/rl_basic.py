@@ -12,7 +12,8 @@ from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 
 class PolicyLSTMBatch(nn.Module):
 
-    def __init__(self, num_tokens, word_emb_size, hidden_size, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
+    def __init__(self, num_tokens, word_emb_size, hidden_size,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
                  kernel_size=1, stride=5, fusion="cat", env=None,
                  condition_answer="none"):
         super(PolicyLSTMBatch, self).__init__()
@@ -22,6 +23,7 @@ class PolicyLSTMBatch(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
+        self.word_emb_size = word_emb_size
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
@@ -39,6 +41,16 @@ class PolicyLSTMBatch(nn.Module):
             self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)
             self.film = contrib_nn.FiLM()
             self.fusion_dim = self.num_filters * h_out ** 2
+        elif self.fusion == "pool":
+            projection_size = 2
+            self.avg_pooling = nn.AvgPool1d(kernel_size=8)
+            self.projection = nn.Linear(256, projection_size)
+            self.merge = nn.Linear(101 * projection_size, hidden_size)
+            self.fusion_dim = 2 * hidden_size
+        elif self.fusion == "before_lstm":
+            self.image_embeddings = nn.Linear(2048, self.word_emb_size)
+            self.relu = nn.ReLU()
+            self.fusion_dim = hidden_size
         elif self.fusion == "average":
             self.projection = nn.Linear(2048, hidden_size)
             self.avg_pooling = nn.AvgPool1d(kernel_size=101)
@@ -53,11 +65,8 @@ class PolicyLSTMBatch(nn.Module):
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
-        embed_text = self._get_embed_text(state_text, state_answer)
-        state_answer = state_answer if state_answer is None else state_answer.to(self.device)
-        img_feat = state_img.to(self.device) # shape (1, 1024, 14, 14) vs (1,101,2048)
-        img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(self.conv(img_feat)) # shape (1,3,7,7)
-        embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
+        # img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(self.conv(img_feat)) # shape (1,3,7,7)
+        embedding = self.process_fusion(state_text, state_img, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         value = self.value_head(embedding)
         # adding lm logits bonus
@@ -69,36 +78,52 @@ class PolicyLSTMBatch(nn.Module):
         probs = F.softmax(logits_exploration, dim=-1)
         policy_dist = Categorical(probs)
         if valid_actions is not None:
-            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, device=self.device, num_tokens=self.num_tokens)
+            policy_dist_truncated = self.truncate(valid_actions, logits_exploration, device=self.device,
+                                                  num_tokens=self.num_tokens)
         else:
             policy_dist_truncated = Categorical(F.softmax(logits_exploration, dim=-1))
         if torch.isnan(policy_dist_truncated.probs).any():
             print("policy dist truncated with nan")
         return policy_dist, policy_dist_truncated
 
-    def process_fusion(self, embed_text, img_feat_, img_feat, answer):
-        if self.fusion == "none":
-            embedding = embed_text
-        elif self.fusion == "film":
+    def process_fusion(self, state_text, img_feat, answer):
+        img_feat = img_feat.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
+        answer = answer if answer is None else answer.to(self.device)
+        embed_text = self._get_embed_text(state_text, answer, img_feat)
+        embedding = embed_text
+        if self.fusion == "film":
+            img_feat_ = F.relu(self.conv(img_feat))
             gammabeta = self.gammabeta(embed_text).view(-1, 2, self.num_filters)
             gamma, beta = gammabeta[:, 0, :], gammabeta[:, 1, :]
             embedding = self.film(img_feat_, gamma, beta).view(img_feat.size(0), -1)
         elif self.fusion == "average":
-            img_feat__ = self.projection(img_feat_) #(1,101,64)
-            img_feat__ = img_feat__.transpose(2,1)
-            img_feat__ = self.avg_pooling(img_feat__) #(1,64,1)
+            img_feat__ = self.projection(img_feat)  # (1,101,64)
+            img_feat__ = img_feat__.transpose(2, 1)
+            img_feat__ = self.avg_pooling(img_feat__)  # (1,64,1)
             img_feat__ = img_feat__.squeeze(dim=-1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
-        else:
+        elif self.fusion == "pool":
+            img_feat__ = self.avg_pooling(img_feat)
+            img_projected = self.projection(img_feat__)
+            img_merged = self.merge(img_projected.view(img_projected.size(0), -1))
+            img_feat__ = img_merged.squeeze(dim=-1)
+            embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+        elif self.fusion not in ["before_lstm"]:
+            img_feat_ = F.relu(self.conv(img_feat))
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         if self.condition_answer == "after_fusion" and answer is not None:
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
 
-    def _get_embed_text(self, text, answer):
+    def _get_embed_text(self, text, answer, img):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
+        if self.fusion == "before_lstm":
+            img_embeddings = self.image_embeddings(img[:, 0:1, :])
+            img_embeddings = self.relu(img_embeddings)
+            pad_embed = torch.cat((img_embeddings, pad_embed), dim=1)
+
         if self.condition_answer == "before_lstm" and answer is not None:
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
@@ -108,7 +133,8 @@ class PolicyLSTMBatch(nn.Module):
 
 
 class PolicyLSTMBatch_SL(nn.Module):
-    def __init__(self, num_tokens, word_emb_size, hidden_size, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
+    def __init__(self, num_tokens, word_emb_size, hidden_size,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
                  kernel_size=1, stride=5, fusion="cat", condition_answer="none", num_tokens_answer=32):
         super(PolicyLSTMBatch_SL, self).__init__()
 
@@ -164,10 +190,10 @@ class PolicyLSTMBatch_SL(nn.Module):
             embedding = self.film(img_feat__, gamma.view(-1, gamma.size(2)), beta.view(-1, beta.size(2)))
             embedding = embedding.view(embed_text.size(0), embed_text.size(1), -1)
         elif self.fusion == "average":
-            img_feat__ = img_feat_.transpose(2, 1) # (B, 2048, 101)
-            img_feat__ = self.avg_pooling(img_feat__).squeeze(-1) # (B,2048)
+            img_feat__ = img_feat_.transpose(2, 1)  # (B, 2048, 101)
+            img_feat__ = self.avg_pooling(img_feat__).squeeze(-1)  # (B,2048)
             img_feat__ = self.projection(img_feat__)  # (B,hidden_size)
-            img_feat__ = img_feat__.unsqueeze(1).repeat(1,seq_len,1)
+            img_feat__ = img_feat__.unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
@@ -184,7 +210,8 @@ class PolicyLSTMBatch_SL(nn.Module):
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(self.conv(img_feat))
-        embedding = self.process_fusion(embed_text=embed_text, img_feat_=img_feat_, img_feat=img_feat, answer=state_answer, seq_len=seq_len)
+        embedding = self.process_fusion(embed_text=embed_text, img_feat_=img_feat_, img_feat=img_feat,
+                                        answer=state_answer, seq_len=seq_len)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
         logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
         value = None
