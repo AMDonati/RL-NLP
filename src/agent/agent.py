@@ -13,6 +13,7 @@ from agent.memory import Memory
 from eval.metric import metrics
 from utils.utils_train import write_to_csv
 
+logger = logging.getLogger()
 
 class Agent:
     def __init__(self, policy, optimizer, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
@@ -91,12 +92,12 @@ class Agent:
         if self.alpha_decay_rate > 0 and self.alpha_logits_lm > alpha_min:
             if i_episode % update_every == 0:
                 self.alpha_logits_lm *= (1 - self.alpha_decay_rate)
-                logging.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
+                logger.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                      self.alpha_logits_lm))
 
         if i_episode == int(self.epsilon_truncated_rate * num_episodes_train) + 1:
             self.epsilon_truncated = 1
-            logging.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
+            logger.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
         if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min and self.temperature < self.temperature_max:
             self.temperature *= self.temp_factor
@@ -162,7 +163,7 @@ class Agent:
     def test(self, num_episodes=10, test_mode='sampling', test_seed=0,num_diversity=1):
         self.temperature = 1
         for env in self.test_envs:
-            logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
+            logger.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
                           num_diversity=num_diversity)
 
@@ -202,7 +203,7 @@ class Agent:
             if train:
                 if self.update_mode == "step" and timestep % self.update_every == 0:
                     loss = self.update()
-                    logging.info("UPDATING POLICY WEIGHTS...")
+                    logger.info("UPDATING POLICY WEIGHTS...")
                     self.memory.clear_memory()
                     timestep = 0
                 else:
@@ -212,7 +213,7 @@ class Agent:
                 if train:
                     if self.update_mode == "episode" and i_episode % self.update_every == 0:
                         loss = self.update()
-                        logging.info("UPDATING POLICY WEIGHTS...")
+                        logger.info("UPDATING POLICY WEIGHTS...")
                         self.memory.clear_memory()
                 else:
                     loss = None
@@ -230,7 +231,7 @@ class Agent:
         timestep = 1
         self.policy.eval()
         for i_episode in range(num_episodes):
-            logging.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
+            logger.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = i_episode if test_seed else np.random.randint(1000000)
             for key_trunc, trunc in self.eval_trunc.items():
                 metrics = self.get_metrics(env.mode, key_trunc, test_mode)
@@ -250,15 +251,15 @@ class Agent:
                 metric.post_treatment()
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
-        logging.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
-        logging.info('Last reward: {:.2f}'.format(ep_reward))
-        logging.info('LAST DIALOG: {}'.format(
+        logger.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
+        logger.info('Last reward: {:.2f}'.format(ep_reward))
+        logger.info('LAST DIALOG: {}'.format(
             self.env.dataset.question_tokenizer.decode(state.text[:, 1:].numpy()[0])))
-        logging.info('Closest Question: {}'.format(closest_question))
+        logger.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.metrics["train"].items():
             metric.log(valid_actions=valid_actions)
             metric.write()
-        logging.info("-" * 60)
+        logger.info("-" * 60)
 
     def learn(self, num_episodes=100):
         sampling_mode = "forced" if self.pretrain else "sampling"
@@ -277,7 +278,7 @@ class Agent:
 
             if i_episode % 1000 == 0:
                 elapsed = time.time() - current_time
-                logging.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
+                logger.info("Training time for 1000 episodes: {:5.2f}".format(elapsed))
                 current_time = time.time()
                 # saving checkpoint:
                 self.save_ckpt(EPOCH=i_episode, loss=loss)
@@ -290,8 +291,8 @@ class Agent:
 
         for _, metric in self.metrics["train"].items():
             metric.post_treatment()
-        logging.info("total training time: {:7.2f}".format(time.time() - start_time))
-        logging.info(
+        logger.info("total training time: {:7.2f}".format(time.time() - start_time))
+        logger.info(
             "--------------------------------------------END OF TRAINING ----------------------------------------------------")
 
     def compute_write_all_metrics(self, output_path, logger):

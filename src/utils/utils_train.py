@@ -1,6 +1,7 @@
 import argparse
 import csv
 import logging
+import logging.config
 import os
 from csv import writer
 
@@ -29,20 +30,10 @@ def write_to_csv(output_dir, dic):
 def create_logger(out_file_log, level="INFO"):
     levels = {"INFO": logging.INFO, "DEBUG": logging.DEBUG, "ERROR": logging.ERROR}
     level = levels[level]
-    logging.basicConfig(filename=out_file_log, level=level, filemode='w')
+    logging.config.fileConfig('config/log/logging.conf',
+                              defaults={'logfilename': out_file_log})
     # create logger
-    logger = logging.getLogger('training log')
-    logger.setLevel(level)
-    # create console handler and set level
-    ch = logging.StreamHandler()
-    ch.setLevel(level)
-    # create formatter
-    formatter = logging.Formatter("%(asctime)s;%(levelname)s;%(message)s",
-                                  "%Y-%m-%d %H:%M:%S")
-    # add formatter to ch
-    ch.setFormatter(formatter)
-    # add ch to logger
-    logger.addHandler(ch)
+    logger = logging.getLogger()
     return logger
 
 

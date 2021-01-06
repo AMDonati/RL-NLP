@@ -15,6 +15,7 @@ import torch.nn.functional as F
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
+logger = logging.getLogger()
 
 class Metric:
     def __init__(self, agent, train_test, key, type, env_mode, trunc, sampling):
@@ -134,9 +135,9 @@ class VAMetric(Metric):
 
     def log(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            logging.info('---------------------Valid action space------------------------------')
-            logging.info('\n'.join(self.metric))
-            logging.info('---------------------------------------------------------------------')
+            logger.info('---------------------Valid action space------------------------------')
+            logger.info('\n'.join(self.metric))
+            logger.info('---------------------------------------------------------------------')
 
     def write(self):
         pass
@@ -647,9 +648,9 @@ class PolicyMetric(Metric):
         pass
 
     def log(self, **kwargs):
-        logging.info('---------------------Policy Top Words------------------------------')
-        logging.info('\n'.join(self.metric))
-        logging.info('--------------------------------------------------------------------')
+        logger.info('---------------------Policy Top Words------------------------------')
+        logger.info('\n'.join(self.metric))
+        logger.info('--------------------------------------------------------------------')
 
 
 class LMVAMetric(Metric):
@@ -717,7 +718,7 @@ class ActionProbs(Metric):
         self.metric.append(np.mean(self.ep_probs))
 
     def log(self, **kwargs):
-        logging.info('episode action probs: {}'.format(self.ep_probs))
+        logger.info('episode action probs: {}'.format(self.ep_probs))
 
 
 class ActionProbsTruncated(Metric):
@@ -733,7 +734,7 @@ class ActionProbsTruncated(Metric):
         self.metric.append(np.mean(self.ep_probs_truncated))
 
     def log(self, **kwargs):
-        logging.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
+        logger.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
 
 
 class LMActionProbs(Metric):
@@ -752,7 +753,7 @@ class LMActionProbs(Metric):
         self.metric.append(np.mean(self.ep_lm_probs))
 
     def log(self, **kwargs):
-        logging.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
+        logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
