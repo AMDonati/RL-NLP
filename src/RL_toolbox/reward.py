@@ -256,7 +256,7 @@ class VILBERT(Reward):
         )
         print("--- %s seconds ---" % (time.time() - start_time))
         _, sorted_indices = torch.sort(vil_prediction, descending=True)
-        reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0))
+        reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0), device=self.device)
         reward = reward.sum().item()
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
