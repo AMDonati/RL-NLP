@@ -82,6 +82,7 @@ class TopK(Truncation):
     def truncate(self, log_probas, logits):
         top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
         top_k_weights = top_k_weights.exp()
+        #top_k_indices, top_k_weights = self.trim_zero_probabilities(top_k_weights, top_k_indices)
         return top_k_indices, top_k_weights
 
 
