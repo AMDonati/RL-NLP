@@ -6,6 +6,8 @@ from torch.distributions import Categorical
 
 from RL_toolbox.RL_functions import masked_softmax
 
+logger = logging.getLogger()
+
 
 def mask_truncature(valid_actions, logits, device, num_tokens=86):
     mask = torch.zeros(logits.size(0), num_tokens).to(device)
@@ -17,7 +19,7 @@ def mask_truncature(valid_actions, logits, device, num_tokens=86):
         assert torch.all(
             torch.abs(sum_probs_va - torch.ones(sum_probs_va.size()).to(device)) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
     except AssertionError:
-        logging.error("ERROR IN TRUNCATION FUNCTION")
+        logger.error("ERROR IN TRUNCATION FUNCTION")
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
 
@@ -151,6 +153,7 @@ class TopP(Truncation):
             valid_actions_ = valid_actions
             action_probs_ = action_probs
         return valid_actions_, action_probs_
+
 
     def truncate(self, log_probas, logits):
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)

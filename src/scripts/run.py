@@ -45,8 +45,9 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "temperature_step": args_.temp_step,
                       "temp_factor": args_.temp_factor,
                       "temperature_min": args_.temp_min,
-                      "temperature_max": args_.temp_max
-                      }
+                      "temperature_max": args_.temp_max,
+                      "s_min": args_.s_min,
+                      "s_max": args_.s_max}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,

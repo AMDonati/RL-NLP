@@ -31,6 +31,7 @@ class REINFORCE(Agent):
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
                        top_p=top_p, temperature=temperature, temperature_step=temperature_step, temp_factor=temp_factor,
                        temperature_min=temperature_min, temperature_max=temperature_max, s_min=s_min, s_max=s_max)
+
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
         self.update_mode = "episode"
