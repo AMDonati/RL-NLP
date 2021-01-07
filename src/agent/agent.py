@@ -15,13 +15,15 @@ from utils.utils_train import write_to_csv
 
 logger = logging.getLogger()
 
+
 class Agent:
     def __init__(self, policy, optimizer, env, writer, pretrained_lm, out_path, gamma=1., lr=1e-2, grad_clip=None,
                  scheduler=None,
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1, temperature_max=10):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
+                 temperature_step=1, temperature_min=1, temperature_max=10, min_tokens_to_keep=1):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -47,16 +49,19 @@ class Agent:
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
+        self.min_tokens_to_keep = min_tokens_to_keep
 
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
                                                          p_th=p_th_, pretrained_lm=pretrained_lm,
-                                                         top_p=top_p)  # adding the truncation class.
+                                                         top_p=top_p,
+                                                         min_tokens_to_keep=self.min_tokens_to_keep)  # adding the truncation class.
         else:
             self.eval_trunc = {"no_trunc": False}
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p,
-                                                      pretrained_lm=pretrained_lm)
+                                                      pretrained_lm=pretrained_lm,
+                                                      min_tokens_to_keep=self.min_tokens_to_keep)
 
         self.writer = writer
         self.out_path = out_path
@@ -93,13 +98,14 @@ class Agent:
             if i_episode % update_every == 0:
                 self.alpha_logits_lm *= (1 - self.alpha_decay_rate)
                 logger.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
-                                                                                                     self.alpha_logits_lm))
+                                                                                                    self.alpha_logits_lm))
 
         if i_episode == int(self.epsilon_truncated_rate * num_episodes_train) + 1:
             self.epsilon_truncated = 1
             logger.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
-        if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min and self.temperature < self.temperature_max:
+        if (
+                i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min and self.temperature < self.temperature_max:
             self.temperature *= self.temp_factor
 
         self.writer.add_scalar('temperature', self.temperature, i_episode)
@@ -160,7 +166,7 @@ class Agent:
         loss = checkpoint['loss']
         return epoch, loss
 
-    def test(self, num_episodes=10, test_mode='sampling', test_seed=0,num_diversity=1):
+    def test(self, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=1):
         self.temperature = 1
         for env in self.test_envs:
             logger.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))

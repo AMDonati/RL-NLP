@@ -14,7 +14,7 @@ class REINFORCE(Agent):
                  eval_no_trunc=0, alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0,
                  epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1., temperature_step=1,
-                 temp_factor=1., temperature_min=1., temperature_max=10):
+                 temp_factor=1., temperature_min=1., temperature_max=10, min_tokens_to_keep=1):
         Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, out_path=out_path, gamma=gamma,
                        lr=lr,
                        grad_clip=grad_clip,
@@ -30,7 +30,8 @@ class REINFORCE(Agent):
                        train_seed=train_seed, epsilon_truncated_rate=epsilon_truncated_rate,
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
                        top_p=top_p, temperature=temperature, temperature_step=temperature_step, temp_factor=temp_factor,
-                       temperature_min=temperature_min, temperature_max=temperature_max)
+                       temperature_min=temperature_min, temperature_max=temperature_max,
+                       min_tokens_to_keep=min_tokens_to_keep)
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
         self.update_mode = "episode"

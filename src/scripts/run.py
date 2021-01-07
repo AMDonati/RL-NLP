@@ -27,6 +27,7 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "grad_clip": args_.grad_clip, "writer": writer,
                       "truncate_mode": args_.truncate_mode,
                       "num_truncated": args_.num_truncated,
+                      "min_tokens_to_keep": args_.min_tokens_to_keep,
                       "p_th": args_.p_th,
                       "out_path": output_path,
                       "log_interval": args_.log_interval, "env": env,
@@ -113,6 +114,7 @@ def get_parser():
     parser.add_argument('-truncate_mode', type=str,
                         help="truncation mode")  # arg that says now if are truncating the action space or not.
     parser.add_argument('-num_truncated', type=int, default=10, help="number of words from lm")
+    parser.add_argument('-min_tokens_to_keep', type=int, default=1, help="minimum number of words to keep")
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
