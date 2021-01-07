@@ -73,16 +73,19 @@ class TopK(Truncation):
         self.num_truncated = kwargs["num_truncated"]
 
     def trim_zero_probabilities(self, top_k_weights, top_k_indices):
-        non_zero_probs = top_k_weights[:, torch.nonzero(top_k_weights, as_tuple=True)]
+        non_zero_probs = top_k_weights[torch.nonzero(top_k_weights, as_tuple=True)]
+        non_zero_probs = non_zero_probs.unsqueeze(dim=0)
         trimmed_top_k_indices = top_k_indices[:, :non_zero_probs.shape[-1]]
         assert trimmed_top_k_indices.shape[-1] == non_zero_probs.shape[-1], "error when trimming top_k_valid action space"
+        if trimmed_top_k_indices.shape[-1] < top_k_indices.shape[-1]:
+            print("trimming valid action space to remove zero proba words...")
         return trimmed_top_k_indices, non_zero_probs
 
 
     def truncate(self, log_probas, logits):
         top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
         top_k_weights = top_k_weights.exp()
-        #top_k_indices, top_k_weights = self.trim_zero_probabilities(top_k_weights, top_k_indices)
+        top_k_indices, top_k_weights = self.trim_zero_probabilities(top_k_weights, top_k_indices)
         return top_k_indices, top_k_weights
 
 
