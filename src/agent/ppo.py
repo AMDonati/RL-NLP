@@ -23,7 +23,7 @@ class PPO(Agent):
                  train_seed=0,
                  epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1,
-                 temp_factor=1, temperature_min=1.):
+                 temp_factor=1, temperature_min=1., min_tokens_to_keep=1):
         Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, pretrained_lm=pretrained_lm,
                        out_path=out_path,
                        gamma=gamma, lr=lr,
@@ -41,7 +41,7 @@ class PPO(Agent):
                        epsilon_truncated_rate=epsilon_truncated_rate,
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
                        top_p=top_p, temperature=temperature, temperature_step=temperature_step, temp_factor=temp_factor,
-                       temperature_min=temperature_min)
+                       temperature_min=temperature_min,min_tokens_to_keep=min_tokens_to_keep)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs

@@ -20,7 +20,8 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
+                 temperature_step=1, temperature_min=1, min_tokens_to_keep=1):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -44,17 +45,20 @@ class Agent:
         self.epsilon_truncated = epsilon_truncated
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
+        self.min_tokens_to_keep = min_tokens_to_keep
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
 
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
                                                          p_th=p_th_, pretrained_lm=pretrained_lm,
-                                                         top_p=top_p)  # adding the truncation class.
+                                                         top_p=top_p,
+                                                         min_tokens_to_keep=self.min_tokens_to_keep)  # adding the truncation class.
         else:
             self.eval_trunc = {"no_trunc": False}
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p,
-                                                      pretrained_lm=pretrained_lm)
+                                                      pretrained_lm=pretrained_lm,
+                                                      min_tokens_to_keep=self.min_tokens_to_keep)
 
         self.writer = writer
         self.out_path = out_path
@@ -161,7 +165,7 @@ class Agent:
         loss = checkpoint['loss']
         return epoch, loss
 
-    def test(self, num_episodes=10, test_mode='sampling', test_seed=0,num_diversity=1):
+    def test(self, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=1):
         for env in self.test_envs:
             logging.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
