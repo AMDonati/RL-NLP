@@ -167,6 +167,7 @@ class TopP(Truncation):
         _, valid_actions = torch.where(indices_to_remove == False)
         action_probs = F.softmax(logits[:, valid_actions], dim=-1)
         valid_actions = valid_actions.unsqueeze(dim=0)
+        valid_actions, action_probs = self.bound_size_valid_actions(log_probas, logits, valid_actions, action_probs)
         return valid_actions, action_probs
 
 
