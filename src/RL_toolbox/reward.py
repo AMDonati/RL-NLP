@@ -269,7 +269,7 @@ class VILBERT(Reward):
         print("reward {}".format(reward))
         print("rank {}".format(rank))
         print("number of target {}".format((target != 0).nonzero().numpy()))
-        return reward, "N/A", None
+        return reward, "N/A", rank
 
 
 class VILBERT_rank(VILBERT):

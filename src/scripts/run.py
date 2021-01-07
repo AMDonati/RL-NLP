@@ -45,8 +45,9 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "temperature_step": args_.temp_step,
                       "temp_factor": args_.temp_factor,
                       "temperature_min": args_.temp_min,
-                      "temperature_max": args_.temp_max
-                      }
+                      "temperature_max": args_.temp_max,
+                      "s_min": args_.s_min,
+                      "s_max": args_.s_max}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -116,6 +117,8 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
+    parser.add_argument('-s_min', default=10, type=int, help="minimal size of the valid action space of the truncation function.")
+    parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
     parser.add_argument('-temp_step', type=int, default=1,
@@ -152,7 +155,7 @@ def get_parser():
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions",
                                  "valid_actions", "dialog", "eps_truncation",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob"], help="train metrics")
+                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],

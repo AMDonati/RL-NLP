@@ -20,7 +20,7 @@ from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
-logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
+logger = logging.getLogger()  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 def assert_match_split_vocab_path_args(split, vocab_path, vocab_path_min):

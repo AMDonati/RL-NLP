@@ -6,6 +6,8 @@ from torch.distributions import Categorical
 
 from RL_toolbox.RL_functions import masked_softmax
 
+logger = logging.getLogger()
+
 
 def mask_truncature(valid_actions, logits, device, num_tokens=86):
     mask = torch.zeros(logits.size(0), num_tokens).to(device)
@@ -17,7 +19,7 @@ def mask_truncature(valid_actions, logits, device, num_tokens=86):
         assert torch.all(
             torch.abs(sum_probs_va - torch.ones(sum_probs_va.size()).to(device)) < 1e-6), "ERROR IN TRUNCATION FUNCTION"
     except AssertionError:
-        logging.error("ERROR IN TRUNCATION FUNCTION")
+        logger.error("ERROR IN TRUNCATION FUNCTION")
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
 
@@ -70,9 +72,21 @@ class TopK(Truncation):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.num_truncated = kwargs["num_truncated"]
 
+    def trim_zero_probabilities(self, top_k_weights, top_k_indices):
+        non_zero_probs = top_k_weights[torch.nonzero(top_k_weights, as_tuple=True)]
+        non_zero_probs = non_zero_probs.unsqueeze(dim=0)
+        trimmed_top_k_indices = top_k_indices[:, :non_zero_probs.shape[-1]]
+        assert trimmed_top_k_indices.shape[-1] == non_zero_probs.shape[-1], "error when trimming top_k_valid action space"
+        if trimmed_top_k_indices.shape[-1] < top_k_indices.shape[-1]:
+            print("trimming valid action space to remove zero proba words...")
+        return trimmed_top_k_indices, non_zero_probs
+
+
     def truncate(self, log_probas, logits):
         top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
-        return top_k_indices, top_k_weights.exp()
+        top_k_weights = top_k_weights.exp()
+        top_k_indices, top_k_weights = self.trim_zero_probabilities(top_k_weights, top_k_indices)
+        return top_k_indices, top_k_weights
 
 
 class ProbaThreshold(Truncation):
@@ -81,6 +95,10 @@ class ProbaThreshold(Truncation):
     def __init__(self, agent, **kwargs):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.p_th = kwargs["p_th"]
+        self.top_k_min = TopK(agent, pretrained_lm=kwargs["pretrained_lm"], num_truncated=kwargs["s_min"])
+        self.top_k_max = TopK(agent, pretrained_lm=kwargs["pretrained_lm"], num_truncated=kwargs["s_max"])
+        self.s_min = kwargs["s_min"]
+        self.s_max = kwargs["s_max"]
 
     def truncate(self, log_probas, logits):
         probas = F.softmax(log_probas, dim=-1)
@@ -88,7 +106,19 @@ class ProbaThreshold(Truncation):
         valid_actions = torch.nonzero(probas_mask, as_tuple=False)[:, 1]  # slice trick to get only the indices.
         action_probs = probas[:, valid_actions]
         assert torch.all(action_probs >= self.p_th), "ERROR in proba threshold truncation function"
-        return valid_actions.unsqueeze(0), action_probs
+        valid_actions = valid_actions.unsqueeze(0)
+        valid_actions, action_probs = self.bound_size_valid_actions(log_probas, logits, valid_actions, action_probs)
+        return valid_actions, action_probs
+
+    def bound_size_valid_actions(self, log_probas, logits, valid_actions, action_probs):
+        if valid_actions.shape[-1] < self.s_min:
+            valid_actions_, action_probs_ = self.top_k_min.truncate(log_probas, logits)
+        elif valid_actions.shape[-1] > self.s_max:
+            valid_actions_, action_probs_ = self.top_k_max.truncate(log_probas, logits)
+        else:
+            valid_actions_ = valid_actions
+            action_probs_ = action_probs
+        return valid_actions_, action_probs_
 
 
 class SampleVA(Truncation):
@@ -112,7 +142,22 @@ class TopP(Truncation):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
         self.top_p = kwargs["top_p"]
         self.filter_value = -float("Inf")
-        self.max_tokens_to_keep = kwargs["num_truncated"]
+        self.min_tokens_to_keep = 1
+        self.top_k_min = TopK(agent, pretrained_lm=kwargs["pretrained_lm"], num_truncated=kwargs["s_min"])
+        self.top_k_max = TopK(agent, pretrained_lm=kwargs["pretrained_lm"], num_truncated=kwargs["s_max"])
+        self.s_min = kwargs["s_min"]
+        self.s_max = kwargs["s_max"]
+
+    def bound_size_valid_actions(self, log_probas, logits, valid_actions, action_probs):
+        if valid_actions.shape[-1] < self.s_min:
+            valid_actions_, action_probs_ = self.top_k_min.truncate(log_probas, logits)
+        elif valid_actions.shape[-1] > self.s_max:
+            valid_actions_, action_probs_ = self.top_k_max.truncate(log_probas, logits)
+        else:
+            valid_actions_ = valid_actions
+            action_probs_ = action_probs
+        return valid_actions_, action_probs_
+
 
     def truncate(self, log_probas, logits):
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)
@@ -121,13 +166,12 @@ class TopP(Truncation):
         sorted_indices_to_remove = cumulative_probs > self.top_p
         sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
         sorted_indices_to_remove[..., 0] = 0
-        #for top k
-        sorted_indices_to_remove[:, self.max_tokens_to_keep:] = True
         # scatter sorted tensors to original indexing
         indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
         _, valid_actions = torch.where(indices_to_remove == False)
         action_probs = F.softmax(logits[:, valid_actions], dim=-1)
         valid_actions = valid_actions.unsqueeze(dim=0)
+        valid_actions, action_probs = self.bound_size_valid_actions(log_probas, logits, valid_actions, action_probs)
         return valid_actions, action_probs
 
 
