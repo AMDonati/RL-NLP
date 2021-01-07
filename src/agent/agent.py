@@ -20,7 +20,7 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1, temperature_max=10):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -51,7 +51,7 @@ class Agent:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
                                                          p_th=p_th_, pretrained_lm=pretrained_lm,
-                                                         top_p=top_p)  # adding the truncation class.
+                                                         top_p=top_p, s_min=s_min, s_max=s_max)  # adding the truncation class.
         else:
             self.eval_trunc = {"no_trunc": False}
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p,
