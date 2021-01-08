@@ -384,7 +384,10 @@ def run(args):
     if args.policy_path is not None:
         pretrained = torch.load(args.policy_path, map_location=device)
         if pretrained.__class__ != OrderedDict:
-            pretrained = pretrained.state_dict()
+            if pretrained.__class__ == dict:
+                pretrained = pretrained["model_state_dict"]
+            else:
+                pretrained = pretrained.state_dict()
         policy.load_state_dict(pretrained, strict=False)
         policy.device = device
     optimizer, scheduler = get_optimizer(policy, args)
