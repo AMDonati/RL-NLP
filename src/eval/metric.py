@@ -17,6 +17,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
 
+
 class Metric:
     def __init__(self, agent, train_test, key, type, env_mode, trunc, sampling):
         self.measure = []
@@ -237,11 +238,11 @@ class DialogImageMetric(Metric):
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]]
-            in_va=true_action.cpu() in kwargs["valid_actions"].cpu()
-            _,indices=torch.sort(kwargs["log_probas_lm"], descending=True)
+            in_va = true_action.cpu() in kwargs["valid_actions"].cpu()
+            _, indices = torch.sort(kwargs["log_probas_lm"], descending=True)
             rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
 
-            self.measure.append([in_va,rank])
+            self.measure.append([in_va, rank])
 
     def compute_(self, **kwargs):
         with torch.no_grad():
@@ -669,7 +670,8 @@ class ValidActionsMetric(Metric):
                     self.measure.append(1)
 
     def compute_(self, **kwargs):
-        self.metric.append(np.sum(self.measure)/len(self.measure))
+        self.metric.append(np.sum(self.measure) / len(self.measure))
+
 
 class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
@@ -683,7 +685,7 @@ class LMVAMetric(Metric):
             ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
             if len(ref_question) > self.idx_word:
                 if ref_question[self.idx_word] not in kwargs["valid_actions"]:
-                        self.counter += 1
+                    self.counter += 1
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
@@ -774,10 +776,11 @@ class LMActionProbs(Metric):
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
-           "lm_valid_actions": LMVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated, "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric}
-metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr", "action_probs_truncated", "valid_actions_episode"]
+           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
+           "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric}
+metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
+                          "action_probs_truncated", "valid_actions_episode"]
