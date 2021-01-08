@@ -230,7 +230,7 @@ def get_output_path(args):
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
-            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max)
+            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max) + '_smax{}'.format(args.s_max)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
