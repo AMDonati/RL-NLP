@@ -653,6 +653,23 @@ class PolicyMetric(Metric):
         logger.info('--------------------------------------------------------------------')
 
 
+class ValidActionsMetric(Metric):
+    """Look at the mismatch ref question / valid action space per episode."""
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "valid_actions_episode", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
+        if len(ref_question) > self.idx_word:
+            if ref_question[self.idx_word] not in kwargs["valid_actions"]:
+                self.measure.append(0)
+            else:
+                self.measure.append(1)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.sum(self.measure)/len(self.measure))
+
 class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
 
@@ -661,12 +678,10 @@ class LMVAMetric(Metric):
         self.counter = 0
 
     def fill_(self, **kwargs):
-        if kwargs["valid_actions"] is not None:
-            closest_question = self.dataset.question_tokenizer.encode(kwargs["closest_question"].split())
-            if len(closest_question) > self.idx_word:
-                if closest_question[self.idx_word] not in kwargs["valid_actions"]:
+        ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
+        if len(ref_question) > self.idx_word:
+            if ref_question[self.idx_word] not in kwargs["valid_actions"]:
                     self.counter += 1
-                    # logging.info("+VA")
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
@@ -762,5 +777,5 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated, "lm_valid_actions": LMVAMetric}
-metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr", "action_probs_truncated"]
+           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated, "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric}
+metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr", "action_probs_truncated", "valid_actions_episode"]
