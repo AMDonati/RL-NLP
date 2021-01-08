@@ -95,7 +95,7 @@ class PPO(Agent):
 
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach().squeeze()
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
+            #advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
             if self.pretrain:
                 advantages = 1.
             surr1 = ratios * advantages
