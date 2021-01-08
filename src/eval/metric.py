@@ -662,9 +662,9 @@ class ValidActionsMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
+            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0].cpu()
             if len(ref_question) > self.idx_word:
-                if ref_question[self.idx_word] not in kwargs["valid_actions"]:
+                if ref_question[self.idx_word] not in kwargs["valid_actions"].cpu():
                     self.measure.append(0)
                 else:
                     self.measure.append(1)
@@ -682,9 +682,9 @@ class LMVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
+            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0].cpu()
             if len(ref_question) > self.idx_word:
-                if ref_question[self.idx_word] not in kwargs["valid_actions"]:
+                if ref_question[self.idx_word] not in kwargs["valid_actions"].cpu():
                     self.counter += 1
 
     def compute_(self, **kwargs):
