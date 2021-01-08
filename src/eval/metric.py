@@ -660,12 +660,13 @@ class ValidActionsMetric(Metric):
         Metric.__init__(self, agent, train_test, "valid_actions_episode", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
-        ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
-        if len(ref_question) > self.idx_word:
-            if ref_question[self.idx_word] not in kwargs["valid_actions"]:
-                self.measure.append(0)
-            else:
-                self.measure.append(1)
+        if kwargs["valid_actions"] is not None:
+            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
+            if len(ref_question) > self.idx_word:
+                if ref_question[self.idx_word] not in kwargs["valid_actions"]:
+                    self.measure.append(0)
+                else:
+                    self.measure.append(1)
 
     def compute_(self, **kwargs):
         self.metric.append(np.sum(self.measure)/len(self.measure))
@@ -678,10 +679,11 @@ class LMVAMetric(Metric):
         self.counter = 0
 
     def fill_(self, **kwargs):
-        ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
-        if len(ref_question) > self.idx_word:
-            if ref_question[self.idx_word] not in kwargs["valid_actions"]:
-                    self.counter += 1
+        if kwargs["valid_actions"] is not None:
+            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
+            if len(ref_question) > self.idx_word:
+                if ref_question[self.idx_word] not in kwargs["valid_actions"]:
+                        self.counter += 1
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
