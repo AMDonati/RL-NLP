@@ -17,6 +17,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
 
+
 class Metric:
     def __init__(self, agent, train_test, key, type, env_mode, trunc, sampling):
         self.measure = []
@@ -237,11 +238,11 @@ class DialogImageMetric(Metric):
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
             true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]]
-            in_va=true_action.cpu() in kwargs["valid_actions"].cpu()
-            _,indices=torch.sort(kwargs["log_probas_lm"], descending=True)
+            in_va = true_action.cpu() in kwargs["valid_actions"].cpu()
+            _, indices = torch.sort(kwargs["log_probas_lm"], descending=True)
             rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
 
-            self.measure.append([in_va,rank])
+            self.measure.append([in_va, rank])
 
     def compute_(self, **kwargs):
         with torch.no_grad():
@@ -756,11 +757,40 @@ class LMActionProbs(Metric):
         logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
+class VilbertMetric(Metric):
+    '''Compute the vilbert score over the ref answer and the generated dialog.'''
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "vilbert", "scalar", env_mode, trunc, sampling)
+        if agent.env.reward_type == "vilbert":
+            self.function = agent.env.reward_func
+        else:
+            self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
+                                               vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
+                                               env=agent.env)
+
+    def fill_(self, **kwargs):
+        if kwargs["done"]:
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
+                                                                      ignored=["<SOS>"],
+                                                                      stop_at_end=True)
+            ref_questions = kwargs["ref_questions_decoded"]
+            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
+                                            step_idx=None,
+                                            done=True)
+            self.measure.append(score)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "lm_valid_actions": LMVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated, "lm_valid_actions": LMVAMetric}
-metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr", "action_probs_truncated"]
+           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
+           "lm_valid_actions": LMVAMetric, "vilbert": VilbertMetric}
+metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
+                          "action_probs_truncated"]

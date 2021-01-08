@@ -117,7 +117,8 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
-    parser.add_argument('-s_min', default=10, type=int, help="minimal size of the valid action space of the truncation function.")
+    parser.add_argument('-s_min', default=10, type=int,
+                        help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
@@ -155,7 +156,8 @@ def get_parser():
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions",
                                  "valid_actions", "dialog", "eps_truncation",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"], help="train metrics")
+                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"],
+                        help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
@@ -226,11 +228,11 @@ def get_output_path(args):
         out_folder = out_folder + '_{}{}'.format(args.opt_schedule, args.div_factor)
     out_folder = out_folder + '_ent{}'.format(args.entropy_coeff)
 
-
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
-            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max) + '_smax{}'.format(args.s_max)
+            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(
+            args.temp_max) + '_smax{}'.format(args.s_max)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
