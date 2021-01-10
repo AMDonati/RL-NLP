@@ -168,7 +168,7 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-device_id', type=int, default=0, help="device id when running on a multi-GPU VM.")
-    parser.add_argument('-num_diversity', type=int, default=1,
+    parser.add_argument('-num_diversity', type=int, default=10,
                         help="number of sampling for the same image/answer for test")
 
     return parser
@@ -209,6 +209,9 @@ def get_output_path(args):
         algo = "{}{}".format(args.truncate_mode, args.top_p)
 
     out_folder = '{}_{}_{}'.format(args.env, args.reward, args.agent)
+    if args.diff_reward:
+        out_folder = out_folder + '_diffrew'
+
     if args.policy_path is not None:
         out_folder = out_folder + '_' + "pretrain"
     out_folder = out_folder + '_' + algo
@@ -225,7 +228,8 @@ def get_output_path(args):
     if args.opt_schedule is not None:
         out_folder = out_folder + '_{}{}'.format(args.opt_schedule, args.div_factor)
     out_folder = out_folder + '_ent{}'.format(args.entropy_coeff)
-
+    out_folder = out_folder + '_epsclip{}'.format(args.eps_clip)
+    out_folder = out_folder + '_graclip{}'.format(args.grad_clip)
 
     # temp args
     if args.temperature != 1 and args.temp_factor != 1:
