@@ -238,7 +238,7 @@ class VILBERT(Reward):
          real_segment_ids,
          co_attention_mask,
          question_id) = self.dataset.get_data_for_ViLBERT(self.env.env_idx)
-        logger.info(real_question)
+        #logger.info(real_question)
         if question is None:
             question = self.dataset.reward_tokenizer.decode(real_question[real_question != 0].numpy())
         logger.info(question)
@@ -270,7 +270,6 @@ class VILBERT(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
-        #try:
         vil_prediction, target = self.get_preds(question)
         if self.reduced_answers:
             mask = torch.ones_like(vil_prediction) * float("-Inf")
@@ -282,11 +281,7 @@ class VILBERT(Reward):
         rank = ranks.min().item()
         reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank)
         return reward, "N/A", rank
-        #except TypeError as e:
-            #logger.error("problem with vilbert reward")
-            #logger.error("{}".format(e))
 
-            #return -100, "N/A", 1000
 
 
 class VILBERT_proba(VILBERT):

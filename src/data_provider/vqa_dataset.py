@@ -23,9 +23,11 @@ from data_provider._image_features_reader import ImageFeaturesH5Reader
 logger = logging.getLogger()  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
+
 def assert_match_split_vocab_path_args(split, vocab_path, vocab_path_min):
     if vocab_path == vocab_path_min:
-        assert split == "minval" or split=="mintrain", "You can't used a reduced vocab on train and val split. used minval and mintrain split instead."
+        assert split == "minval" or split == "mintrain", "You can't used a reduced vocab on train and val split. used minval and mintrain split instead."
+
 
 class VQADataset(Dataset):
     def __init__(
@@ -72,7 +74,7 @@ class VQADataset(Dataset):
             "cache",
             "vocab_min.json")
         if vocab_path == "none":
-            if split =="trainval" and os.path.isfile(vocab_path_):
+            if split == "trainval" and os.path.isfile(vocab_path_):
                 print('WARNING: a vocab.json file already exists and will be replaced')
             elif split == "mintrainval" and os.path.isfile(vocab_path_min):
                 print('WARNING: a vocab_min.json file already exists and will be replaced')
@@ -122,8 +124,8 @@ class VQADataset(Dataset):
                 if rl:
                     if self.split == 'train' or self.split == 'mintrain':
                         self.split_entries()
-            self.reduced_answers=[entry["answer"]["labels"] for entry in self.filtered_entries]
-            self.reduced_answers=torch.stack(self.reduced_answers)
+        self.reduced_answers = [entry["answer"]["labels"] for entry in self.filtered_entries]
+        self.reduced_answers = torch.stack(self.reduced_answers)
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
@@ -428,13 +430,13 @@ if __name__ == '__main__':
         print("len vocab answers", vqa_dataset.len_vocab_answer)
 
         # test of translate functions:
-        #print("Test of reward tokenizer...")
-        #print('Is there a pizza?')
-        #lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
-        #input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
-        #reward_idx = vqa_dataset.translate_for_reward(input_idx)
-        #question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
-       #print('question decoded', question_decoded)
+        # print("Test of reward tokenizer...")
+        # print('Is there a pizza?')
+        # lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
+        # input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
+        # reward_idx = vqa_dataset.translate_for_reward(input_idx)
+        # question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
+        # print('question decoded', question_decoded)
 
         print("Test of lm_to_dataset_function ...")
         idx = np.random.randint(vqa_dataset.len_vocab)
