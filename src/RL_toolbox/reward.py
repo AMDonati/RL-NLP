@@ -224,7 +224,7 @@ class VILBERT(Reward):
         config = BertConfig.from_json_file(vocab)
         self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
 
-    def get_preds(self, question):
+    def get_preds(self, question=None):
         (features,
          spatials,
          image_mask,
@@ -234,10 +234,11 @@ class VILBERT(Reward):
          real_segment_ids,
          co_attention_mask,
          question_id) = self.dataset.get_data_for_ViLBERT(self.env.env_idx)
+        if question is None:
+            question = self.dataset.reward_tokenizer.decode(real_question[real_question != 0].numpy())
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
-        # encoded_question = F.pad(input=encoded_question, pad=(0, question.size(0) - encoded_question.size(0)),
-        #                        mode='constant', value=0)
+
         segment_ids, input_mask, encoded_question = self.dataset.get_masks_for_tokens(encoded_question)
         segment_ids, input_mask, encoded_question = torch.tensor(segment_ids), torch.tensor(input_mask), torch.tensor(
             encoded_question).view(-1)
@@ -255,61 +256,72 @@ class VILBERT(Reward):
 
         return vil_prediction, target
 
-    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
-        if not done:
-            return 0, "N/A", None
-        start_time = time.time()
-        vil_prediction, target = self.get_preds(question)
-        print("--- %s seconds ---" % (time.time() - start_time))
-        _, sorted_indices = torch.sort(vil_prediction, descending=True)
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
         reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0), device=self.device)
         reward = reward.sum().item()
-        ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
-        rank = ranks.min().item()
-        print("reward {}".format(reward))
-        print("rank {}".format(rank))
-        print("number of target {}".format((target != 0).nonzero().numpy()))
-        return reward, "N/A", rank
-
-
-class VILBERT_rank(VILBERT):
-    def __init__(self, path=None, vocab=None, dataset=None, env=None):
-        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+        return reward
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
-        start_time = time.time()
         vil_prediction, target = self.get_preds(question)
-        print("--- %s seconds ---" % (time.time() - start_time))
-        _, sorted_indices = torch.sort(vil_prediction, descending=True)
-
+        sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
-        reward = -np.log(rank + 1)
-        print("rank {}".format(rank))
-        print("number of target {}".format((target != 0).nonzero().numpy()))
-        return reward, "N/A", None
+        reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank)
+        return reward, "N/A", rank
 
 
 class VILBERT_proba(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
 
-    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
-        if not done:
-            return 0, "N/A", None
-        start_time = time.time()
-        vil_prediction, target = self.get_preds(question)
-        print("--- %s seconds ---" % (time.time() - start_time))
-        probs_pred = F.softmax(vil_prediction, dim=1)
-        sorted_preds, sorted_indices = torch.sort(probs_pred, descending=True)
-        ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
-        rank = ranks.min().item()
-        reward = sorted_preds[:, rank]
-        print("rank {}".format(rank))
-        print("number of target {}".format((target != 0).nonzero().numpy()))
-        return reward, "N/A", None
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+        sorted_probs = F.softmax(sorted_logits, dim=1)
+        reward = sorted_probs[:, rank]
+        return reward
+
+
+class VILBERT_rank(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+        reward = -np.log(rank + 1)
+        return reward
+
+
+class VILBERT_rank_DCG1(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+        sorted_probs = F.softmax(sorted_logits, dim=1)
+        rank_prob = sorted_probs[:, rank]
+        reward = rank_prob / np.log2(2 + rank)
+        return reward
+
+
+class VILBERT_rank_DCG2(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+        # getting the  vil prediction fo the true question
+        true_vil_prediction, target = self.get_preds()
+        true_probs = F.softmax(true_vil_prediction, dim=1)
+        importances = true_probs * 100
+        true_sorted_importances, true_sorted_indices = torch.sort(importances, descending=True)
+        range_ = torch.arange(0, true_sorted_indices.size(1))
+        ref_dcg = true_sorted_importances / torch.log2(2. + range_)
+        ref_dcg = ref_dcg.sum()
+
+        _, sorted_indices = torch.sort(vil_prediction, descending=True)
+        importances_ = torch.gather(importances, 1, sorted_indices)
+        dcg = importances_ / torch.log2(2. + range_)
+        dcg = dcg.sum()
+        ndcg = dcg / ref_dcg
+        return dcg.item()
 
 
 # ---------------------------------------------other Bleu variants------------------------------------------------------
@@ -409,7 +421,8 @@ rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": Levenshtein
            "bleu": Bleu_sf2,
            "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,
            "bleu_sf7": Bleu_sf7,
-           "vilbert": VILBERT, "vilbert_rank": VILBERT_rank, "vilbert_proba": VILBERT_proba}
+           "vilbert": VILBERT, "vilbert_rank": VILBERT_rank, "vilbert_proba": VILBERT_proba,
+           "vilbert_dcg": VILBERT_rank_DCG2}
 
 if __name__ == '__main__':
     print("testing of BLEU score with sf7 smoothing function")
