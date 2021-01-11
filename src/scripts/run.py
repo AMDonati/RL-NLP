@@ -168,7 +168,7 @@ def get_parser():
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
     parser.add_argument('-pretrain', type=int, default=0, help="the agent use pretraining on the dataset")
     parser.add_argument('-device_id', type=int, default=0, help="device id when running on a multi-GPU VM.")
-    parser.add_argument('-num_diversity', type=int, default=10,
+    parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
 
     return parser
