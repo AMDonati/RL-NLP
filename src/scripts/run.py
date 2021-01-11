@@ -172,7 +172,7 @@ def get_parser():
     parser.add_argument('-device_id', type=int, default=0, help="device id when running on a multi-GPU VM.")
     parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
-
+    parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
     return parser
 
 
@@ -315,18 +315,20 @@ def get_rl_env(args, device):
     if args.env == "clevr":
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
-                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
+                       reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
+                       reduced_answers=args.reduced_answers)
         test_modes = args.test_modes
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,
-                              reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device)
+                              reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
+                              reduced_answers=args.reduced_answers)
                      for mode in test_modes]
     elif args.env == "vqa":
         env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
                      reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
                      reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                     min_data=args.min_data)
+                     min_data=args.min_data, reduced_answers=args.reduced_answers)
         if device.type == "cpu":
             test_envs = [env]
         else:
@@ -337,7 +339,7 @@ def get_rl_env(args, device):
                                         debug=args.debug,
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                                        min_data=args.min_data))
+                                        min_data=args.min_data, reduced_answers=args.reduced_answers))
             if "test_text" in args.test_modes:
                 test_text_env = env
                 test_text_env.mode = "test_text"

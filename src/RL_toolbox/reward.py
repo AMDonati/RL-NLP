@@ -223,6 +223,7 @@ class VILBERT(Reward):
         self.env = env
         config = BertConfig.from_json_file(vocab)
         self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
+        self.reduced_answers = self.env.reduced_answers
 
     def get_preds(self, question=None):
         (features,
@@ -265,6 +266,10 @@ class VILBERT(Reward):
         if not done:
             return 0, "N/A", None
         vil_prediction, target = self.get_preds(question)
+        if self.reduced_answers:
+            mask = torch.ones_like(vil_prediction) * float("-Inf")
+            mask[:, self.dataset.reduced_answers.squeeze()] = vil_prediction[:, self.dataset.reduced_answers.squeeze()]
+            vil_prediction = mask
         sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
