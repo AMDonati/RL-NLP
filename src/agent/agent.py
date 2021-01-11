@@ -196,7 +196,7 @@ class Agent:
                             log_probs_truncated=log_probs_truncated, test_mode=test_mode, pred_answer=pred_answer,
                             i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm,
                             log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm,
-                            alpha=self.alpha_logits_lm)
+                            alpha=self.alpha_logits_lm, ref_answer=env.ref_answer)
             state = new_state
             ep_reward += reward
 
