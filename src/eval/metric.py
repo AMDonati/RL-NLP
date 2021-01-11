@@ -368,12 +368,22 @@ class LanguageScore(Metric):
         if kwargs["state"].text.shape[-1] > 1:
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
             inputs = self.tokenizer(state_decoded, return_tensors="pt")
-            _, logits = self.lm_model(**inputs, labels=inputs["input_ids"])
-            scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
-            action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
-            action_id = self.tokenizer(action_decoded)
-            log_prob = scores[:, -1, action_id["input_ids"][0]]
-            self.measure.append(log_prob.squeeze())
+            if inputs["input_ids"].shape[-1] >= 1:
+                _, logits = self.lm_model(**inputs, labels=inputs["input_ids"])
+                scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
+                action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
+                action_id = self.tokenizer(action_decoded)
+                if len(action_id["input_ids"]) == 1:
+                    log_prob = scores[:, -1, action_id["input_ids"][0]]
+                    self.measure.append(log_prob.squeeze())
+                elif len(action_id["input_ids"]) == 2:
+                    log_prob_1 = scores[:, -1, action_id["input_ids"][0]]
+                    self.measure.append(log_prob_1.squeeze())
+                    inputs_2 = torch.cat([inputs["input_ids"], torch.tensor(action_id["input_ids"][0]).view(1,1)], dim=-1)
+                    outputs = self.lm_model(input_ids=inputs_2)
+                    scores_2 = F.log_softmax(outputs[0], dim=-1)  # (B, S, vocab size)
+                    log_prob_2 = scores_2[:, -1, action_id["input_ids"][1]]
+                    self.measure.append(log_prob_2.squeeze())
 
     def compute_(self, **kwargs):
         if len(self.measure) > 0:
