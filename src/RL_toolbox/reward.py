@@ -291,20 +291,21 @@ class VILBERT_rank(VILBERT):
         return reward
 
 
-class VILBERT_rank_DCG1(VILBERT):
+class VILBERT_rank_DCG2(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
 
     def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
-        sorted_probs = F.softmax(sorted_logits, dim=1)
-        rank_prob = sorted_probs[:, rank]
-        reward = rank_prob / np.log2(2 + rank)
+        # sorted_probs = F.softmax(sorted_logits, dim=1)
+        # rank_prob = sorted_probs[:, rank]
+        reward = 1 / np.log2(2 + rank)
         return reward
 
 
-class VILBERT_rank_DCG2(VILBERT):
+class VILBERT_rank_DCG(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+        self.normalize = False
 
     def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
         # getting the  vil prediction fo the true question
@@ -320,8 +321,15 @@ class VILBERT_rank_DCG2(VILBERT):
         importances_ = torch.gather(importances, 1, sorted_indices)
         dcg = importances_ / torch.log2(2. + range_)
         dcg = dcg.sum()
-        ndcg = dcg / ref_dcg
+        if self.normalize:
+            dcg = dcg / ref_dcg
         return dcg.item()
+
+
+class VILBERT_rank_NDCG(VILBERT_rank_DCG):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+        self.normalize = True
 
 
 # ---------------------------------------------other Bleu variants------------------------------------------------------
@@ -422,7 +430,7 @@ rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": Levenshtein
            "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,
            "bleu_sf7": Bleu_sf7,
            "vilbert": VILBERT, "vilbert_rank": VILBERT_rank, "vilbert_proba": VILBERT_proba,
-           "vilbert_dcg": VILBERT_rank_DCG2}
+           "vilbert_dcg": VILBERT_rank_DCG, "vilbert_dcg2": VILBERT_rank_DCG2, "vilbert_ndcg": VILBERT_rank_NDCG}
 
 if __name__ == '__main__':
     print("testing of BLEU score with sf7 smoothing function")
