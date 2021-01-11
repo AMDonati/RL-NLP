@@ -487,6 +487,7 @@ class HistogramOracle(Metric):
             if self.condition_answer != "none":
                 plt.figure(figsize=(20,15))
                 plt.bar(list(self.metric_history.keys()), self.metric_history.values())
+                plt.legend(fontsize="x-large")
                 plt.savefig(self.out_csv_file)
 
 class LvNormMetric(Metric):
