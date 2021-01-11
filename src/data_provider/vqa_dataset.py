@@ -192,6 +192,12 @@ class VQADataset(Dataset):
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries
 
+    def get_unique_answers(self):
+        df = pd.DataFrame.from_records(self.filtered_entries)
+        answers = df.answer
+        answers_idx = [ans["labels"].cpu().squeeze().numpy().item() for ans in answers]
+        self.answers_idx = list(set(answers_idx))
+
     def split_entries(self):
         train_entries, test_entries = [], []
         for img_idx in self.images_idx:

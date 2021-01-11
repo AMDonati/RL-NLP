@@ -393,6 +393,11 @@ def run(args):
     agent = get_agent(pretrained_lm=pretrained_lm, writer=writer, output_path=output_path, env=env, test_envs=test_envs,
                       policy=policy, optimizer=optimizer, args_=args)
 
+
+    if args.env == "vqa":
+        agent.env.dataset.get_unique_answers()
+        logger.info("NUMBER OF UNIQUE ANSWERS: {}".format(len(agent.env.dataset.answers_idx)))
+
     eval_mode = ['sampling', 'greedy']
 
     # start training
