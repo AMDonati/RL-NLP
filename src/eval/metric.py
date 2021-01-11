@@ -12,6 +12,7 @@ from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -457,6 +458,35 @@ class SelfBleuMetric(Metric):
             scores.append(score)
         self.metric_history.extend(scores)
 
+class HistogramOracle(Metric):
+    """Compute the Histogram of Correct Answers."""
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
+        self.condition_answer = agent.policy.condition_answer
+        self.metric_history = {}
+        self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".png")
+
+    def fill_(self, **kwargs):
+        if self.reward_type == "vilbert" or self.reward_type == "vqa":
+            if self.condition_answer != "none":
+                if kwargs["done"] and kwargs["reward"] == 1.:
+                    ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                    if ref_answer_decoded in self.metric_history.keys():
+                        self.metric_history[ref_answer_decoded] += kwargs["reward"]
+                    else:
+                        self.metric_history[ref_answer_decoded] = kwargs["reward"]
+
+    def compute_(self, **kwargs):
+        pass
+
+    def write(self, **kwargs):
+        pass
+
+    def post_treatment(self):
+        if self.reward_type == "vilbert" or self.reward_type == "vqa":
+            if self.condition_answer != "none":
+                plt.bar(list(self.metric_history.keys()), self.metric_history.values())
+                plt.savefig(self.out_csv_file)
 
 class LvNormMetric(Metric):
     '''Compute the levenshtein over the ref questions and the generated dialog.'''
@@ -791,6 +821,6 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
            "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
-           "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric}
+           "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric, "histogram_answers": HistogramOracle}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode"]
