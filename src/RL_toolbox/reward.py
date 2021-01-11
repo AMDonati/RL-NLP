@@ -8,6 +8,7 @@ from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import torch.nn.functional as F
+import logging
 
 try:
     from vilbert.task_utils import compute_score_with_logits
@@ -19,6 +20,8 @@ try:
     from vr.utils import load_execution_engine, load_program_generator
 except ImportError:
     print("VR NOT IMPORTED!!")
+
+logger = logging.getLogger()
 
 
 def get_vocab(key, vocab_path):
@@ -265,16 +268,23 @@ class VILBERT(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
-        vil_prediction, target = self.get_preds(question)
-        if self.reduced_answers:
-            mask = torch.ones_like(vil_prediction) * float("-Inf")
-            mask[:, self.dataset.reduced_answers.squeeze()] = vil_prediction[:, self.dataset.reduced_answers.squeeze()]
-            vil_prediction = mask
-        sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
-        ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
-        rank = ranks.min().item()
-        reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank)
-        return reward, "N/A", rank
+        try:
+            vil_prediction, target = self.get_preds(question)
+            if self.reduced_answers:
+                mask = torch.ones_like(vil_prediction) * float("-Inf")
+                mask[:, self.dataset.reduced_answers.squeeze()] = vil_prediction[:,
+                                                                  self.dataset.reduced_answers.squeeze()]
+                vil_prediction = mask
+            sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
+            ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
+            rank = ranks.min().item()
+            reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank)
+            return reward, "N/A", rank
+        except TypeError as e:
+            logger.error("problem with vilbert reward")
+            logger.error("{}".format(e))
+
+            return -100, "N/A", 1000
 
 
 class VILBERT_proba(VILBERT):
