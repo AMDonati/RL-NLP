@@ -238,8 +238,10 @@ class VILBERT(Reward):
          real_segment_ids,
          co_attention_mask,
          question_id) = self.dataset.get_data_for_ViLBERT(self.env.env_idx)
+        logger.info(real_question)
         if question is None:
             question = self.dataset.reward_tokenizer.decode(real_question[real_question != 0].numpy())
+        logger.info(question)
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
 
