@@ -271,7 +271,7 @@ class VILBERT(Reward):
         if not done:
             return 0, "N/A", None
         #try:
-        vil_prediction, target = self.get_preds(question,ep_questions_decoded)
+        vil_prediction, target = self.get_preds(question)
         if self.reduced_answers:
             mask = torch.ones_like(vil_prediction) * float("-Inf")
             mask[:, self.dataset.reduced_answers.squeeze()] = vil_prediction[:,
