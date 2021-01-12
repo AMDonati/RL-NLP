@@ -485,9 +485,10 @@ class HistogramOracle(Metric):
     def post_treatment(self):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             if self.condition_answer != "none":
-                plt.figure(figsize=(20,15))
-                plt.bar(list(self.metric_history.keys()), self.metric_history.values())
-                plt.legend(fontsize="x-large")
+                fig, ax = plt.subplots(figsize=(20,15))
+                #plt.figure(figsize=(20,15))
+                ax.bar(list(self.metric_history.keys()), self.metric_history.values())
+                ax.tick_params(labelsize=24)
                 plt.savefig(self.out_csv_file)
 
 class LvNormMetric(Metric):
