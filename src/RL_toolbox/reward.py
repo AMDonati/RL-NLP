@@ -280,7 +280,7 @@ class VILBERT(Reward):
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
         reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank)
-        return reward, "N/A", rank
+        return reward, "N/A", vil_prediction.argmax()
 
 
 

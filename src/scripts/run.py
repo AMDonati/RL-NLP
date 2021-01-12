@@ -156,7 +156,8 @@ def get_parser():
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions",
                                  "valid_actions", "dialog", "eps_truncation",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"],
+                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated",
+                                 "dialogimage"],
                         help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm",

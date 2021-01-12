@@ -259,9 +259,9 @@ class DialogImageMetric(Metric):
                 ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
                 values["ref_answer"] = ref_answer_decoded
 
-            if self.reward_type == 'vqa':
-                pred_answer_decoded = self.dataset.question_tokenizer.decode(text=kwargs["pred_answer"].numpy(),
-                                                                             decode_answers=True)
+            if kwargs["pred_answer"] != None:
+                pred_answer = [int(kwargs["pred_answer"].squeeze().numpy())]
+                pred_answer_decoded = self.dataset.answer_tokenizer.decode(text=pred_answer)
                 values["pred_answer"] = pred_answer_decoded
 
             dialog = ["{} : {}".format(key, value) for key, value in values.items()]
