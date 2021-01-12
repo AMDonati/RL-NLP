@@ -302,6 +302,15 @@ class VILBERT_rank(VILBERT):
         return reward
 
 
+class VILBERT_rank2(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
+        reward = np.exp((1 - rank) / 2)
+        return reward
+
+
 class VILBERT_rank_DCG2(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
