@@ -469,7 +469,7 @@ class HistogramOracle(Metric):
         Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
         self.condition_answer = agent.policy.condition_answer
         self.metric_history = {}
-        self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".png")
+        self.out_png_file = os.path.join(self.out_path, "metrics", self.name + ".png")
 
     def fill_(self, **kwargs):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
@@ -496,13 +496,19 @@ class HistogramOracle(Metric):
         return top_k_dict
 
     def post_treatment(self):
+        self.post_treatment_()
+        metric_history_sorted = dict(sorted(self.metric_history.items(), key=lambda item: item[1]), reverse=True)
+        serie = pd.Series(metric_history_sorted)
+        serie.to_csv(self.out_csv_file, index=False, header=False)
+
+    def post_treatment_(self):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             if self.condition_answer != "none":
                 fig, ax = plt.subplots(figsize=(30, 10))
-                self.metric_history = self.get_top_k_values()
-                ax.bar(list(self.metric_history.keys()), self.metric_history.values())
+                top_k_metric_history = self.get_top_k_values()
+                ax.bar(list(top_k_metric_history.keys()), top_k_metric_history.values())
                 ax.tick_params(labelsize=18)
-                plt.savefig(self.out_csv_file)
+                plt.savefig(self.out_png_file)
 
 
 class LvNormMetric(Metric):
