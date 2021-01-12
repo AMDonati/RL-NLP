@@ -228,7 +228,7 @@ class VILBERT(Reward):
         self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
         self.reduced_answers = self.env.reduced_answers
 
-    def get_preds(self, question=None):
+    def get_preds(self, question=None, ep_questions_decoded=None):
         (features,
          spatials,
          image_mask,
@@ -238,9 +238,9 @@ class VILBERT(Reward):
          real_segment_ids,
          co_attention_mask,
          question_id) = self.dataset.get_data_for_ViLBERT(self.env.env_idx)
-        #logger.info(real_question)
+        # logger.info(real_question)
         if question is None:
-            question = self.dataset.reward_tokenizer.decode(real_question[real_question != 0].numpy())
+            question = ep_questions_decoded
         logger.info(question)
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
@@ -279,16 +279,15 @@ class VILBERT(Reward):
         sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
         rank = ranks.min().item()
-        reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank)
+        reward = self.get_reward(sorted_logits, vil_prediction, target, ranks, rank, ep_questions_decoded)
         return reward, "N/A", vil_prediction.argmax()
-
 
 
 class VILBERT_proba(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
 
-    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
         sorted_probs = F.softmax(sorted_logits, dim=1)
         reward = sorted_probs[:, rank]
         return reward
@@ -298,7 +297,7 @@ class VILBERT_rank(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
 
-    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
         reward = -np.log(rank + 1)
         return reward
 
@@ -307,7 +306,7 @@ class VILBERT_rank_DCG2(VILBERT):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
 
-    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
         # sorted_probs = F.softmax(sorted_logits, dim=1)
         # rank_prob = sorted_probs[:, rank]
         reward = 1 / np.log2(2 + rank)
@@ -319,9 +318,9 @@ class VILBERT_rank_DCG(VILBERT):
         super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
         self.normalize = False
 
-    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
         # getting the  vil prediction fo the true question
-        true_vil_prediction, target = self.get_preds()
+        true_vil_prediction, target = self.get_preds(ep_questions_decoded=ep_question_decoded)
         true_probs = F.softmax(true_vil_prediction, dim=1)
         importances = true_probs * 100
         true_sorted_importances, true_sorted_indices = torch.sort(importances, descending=True)
