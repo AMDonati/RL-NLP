@@ -13,6 +13,7 @@ from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import heapq
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -482,13 +483,21 @@ class HistogramOracle(Metric):
     def write(self, **kwargs):
         pass
 
+    def get_top_k_values(self, k=25):
+        if len(self.metric_history) > k:
+            k_keys_sorted_by_values = heapq.nlargest(k, self.metric_history, key=self.metric_history.get)
+            top_k_dict = {k:v for k, v in self.metric_history.items() if k in k_keys_sorted_by_values}
+        else:
+            top_k_dict = self.metric_history
+        return top_k_dict
+
     def post_treatment(self):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             if self.condition_answer != "none":
-                fig, ax = plt.subplots(figsize=(20,15))
-                #plt.figure(figsize=(20,15))
+                fig, ax = plt.subplots(figsize=(30,10))
+                self.metric_history = self.get_top_k_values()
                 ax.bar(list(self.metric_history.keys()), self.metric_history.values())
-                ax.tick_params(labelsize=24)
+                ax.tick_params(labelsize=18)
                 plt.savefig(self.out_csv_file)
 
 class LvNormMetric(Metric):
