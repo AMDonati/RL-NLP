@@ -124,8 +124,9 @@ class VQADataset(Dataset):
                 if rl:
                     if self.split == 'train' or self.split == 'mintrain':
                         self.split_entries()
-        self.reduced_answers = [entry["answer"]["labels"] for entry in self.filtered_entries]
-        self.reduced_answers = torch.stack(self.reduced_answers)
+        if self.filtered_entries:
+            self.reduced_answers = [entry["answer"]["labels"] for entry in self.filtered_entries]
+            self.reduced_answers = torch.stack(self.reduced_answers)
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
