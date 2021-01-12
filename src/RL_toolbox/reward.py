@@ -173,10 +173,10 @@ class Differential(Reward):
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if step_idx == 0:
-            self.last_reward, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True)
+            self.last_reward, _, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True, real_answer=real_answer, state=state)
         reward, closest_question, pred_answer = self.reward_function.get(question, ep_questions_decoded,
                                                                          step_idx=step_idx,
-                                                                         done=True)
+                                                                         done=True, real_answer=real_answer, state=state)
         diff_reward = reward - self.last_reward
         self.last_reward = reward
         return diff_reward, closest_question, pred_answer

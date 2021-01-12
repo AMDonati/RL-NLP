@@ -12,10 +12,13 @@ from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import heapq
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
+
 
 
 class Metric:
@@ -368,12 +371,23 @@ class LanguageScore(Metric):
         if kwargs["state"].text.shape[-1] > 1:
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
             inputs = self.tokenizer(state_decoded, return_tensors="pt")
-            _, logits = self.lm_model(**inputs, labels=inputs["input_ids"])
-            scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
-            action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
-            action_id = self.tokenizer(action_decoded)
-            log_prob = scores[:, -1, action_id["input_ids"][0]]
-            self.measure.append(log_prob.squeeze())
+            if inputs["input_ids"].shape[-1] >= 1:
+                _, logits = self.lm_model(**inputs, labels=inputs["input_ids"])
+                scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
+                action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
+                action_id = self.tokenizer(action_decoded)
+                if len(action_id["input_ids"]) == 1:
+                    log_prob = scores[:, -1, action_id["input_ids"][0]]
+                    self.measure.append(log_prob.squeeze())
+                elif len(action_id["input_ids"]) == 2:
+                    log_prob_1 = scores[:, -1, action_id["input_ids"][0]]
+                    self.measure.append(log_prob_1.squeeze())
+                    inputs_2 = torch.cat([inputs["input_ids"], torch.tensor(action_id["input_ids"][0]).view(1, 1)],
+                                         dim=-1)
+                    outputs = self.lm_model(input_ids=inputs_2)
+                    scores_2 = F.log_softmax(outputs[0], dim=-1)  # (B, S, vocab size)
+                    log_prob_2 = scores_2[:, -1, action_id["input_ids"][1]]
+                    self.measure.append(log_prob_2.squeeze())
 
     def compute_(self, **kwargs):
         if len(self.measure) > 0:
@@ -446,6 +460,49 @@ class SelfBleuMetric(Metric):
             score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
             scores.append(score)
         self.metric_history.extend(scores)
+
+
+class HistogramOracle(Metric):
+    """Compute the Histogram of Correct Answers."""
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
+        self.condition_answer = agent.policy.condition_answer
+        self.metric_history = {}
+        self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".png")
+
+    def fill_(self, **kwargs):
+        if self.reward_type == "vilbert" or self.reward_type == "vqa":
+            if self.condition_answer != "none":
+                if kwargs["done"] and kwargs["reward"] == 1.:
+                    ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                    if ref_answer_decoded in self.metric_history.keys():
+                        self.metric_history[ref_answer_decoded] += kwargs["reward"]
+                    else:
+                        self.metric_history[ref_answer_decoded] = kwargs["reward"]
+
+    def compute_(self, **kwargs):
+        pass
+
+    def write(self, **kwargs):
+        pass
+
+    def get_top_k_values(self, k=25):
+        if len(self.metric_history) > k:
+            k_keys_sorted_by_values = heapq.nlargest(k, self.metric_history, key=self.metric_history.get)
+            top_k_dict = {k: v for k, v in self.metric_history.items() if k in k_keys_sorted_by_values}
+        else:
+            top_k_dict = self.metric_history
+        return top_k_dict
+
+    def post_treatment(self):
+        if self.reward_type == "vilbert" or self.reward_type == "vqa":
+            if self.condition_answer != "none":
+                fig, ax = plt.subplots(figsize=(30, 10))
+                self.metric_history = self.get_top_k_values()
+                ax.bar(list(self.metric_history.keys()), self.metric_history.values())
+                ax.tick_params(labelsize=18)
+                plt.savefig(self.out_csv_file)
 
 
 class LvNormMetric(Metric):
@@ -654,6 +711,25 @@ class PolicyMetric(Metric):
         logger.info('--------------------------------------------------------------------')
 
 
+class ValidActionsMetric(Metric):
+    """Look at the mismatch ref question / valid action space per episode."""
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "valid_actions_episode", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        if kwargs["valid_actions"] is not None:
+            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0].cpu()
+            if len(ref_question) > self.idx_word:
+                if ref_question[self.idx_word] not in kwargs["valid_actions"].cpu():
+                    self.measure.append(0)
+                else:
+                    self.measure.append(1)
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.sum(self.measure) / len(self.measure))
+
+
 class LMVAMetric(Metric):
     '''Monitor the mismatch between the valid actions space and the ref questions.'''
 
@@ -663,11 +739,10 @@ class LMVAMetric(Metric):
 
     def fill_(self, **kwargs):
         if kwargs["valid_actions"] is not None:
-            closest_question = self.dataset.question_tokenizer.encode(kwargs["closest_question"].split())
-            if len(closest_question) > self.idx_word:
-                if closest_question[self.idx_word] not in kwargs["valid_actions"]:
+            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0].cpu()
+            if len(ref_question) > self.idx_word:
+                if ref_question[self.idx_word] not in kwargs["valid_actions"].cpu():
                     self.counter += 1
-                    # logging.info("+VA")
 
     def compute_(self, **kwargs):
         self.metric = [self.counter]
@@ -785,12 +860,12 @@ class VilbertMetric(Metric):
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
-           "lm_valid_actions": LMVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
            "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
-           "lm_valid_actions": LMVAMetric, "vilbert": VilbertMetric}
+           "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
+           "histogram_answers": HistogramOracle, "vilbert": VilbertMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
-                          "action_probs_truncated"]
+                          "action_probs_truncated", "valid_actions_episode"]
