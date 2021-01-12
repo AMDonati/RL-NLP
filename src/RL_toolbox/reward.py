@@ -241,7 +241,7 @@ class VILBERT(Reward):
         # logger.info(real_question)
         if question is None:
             question = ep_questions_decoded
-        logger.info(question)
+        #logger.info(question)
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
 
