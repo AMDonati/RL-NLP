@@ -180,7 +180,7 @@ class PolicyLSTMBatch(nn.Module):
             h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
             answer_embedding = None
             if self.condition_answer == "attention":
-                answer_embedding = self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)
+                answer_embedding = self.answer_embedding(answer.view(text.size(0), 1).to(self.device))
 
             attention_weighted_encoding, alpha = self.attention(img_transposed, h.to(self.device), answer_embedding)
             gate = self.sigmoid(self.f_beta(h))
