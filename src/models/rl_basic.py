@@ -300,6 +300,8 @@ class PolicyLSTMBatch_SL(nn.Module):
             img_feat__ = self.projection(img_feat__)  # (B,hidden_size)
             img_feat__ = img_feat__.unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
+        elif self.fusion == "sat":
+            embedding = embed_text
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1).unsqueeze(1).repeat(1, seq_len, 1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
@@ -314,7 +316,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         embed_text = self._get_embed_text(state_text, state_img, state_answer )
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
-        img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(self.conv(img_feat))
+        img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(self.conv(img_feat))
         embedding = self.process_fusion(embed_text=embed_text, img_feat_=img_feat_, img_feat=img_feat,
                                         answer=state_answer, seq_len=seq_len)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
