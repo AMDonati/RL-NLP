@@ -153,11 +153,11 @@ def get_parser():
     parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
-                        default=["return", "size_valid_actions",
+                        default=["return", "size_valid_actions", "ppl_dialog_lm", "ttr_question",
                                  "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog", "eps_truncation", "histogram_answers",
                                  "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["return", "dialog", "bleu", "ppl_dialog_lm",
+                        default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
