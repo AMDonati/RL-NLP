@@ -173,10 +173,12 @@ class Differential(Reward):
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if step_idx == 0:
-            self.last_reward, _, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True, real_answer=real_answer, state=state)
+            self.last_reward, _, _ = self.reward_function.get("", ep_questions_decoded, step_idx=step_idx, done=True,
+                                                              real_answer=real_answer, state=state)
         reward, closest_question, pred_answer = self.reward_function.get(question, ep_questions_decoded,
                                                                          step_idx=step_idx,
-                                                                         done=True, real_answer=real_answer, state=state)
+                                                                         done=True, real_answer=real_answer,
+                                                                         state=state)
         diff_reward = reward - self.last_reward
         self.last_reward = reward
         return diff_reward, closest_question, pred_answer
@@ -241,7 +243,7 @@ class VILBERT(Reward):
         # logger.info(real_question)
         if question is None:
             question = ep_questions_decoded[0]
-        #logger.info(question)
+        # logger.info(question)
         encoded_question = self.dataset.reward_tokenizer.encode(question)
         encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
 
@@ -262,7 +264,7 @@ class VILBERT(Reward):
 
         return vil_prediction, target
 
-    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_questions_decoded):
         reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0), device=self.device)
         reward = reward.sum().item()
         return reward
