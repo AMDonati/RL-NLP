@@ -74,6 +74,7 @@ def get_parser():
     parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
+    parser.add_argument("-attention_dim", type=int, default=512, help="dimension of the attention")
     parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
@@ -384,7 +385,7 @@ def run(args):
                                 stride=args.stride, num_filters=args.num_filters,
                                 fusion=args.fusion, env=env,
                                 condition_answer=args.condition_answer,
-                                device=device)
+                                device=device, attention_dim=args.attention_dim)
     if args.policy_path is not None:
         pretrained = torch.load(args.policy_path, map_location=device)
         if pretrained.__class__ != OrderedDict:

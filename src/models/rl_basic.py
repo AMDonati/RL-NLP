@@ -55,7 +55,7 @@ class PolicyLSTMBatch(nn.Module):
     def __init__(self, num_tokens, word_emb_size, hidden_size,
                  device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
                  kernel_size=1, stride=5, fusion="cat", env=None,
-                 condition_answer="none"):
+                 condition_answer="none", attention_dim=512):
         super(PolicyLSTMBatch, self).__init__()
         self.device = device
         self.condition_answer = condition_answer
@@ -72,6 +72,7 @@ class PolicyLSTMBatch(nn.Module):
         self.stride = stride
         self.kernel_size = kernel_size
         self.word_emb_size = word_emb_size
+        self.attention_dim = attention_dim
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
@@ -88,7 +89,7 @@ class PolicyLSTMBatch(nn.Module):
             self.merge = nn.Linear(101 * projection_size, hidden_size)
             self.fusion_dim = 2 * hidden_size
         elif self.fusion == "sat":
-            self.attention = Attention(101, self.hidden_size, 512, word_emb_size)
+            self.attention = Attention(101, self.hidden_size, attention_dim, word_emb_size)
             self.init_h = nn.Linear(101, hidden_size)  # linear layer to find initial hidden state of LSTMCell
             self.init_c = nn.Linear(101, hidden_size)  # linear layer to find initial cell state of LSTMCell
             self.last_states = None
@@ -185,7 +186,7 @@ class PolicyLSTMBatch(nn.Module):
             gate = self.sigmoid(self.f_beta(h))
             attention_weighted_encoding = gate * attention_weighted_encoding
             h, c = self.decode_step(torch.cat([pad_embed[:, -1, :], attention_weighted_encoding], dim=1), (h, c))
-            #self.last_states = (h, c)
+            # self.last_states = (h, c)
             return h, c
 
         if self.condition_answer == "before_lstm" and answer is not None:
@@ -199,7 +200,8 @@ class PolicyLSTMBatch(nn.Module):
 class PolicyLSTMBatch_SL(nn.Module):
     def __init__(self, num_tokens, word_emb_size, hidden_size,
                  device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
-                 kernel_size=1, stride=5, fusion="cat", condition_answer="none", num_tokens_answer=32):
+                 kernel_size=1, stride=5, fusion="cat", condition_answer="none", num_tokens_answer=32,
+                 attention_dim=512):
         super(PolicyLSTMBatch_SL, self).__init__()
 
         self.device = device
@@ -217,6 +219,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         self.answer_embedding = nn.Embedding(num_tokens_answer, word_emb_size)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
                               stride=self.stride)
+        self.attention_dim = attention_dim
 
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
 
@@ -228,6 +231,16 @@ class PolicyLSTMBatch_SL(nn.Module):
             self.projection = nn.Linear(2048, hidden_size)
             self.avg_pooling = nn.AvgPool1d(kernel_size=101)
             self.fusion_dim = 2 * hidden_size
+        elif self.fusion == "sat":
+            self.attention = Attention(101, self.hidden_size, attention_dim, word_emb_size)
+            self.init_h = nn.Linear(101, hidden_size)  # linear layer to find initial hidden state of LSTMCell
+            self.init_c = nn.Linear(101, hidden_size)  # linear layer to find initial cell state of LSTMCell
+            self.last_states = None
+            self.f_beta = nn.Linear(hidden_size, 101)  # linear layer to create a sigmoid-activated gate
+            self.sigmoid = nn.Sigmoid()
+            self.fc = nn.Linear(hidden_size, self.num_tokens)
+            self.decode_step = nn.LSTMCell(word_emb_size + 101, hidden_size, bias=True)
+            self.fusion_dim = hidden_size
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
 
@@ -236,9 +249,37 @@ class PolicyLSTMBatch_SL(nn.Module):
 
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
 
-    def _get_embed_text(self, text):
+    def init_hidden_state(self, encoder_out):
+        """
+        Creates the initial hidden and cell states for the decoder's LSTM based on the encoded images.
+
+        :param encoder_out: encoded images, a tensor of dimension (batch_size, num_pixels, encoder_dim)
+        :return: hidden state, cell state
+        """
+        mean_encoder_out = encoder_out.mean(dim=1)
+        h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
+        c = self.init_c(mean_encoder_out.to(self.device))
+        return h, c
+
+    def _get_embed_text(self, text, img, answer):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text)
+        if self.fusion == "sat":
+            output = torch.zeros(text.size(0), text.size(1), self.hidden_size).to(self.device)
+            img_transposed = img.transpose(2, 1).to(self.device)
+            h, c = self.init_hidden_state(img_transposed)
+            for t in range(text.size(1)):
+                answer_embedding = None
+                if self.condition_answer == "attention":
+                    answer_embedding = self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)
+
+                attention_weighted_encoding, alpha = self.attention(img_transposed, h.to(self.device), answer_embedding)
+                gate = self.sigmoid(self.f_beta(h))
+                attention_weighted_encoding = gate * attention_weighted_encoding
+                h, c = self.decode_step(torch.cat([pad_embed[:, -1, :], attention_weighted_encoding], dim=1), (h, c))
+                output[:, t, :] = h
+            return output
+
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
@@ -270,7 +311,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         return embedding
 
     def forward(self, state_text, state_img, state_answer):
-        embed_text = self._get_embed_text(state_text)
+        embed_text = self._get_embed_text(state_text, state_img, state_answer )
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = img_feat if self.fusion == "average" or self.fusion == "none" else F.relu(self.conv(img_feat))
