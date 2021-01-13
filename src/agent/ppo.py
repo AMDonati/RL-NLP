@@ -53,7 +53,7 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
-        policy_dist, _, value = self.policy(state_text, state_img, states_answer, valid_actions=None,
+        policy_dist, _, value,_,_ = self.policy(state_text, state_img, states_answer, valid_actions=None,
                                             ht=old_ht_truncated, ct=old_ct_truncated)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
@@ -76,8 +76,8 @@ class PPO(Agent):
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
         old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
         old_logprobs_truncated = torch.stack(self.memory.logprobs_truncated).to(self.device).detach()
-        old_ht_truncated = torch.stack(self.memory.ht).to(self.device)
-        old_ct_truncated = torch.stack(self.memory.ct).to(self.device)
+        old_ht_truncated = torch.stack(self.memory.ht).squeeze().to(self.device).detach()
+        old_ct_truncated = torch.stack(self.memory.ct).squeeze().to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
