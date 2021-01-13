@@ -469,17 +469,25 @@ class HistogramOracle(Metric):
         Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
         self.condition_answer = agent.policy.condition_answer
         self.metric_history = {}
+        self.answer_history = {}
         self.out_png_file = os.path.join(self.out_path, "metrics", self.name + ".png")
+
+    def fill_history(self, history, ref_answer_decoded, reward):
+        if ref_answer_decoded in history.keys():
+            history[ref_answer_decoded] += reward
+        else:
+            history[ref_answer_decoded] = reward
+        return history
 
     def fill_(self, **kwargs):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
-            if self.condition_answer != "none":
-                if kwargs["done"] and kwargs["reward"] == 1.:
-                    ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
-                    if ref_answer_decoded in self.metric_history.keys():
-                        self.metric_history[ref_answer_decoded] += kwargs["reward"]
-                    else:
-                        self.metric_history[ref_answer_decoded] = kwargs["reward"]
+            if kwargs["done"]:
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                if kwargs["reward"] == 1.:
+                    self.metric_history = self.fill_history(self.metric_history, ref_answer_decoded, kwargs["reward"])
+                    self.answer_history = self.fill_history(self.answer_history, ref_answer_decoded, 1)
+                else:
+                    self.answer_history = self.fill_history(self.answer_history, ref_answer_decoded, 1)
 
     def compute_(self, **kwargs):
         pass
@@ -498,17 +506,20 @@ class HistogramOracle(Metric):
     def post_treatment(self):
         self.post_treatment_()
         metric_history_sorted = dict(sorted(self.metric_history.items(), key=lambda item: item[1]), reverse=True)
-        serie = pd.Series(metric_history_sorted)
-        serie.to_csv(self.out_csv_file, index=False, header=False)
+        answer_history_sorted = {k:v for k,v in zip(metric_history_sorted.keys(), self.answer_history.values())}
+        df = pd.DataFrame.from_dict([metric_history_sorted, answer_history_sorted])
+        #serie = pd.Series(metric_history_sorted)
+        df.to_csv(self.out_csv_file, index=False, header=False)
 
     def post_treatment_(self):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
-            if self.condition_answer != "none":
-                fig, ax = plt.subplots(figsize=(30, 10))
-                top_k_metric_history = self.get_top_k_values()
-                ax.bar(list(top_k_metric_history.keys()), top_k_metric_history.values())
-                ax.tick_params(labelsize=18)
-                plt.savefig(self.out_png_file)
+            fig, ax = plt.subplots(figsize=(30, 10))
+            top_k_metric_history = self.get_top_k_values()
+            top_k_answer_history = {k:v for k,v in self.answer_history.items() if k in top_k_metric_history.keys()}
+            ax.bar(list(top_k_metric_history.keys()), top_k_metric_history.values())
+            ax.bar(list(top_k_metric_history.keys()), top_k_answer_history.values())
+            ax.tick_params(labelsize=18)
+            plt.savefig(self.out_png_file)
 
 
 class LvNormMetric(Metric):
