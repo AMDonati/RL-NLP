@@ -118,8 +118,8 @@ class PolicyLSTMBatch(nn.Module):
         :return: hidden state, cell state
         """
         mean_encoder_out = encoder_out.mean(dim=1)
-        h = self.init_h(mean_encoder_out)  # (batch_size, decoder_dim)
-        c = self.init_c(mean_encoder_out)
+        h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
+        c = self.init_c(mean_encoder_out.to(self.device))
         return h, c
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
