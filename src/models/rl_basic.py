@@ -174,13 +174,13 @@ class PolicyLSTMBatch(nn.Module):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.fusion == "sat":
-            img_transposed = img.transpose(2, 1)
+            img_transposed = img.transpose(2, 1).to(self.device)
             h, c = self.init_hidden_state(img_transposed) if text.size(1) == 1 else self.last_states
             answer_embedding = None
             if self.condition_answer == "attention":
                 answer_embedding = self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)
 
-            attention_weighted_encoding, alpha = self.attention(img_transposed, h, answer_embedding)
+            attention_weighted_encoding, alpha = self.attention(img_transposed, h.to(self.device), answer_embedding)
             gate = self.sigmoid(self.f_beta(h))
             attention_weighted_encoding = gate * attention_weighted_encoding
             h, c = self.decode_step(torch.cat([pad_embed[:, -1, :], attention_weighted_encoding], dim=1), (h, c))
