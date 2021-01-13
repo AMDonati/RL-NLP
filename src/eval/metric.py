@@ -906,4 +906,4 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
            "histogram_answers": HistogramOracle, "vilbert": VilbertMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
-                          "action_probs_truncated", "valid_actions_episode"]
+                          "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]
