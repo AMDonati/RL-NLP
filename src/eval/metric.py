@@ -881,18 +881,20 @@ class VilbertMetric(Metric):
                                                env=agent.env)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                      ignored=["<SOS>"],
-                                                                      stop_at_end=True)
-            ref_questions = kwargs["ref_questions_decoded"]
-            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                            step_idx=None,
-                                            done=True)
-            self.measure.append(score)
+        if self.dataset.__class__ != CLEVR_Dataset:
+            if kwargs["done"]:
+                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
+                                                                          ignored=["<SOS>"],
+                                                                          stop_at_end=True)
+                ref_questions = kwargs["ref_questions_decoded"]
+                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
+                                                step_idx=None,
+                                                done=True)
+                self.measure.append(score)
 
     def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
+        if len(self.measure) > 0:
+            self.metric.append(np.mean(self.measure))
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
