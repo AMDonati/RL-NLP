@@ -22,7 +22,8 @@ class PPO(Agent):
                  epsilon_truncated=0.,
                  train_seed=0,
                  epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1, temp_factor=1, temperature_min=1., temperature_max=10, s_min=10, s_max=200):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1,
+                 temp_factor=1, temperature_min=1., temperature_max=10, s_min=10, s_max=200):
         Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, pretrained_lm=pretrained_lm,
                        out_path=out_path,
                        gamma=gamma, lr=lr,
@@ -51,8 +52,9 @@ class PPO(Agent):
         self.update_mode = "episode"
         self.writer_iteration = 0
 
-    def evaluate(self, state_text, state_img, states_answer, action):
-        policy_dist, _, value = self.policy(state_text, state_img, states_answer, valid_actions=None)
+    def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
+        policy_dist, _, value = self.policy(state_text, state_img, states_answer, valid_actions=None,
+                                            ht=old_ht_truncated, ct=old_ct_truncated)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy
@@ -74,13 +76,15 @@ class PPO(Agent):
         old_actions = torch.stack(self.memory.actions).to(self.device).detach()
         old_logprobs = torch.stack(self.memory.logprobs).to(self.device).detach()
         old_logprobs_truncated = torch.stack(self.memory.logprobs_truncated).to(self.device).detach()
+        old_ht_truncated = torch.stack(self.memory.ht).to(self.device)
+        old_ct_truncated = torch.stack(self.memory.ct).to(self.device)
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values:
             old_states_img.requires_grad = True
             logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_states_answer,
-                                                                 old_actions)
+                                                                 old_actions, old_ht_truncated, old_ct_truncated)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
@@ -95,7 +99,7 @@ class PPO(Agent):
 
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach().squeeze()
-            #advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
+            # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
             if self.pretrain:
                 advantages = 1.
             surr1 = ratios * advantages
@@ -135,9 +139,10 @@ class PPO(Agent):
 
         return loss.mean()
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False):
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False, ht=None,
+                                 ct=None):
         policy = self.start_policy if baseline else self.policy_old
-        policy_dist, policy_dist_truncated, value = policy(state.text, state.img, state.answer,
-                                                           valid_actions=valid_actions,
-                                                           logits_lm=logits_lm, alpha=alpha)
-        return policy_dist, policy_dist_truncated, value
+        policy_dist, policy_dist_truncated, value, ht, ct = policy(state.text, state.img, state.answer,
+                                                                   valid_actions=valid_actions,
+                                                                   logits_lm=logits_lm, alpha=alpha, ht=ht, ct=ct)
+        return policy_dist, policy_dist_truncated, value, ht, ct

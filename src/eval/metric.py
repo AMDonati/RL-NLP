@@ -331,7 +331,7 @@ class PPLMetric(Metric):
 
                 for i, action in enumerate(ref_question[:, 1:].view(-1)):
                     forced_state = state.__class__(ref_question[:, :i + 1], state.img, state.answer)
-                    real_action, log_probs, _, _, dist, _, _, _ = self.agent.act(
+                    real_action, log_probs, _, _, dist, _, _, _,ht,ct = self.agent.act(
                         state=forced_state,
                         mode="forced",
                         truncation=True,

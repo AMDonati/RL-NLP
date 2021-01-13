@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+
 class Memory:
     def __init__(self):
         self.actions = []
@@ -13,8 +14,11 @@ class Memory:
         self.rewards = []
         self.is_terminals = []
         self.values = []
-        self.arrs = [self.actions, self.states_text, self.states_img, self.logprobs, self.logprobs_truncated, self.rewards,
-                     self.is_terminals, self.values, self.states_answer]
+        self.ht = []
+        self.ct = []
+        self.arrs = [self.actions, self.states_text, self.states_img, self.logprobs, self.logprobs_truncated,
+                     self.rewards,
+                     self.is_terminals, self.values, self.states_answer, self.ht, self.ct]
 
         self.idx_episode = 0
 
@@ -29,9 +33,12 @@ class Memory:
         del self.rewards[:]
         del self.is_terminals[:]
         del self.values[:]
+        del self.ht[:]
+        del self.ct[:]
 
-    def add_step(self, actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals, values, states_answer):
+    def add_step(self, actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals, values,
+                 states_answer, ht, ct):
         for arr, val in zip(self.arrs,
-                            [actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals, values, states_answer]):
+                            [actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals,
+                             values, states_answer, ht, ct]):
             arr.append(val)
-

@@ -122,8 +122,9 @@ class PolicyLSTMBatch(nn.Module):
         c = self.init_c(mean_encoder_out.to(self.device))
         return h, c
 
-    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0.):
-        embed_text = self._get_embed_text(state_text, state_answer, state_img)
+    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0., ht=None,
+                ct=None):
+        embed_text, ct = self._get_embed_text(state_text, state_answer, state_img, ht, ct)
         state_answer = state_answer if state_answer is None else state_answer.to(self.device)
         img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
         img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(
@@ -134,7 +135,7 @@ class PolicyLSTMBatch(nn.Module):
         # adding lm logits bonus
         logits_exploration = (1 - alpha) * logits + alpha * logits_lm
         policy_dist, policy_dist_truncated = self.get_policies(valid_actions, logits_exploration)
-        return policy_dist, policy_dist_truncated, value
+        return policy_dist, policy_dist_truncated, value, embed_text, ct
 
     def get_policies(self, valid_actions, logits_exploration):
         probs = F.softmax(logits_exploration, dim=-1)
@@ -170,12 +171,12 @@ class PolicyLSTMBatch(nn.Module):
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
 
-    def _get_embed_text(self, text, answer, img):
+    def _get_embed_text(self, text, answer, img, ht, ct):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.fusion == "sat":
             img_transposed = img.transpose(2, 1).to(self.device)
-            h, c = self.init_hidden_state(img_transposed) if text.size(1) == 1 else self.last_states
+            h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
             answer_embedding = None
             if self.condition_answer == "attention":
                 answer_embedding = self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)
@@ -184,15 +185,15 @@ class PolicyLSTMBatch(nn.Module):
             gate = self.sigmoid(self.f_beta(h))
             attention_weighted_encoding = gate * attention_weighted_encoding
             h, c = self.decode_step(torch.cat([pad_embed[:, -1, :], attention_weighted_encoding], dim=1), (h, c))
-            self.last_states = (h, c)
-            return h
+            #self.last_states = (h, c)
+            return h, c
 
         if self.condition_answer == "before_lstm" and answer is not None:
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        return ht[-1]
+        return ht[-1], ct
 
 
 class PolicyLSTMBatch_SL(nn.Module):
