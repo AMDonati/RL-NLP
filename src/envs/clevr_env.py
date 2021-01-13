@@ -182,7 +182,7 @@ class VQAEnv(GenericEnv):
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
         modes = self.get_modes(device=device, min_data=min_data)
-
+        self.min_data = min_data
         vocab_path = os.path.join(data_path, "cache", "vocab.json") if not min_data else os.path.join(data_path,
                                                                                                       "cache",
                                                                                                       "vocab_min.json")

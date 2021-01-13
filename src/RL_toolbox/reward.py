@@ -262,7 +262,7 @@ class VILBERT(Reward):
 
         return vil_prediction, target
 
-    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank):
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_questions_decoded):
         reward = compute_score_with_logits(vil_prediction, target.unsqueeze(dim=0), device=self.device)
         reward = reward.sum().item()
         return reward

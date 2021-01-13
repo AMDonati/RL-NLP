@@ -14,6 +14,8 @@ from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import heapq
+from models.language_model import ClevrLanguageModel
+import operator
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -348,10 +350,27 @@ class PPLDialogfromLM(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
+        self.min_data = agent.env.min_data
+        self.device = agent.device
+        self.get_lm_model(agent)
+
+    def get_lm_model(self, agent):
+        if self.dataset.__class__ == CLEVR_Dataset:
+            lm_model = torch.load("output/lm_model/model.pt", map_location=torch.device('cpu'))
+        else:
+            if self.min_data:
+                lm_model = torch.load("output/vqa_lm_model_smallvocab/model.pt", map_location=torch.device('cpu'))
+            else:
+                lm_model = torch.load("output/vqa_lm_model/model.pt", map_location=torch.device('cpu'))
+        lm_model.eval()
+        self.pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=self.dataset,
+                                           tokenizer=self.dataset.question_tokenizer, device=agent.device)
 
     def fill_(self, **kwargs):
-        if kwargs["log_probas_lm"] is not None:
-            self.measure.append(kwargs["log_probas_lm"][:, kwargs["action"]])
+        with torch.no_grad():
+            log_probas_lm, _, _ = self.pretrained_lm.forward(kwargs["state"].text.to(self.device), temperature=1)
+            log_probas_lm = log_probas_lm.cpu()
+            self.measure.append(log_probas_lm[:, kwargs["action"]])
 
     def compute_(self, **kwargs):
         if len(self.measure) > 0:
@@ -467,7 +486,6 @@ class HistogramOracle(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
-        self.condition_answer = agent.policy.condition_answer
         self.metric_history = {}
         self.answer_history = {}
         self.out_png_file = os.path.join(self.out_path, "metrics", self.name + ".png")
@@ -504,22 +522,23 @@ class HistogramOracle(Metric):
         return top_k_dict
 
     def post_treatment(self):
-        self.post_treatment_()
-        metric_history_sorted = dict(sorted(self.metric_history.items(), key=lambda item: item[1]), reverse=True)
-        answer_history_sorted = {k:v for k,v in zip(metric_history_sorted.keys(), self.answer_history.values())}
-        df = pd.DataFrame.from_dict([metric_history_sorted, answer_history_sorted])
-        #serie = pd.Series(metric_history_sorted)
-        df.to_csv(self.out_csv_file, index=False, header=False)
+        if self.reward_type == "vilbert" or self.reward_type == "vqa":
+            self.post_treatment_()
+            metric_history_sorted = dict(sorted(self.metric_history.items(), key=operator.itemgetter(1), reverse=True))
+            answer_history_sorted = {k:self.answer_history[k] for k in list(metric_history_sorted.keys())}
+            df = pd.DataFrame.from_dict([metric_history_sorted, answer_history_sorted])
+            df = df.transpose()
+            df.to_csv(self.out_csv_file, index=True, header=["reward = 1", "answer freq"])
 
     def post_treatment_(self):
-        if self.reward_type == "vilbert" or self.reward_type == "vqa":
-            fig, ax = plt.subplots(figsize=(30, 10))
-            top_k_metric_history = self.get_top_k_values()
-            top_k_answer_history = {k:v for k,v in self.answer_history.items() if k in top_k_metric_history.keys()}
-            ax.bar(list(top_k_metric_history.keys()), top_k_metric_history.values())
-            ax.bar(list(top_k_metric_history.keys()), top_k_answer_history.values())
-            ax.tick_params(labelsize=18)
-            plt.savefig(self.out_png_file)
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(30, 15))
+        top_k_metric_history = self.get_top_k_values()
+        top_k_answer_history = {k: self.answer_history[k] for k in list(top_k_metric_history.keys())}
+        ax1.bar(list(top_k_metric_history.keys()), top_k_metric_history.values())
+        ax2.bar(list(top_k_metric_history.keys()), top_k_answer_history.values())
+        ax1.tick_params(labelsize=18)
+        ax2.tick_params(labelsize=18)
+        plt.savefig(self.out_png_file)
 
 
 class LvNormMetric(Metric):
