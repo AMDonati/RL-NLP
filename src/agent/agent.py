@@ -193,12 +193,12 @@ class Agent:
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
-        state, ep_reward, ht, ct = env.reset(seed), 0, None, None
+        state, ep_reward, ht, ct = env.reset(seed), 0, (self.policy.init_hidden(1))
         for t in range(0, env.max_len):
             forced = env.ref_question[t]
             action, log_probs, value, (
                 valid_actions, actions_probs,
-                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm, ht, ct = self.act(
+                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm, new_ht, new_ct = self.act(
                 state=state,
                 mode=test_mode,
                 truncation=truncation,
@@ -221,6 +221,8 @@ class Agent:
                             log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm,
                             alpha=self.alpha_logits_lm, ref_answer=env.ref_answer)
             state = new_state
+            ht = new_ht
+            ct = new_ct
             ep_reward += reward
 
             # update if its time
