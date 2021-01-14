@@ -191,7 +191,7 @@ class PolicyLSTMBatch(nn.Module):
         if ht is None:
             ht, ct = self.init_hidden(pad_embed.size(0))
 
-        packed_output, (ht, ct) = self.lstm(pad_embed_pack, (ht.view(1, batch_size, -1), ct.view(1, batch_size, -1)))
+        output, (ht, ct) = self.lstm(pad_embed, (ht.view(1, batch_size, -1), ct.view(1, batch_size, -1)))
         return ht[-1], ct[-1]
 
     def init_hidden(self, size_):
