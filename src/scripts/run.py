@@ -181,6 +181,10 @@ def get_parser():
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
     return parser
 
+def create_cmd_file(cmd_file_path):
+    cmd_file=open(cmd_file_path, 'w')
+    cmd_file.write(" ".join(sys.argv))
+    cmd_file.close()
 
 def create_config_file(conf_file, args):
     config = ConfigParser()
@@ -373,7 +377,9 @@ def run(args):
     conf_file = os.path.join(output_path, 'conf.ini')
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     out_policy_file = os.path.join(output_path, 'model.pth')
+    cmd_file =  os.path.join(output_path, 'cmd.txt')
     create_config_file(conf_file, args)
+    create_cmd_file(cmd_file)
     logger = create_logger(out_file_log, level=args.logger_level)
     writer = SummaryWriter(log_dir=os.path.join(output_path, "runs"))
 
@@ -401,7 +407,10 @@ def run(args):
     if args.policy_path is not None:
         pretrained = torch.load(args.policy_path, map_location=device)
         if pretrained.__class__ != OrderedDict:
-            pretrained = pretrained.state_dict()
+            if pretrained.__class__ == dict:
+                pretrained = pretrained["model_state_dict"]
+            else:
+                pretrained = pretrained.state_dict()
         policy.load_state_dict(pretrained, strict=False)
         policy.device = device
     optimizer, scheduler = get_optimizer(policy, args)
