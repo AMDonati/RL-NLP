@@ -193,7 +193,7 @@ class Agent:
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
-        state, ep_reward, ht, ct = env.reset(seed), 0, (self.policy.init_hidden(1))
+        state, ep_reward, (ht, ct) = env.reset(seed), 0, self.policy.init_hidden(1)
         for t in range(0, env.max_len):
             forced = env.ref_question[t]
             action, log_probs, value, (
