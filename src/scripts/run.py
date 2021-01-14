@@ -120,7 +120,8 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
-    parser.add_argument('-s_min', default=10, type=int, help="minimal size of the valid action space of the truncation function.")
+    parser.add_argument('-s_min', default=10, type=int,
+                        help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
@@ -159,8 +160,10 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions", "ppl_dialog_lm", "ttr_question",
-                                 "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog", "eps_truncation", "histogram_answers",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"], help="train metrics")
+                                 "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog",
+                                 "eps_truncation", "histogram_answers",
+                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated",
+                                 "dialogimage"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
@@ -239,7 +242,8 @@ def get_output_path(args):
     # temp args
     if args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
-            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max) + '_smax{}'.format(args.s_max)
+            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(
+            args.temp_max) + '_smax{}'.format(args.s_max)
     if args.inv_schedule_step != 0:
         out_folder = out_folder + '_invsch{}'.format(args.inv_schedule_step)
     if args.schedule_start > 1:
