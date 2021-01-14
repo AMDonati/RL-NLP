@@ -57,9 +57,16 @@ class PPO(Agent):
     def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
         policy_dist, _, value,_,_ = self.policy(state_text, state_img, states_answer, valid_actions=None,
                                             ht=old_ht_truncated, ct=old_ct_truncated)
+
+        probs = policy_dist.probs
+
+        print('-------------GRADIENTS policy-------------------------------------')
+        probs[0].register_hook(lambda x: print(f"policy probs gradients: {x}"))
+        print('-------------GRADIENTS policy-------------------------------------')
+
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
-        return log_prob, value, dist_entropy
+        return log_prob, value, dist_entropy, probs
 
     def update(self):
         rewards = []
@@ -85,8 +92,16 @@ class PPO(Agent):
         for _ in range(self.K_epochs):
             # Evaluating old actions and values:
             old_states_img.requires_grad = True
-            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_states_answer,
+            logprobs, state_values, dist_entropy, probs = self.evaluate(old_states_text, old_states_img, old_states_answer,
                                                                  old_actions, old_ht_truncated, old_ct_truncated)
+
+            #print('-------------GRADIENTS logprobs-------------------------------------')
+            #logprobs.register_hook(lambda x: print(f"logprobs gradients: {x}"))
+            #print('-------------GRADIENTS logprobs-------------------------------------')
+
+            print('-------------GRADIENTS policy-------------------------------------')
+            probs[0].register_hook(lambda x: print(f"policy probs gradients: {x}"))
+            print('-------------GRADIENTS policy-------------------------------------')
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
@@ -132,6 +147,10 @@ class PPO(Agent):
             self.writer.add_scalar('grad_norm', grad_norm, self.writer_iteration + 1)
 
             self.writer_iteration += 1
+
+        #print('-------------GRADIENTS logprobs 2-------------------------------------')
+        #logprobs.register_hook(lambda x: print(f"logprobs gradients: {x}"))
+        #print('-------------GRADIENTS logprobs 2-------------------------------------')
 
         if self.scheduler is not None:
             self.scheduler.step()
