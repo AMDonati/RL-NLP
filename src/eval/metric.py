@@ -14,6 +14,8 @@ from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import heapq
+from models.language_model import ClevrLanguageModel
+import operator
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -348,10 +350,27 @@ class PPLDialogfromLM(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
+        self.min_data = agent.env.min_data
+        self.device = agent.device
+        self.get_lm_model(agent)
+
+    def get_lm_model(self, agent):
+        if self.dataset.__class__ == CLEVR_Dataset:
+            lm_model = torch.load("output/lm_model/model.pt", map_location=torch.device('cpu'))
+        else:
+            if self.min_data:
+                lm_model = torch.load("output/vqa_lm_model_smallvocab/model.pt", map_location=torch.device('cpu'))
+            else:
+                lm_model = torch.load("output/vqa_lm_model/model.pt", map_location=torch.device('cpu'))
+        lm_model.eval()
+        self.pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=self.dataset,
+                                           tokenizer=self.dataset.question_tokenizer, device=agent.device)
 
     def fill_(self, **kwargs):
-        if kwargs["log_probas_lm"] is not None:
-            self.measure.append(kwargs["log_probas_lm"][:, kwargs["action"]])
+        with torch.no_grad():
+            log_probas_lm, _, _ = self.pretrained_lm.forward(kwargs["state"].text.to(self.device), temperature=1)
+            log_probas_lm = log_probas_lm.cpu()
+            self.measure.append(log_probas_lm[:, kwargs["action"]])
 
     def compute_(self, **kwargs):
         if len(self.measure) > 0:
@@ -467,19 +486,26 @@ class HistogramOracle(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
-        self.condition_answer = agent.policy.condition_answer
         self.metric_history = {}
-        self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".png")
+        self.answer_history = {}
+        self.out_png_file = os.path.join(self.out_path, "metrics", self.name + ".png")
+
+    def fill_history(self, history, ref_answer_decoded, reward):
+        if ref_answer_decoded in history.keys():
+            history[ref_answer_decoded] += reward
+        else:
+            history[ref_answer_decoded] = reward
+        return history
 
     def fill_(self, **kwargs):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
-            if self.condition_answer != "none":
-                if kwargs["done"] and kwargs["reward"] == 1.:
-                    ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
-                    if ref_answer_decoded in self.metric_history.keys():
-                        self.metric_history[ref_answer_decoded] += kwargs["reward"]
-                    else:
-                        self.metric_history[ref_answer_decoded] = kwargs["reward"]
+            if kwargs["done"]:
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                if kwargs["reward"] == 1.:
+                    self.metric_history = self.fill_history(self.metric_history, ref_answer_decoded, kwargs["reward"])
+                    self.answer_history = self.fill_history(self.answer_history, ref_answer_decoded, 1)
+                else:
+                    self.answer_history = self.fill_history(self.answer_history, ref_answer_decoded, 1)
 
     def compute_(self, **kwargs):
         pass
@@ -497,12 +523,22 @@ class HistogramOracle(Metric):
 
     def post_treatment(self):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
-            if self.condition_answer != "none":
-                fig, ax = plt.subplots(figsize=(30, 10))
-                self.metric_history = self.get_top_k_values()
-                ax.bar(list(self.metric_history.keys()), self.metric_history.values())
-                ax.tick_params(labelsize=18)
-                plt.savefig(self.out_csv_file)
+            self.post_treatment_()
+            metric_history_sorted = dict(sorted(self.metric_history.items(), key=operator.itemgetter(1), reverse=True))
+            answer_history_sorted = {k:self.answer_history[k] for k in list(metric_history_sorted.keys())}
+            df = pd.DataFrame.from_dict([metric_history_sorted, answer_history_sorted])
+            df = df.transpose()
+            df.to_csv(self.out_csv_file, index=True, header=["reward = 1", "answer freq"])
+
+    def post_treatment_(self):
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(30, 15))
+        top_k_metric_history = self.get_top_k_values()
+        top_k_answer_history = {k: self.answer_history[k] for k in list(top_k_metric_history.keys())}
+        ax1.bar(list(top_k_metric_history.keys()), top_k_metric_history.values())
+        ax2.bar(list(top_k_metric_history.keys()), top_k_answer_history.values())
+        ax1.tick_params(labelsize=18)
+        ax2.tick_params(labelsize=18)
+        plt.savefig(self.out_png_file)
 
 
 class LvNormMetric(Metric):
@@ -845,18 +881,20 @@ class VilbertMetric(Metric):
                                                env=agent.env)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                      ignored=["<SOS>"],
-                                                                      stop_at_end=True)
-            ref_questions = kwargs["ref_questions_decoded"]
-            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                            step_idx=None,
-                                            done=True)
-            self.measure.append(score)
+        if self.dataset.__class__ != CLEVR_Dataset:
+            if kwargs["done"]:
+                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
+                                                                          ignored=["<SOS>"],
+                                                                          stop_at_end=True)
+                ref_questions = kwargs["ref_questions_decoded"]
+                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
+                                                step_idx=None,
+                                                done=True)
+                self.measure.append(score)
 
     def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
+        if len(self.measure) > 0:
+            self.metric.append(np.mean(self.measure))
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
@@ -868,4 +906,4 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
            "histogram_answers": HistogramOracle, "vilbert": VilbertMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
-                          "action_probs_truncated", "valid_actions_episode"]
+                          "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]

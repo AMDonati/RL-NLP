@@ -38,6 +38,7 @@ class GenericEnv(gym.Env):
         self.ref_questions, self.ref_questions_decoded = None, None
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
         self.reduced_answers = reduced_answers
+        self.min_data = 0
 
     def set_special_tokens(self):
         SOS_idx = self.dataset.vocab_questions["<SOS>"]
@@ -182,7 +183,7 @@ class VQAEnv(GenericEnv):
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
         modes = self.get_modes(device=device, min_data=min_data)
-
+        self.min_data = min_data
         vocab_path = os.path.join(data_path, "cache", "vocab.json") if not min_data else os.path.join(data_path,
                                                                                                       "cache",
                                                                                                       "vocab_min.json")

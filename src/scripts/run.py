@@ -47,7 +47,9 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "temperature_min": args_.temp_min,
                       "temperature_max": args_.temp_max,
                       "s_min": args_.s_min,
-                      "s_max": args_.s_max}
+                      "s_max": args_.s_max,
+                      "inv_schedule_step": args_.inv_schedule_step,
+                      "schedule_start": args_.schedule_start}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -125,9 +127,11 @@ def get_parser():
     parser.add_argument('-temp_step', type=int, default=1,
                         help="temperature step for updating the temperature for the language model")
     parser.add_argument('-temp_factor', type=float, default=1., help="temperature factor for the language model")
-    ## alpha logits fusion args.
     parser.add_argument('-temp_min', type=float, default=1., help="temperature min for the language model")
-    parser.add_argument('-temp_max', type=float, default=10, help="temperature max for the language model")
+    parser.add_argument('-temp_max', type=float, default=10., help="temperature max for the language model")
+    parser.add_argument('-inv_schedule_step', type=int, default=0, help="step to inverse the temperature schedule.")
+    parser.add_argument('-schedule_start', type=int, default=1, help="step to start the temperature scheduling.")
+    ## alpha logits fusion args.
     parser.add_argument('-alpha_logits', default=0., type=float,
                         help="alpha value for the convex logits mixture. if 0, does not fuse the logits of the policy with the logits of the lm.")
     parser.add_argument('-alpha_decay_rate', default=0., type=float,
@@ -154,11 +158,11 @@ def get_parser():
     parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
-                        default=["return", "size_valid_actions",
+                        default=["return", "size_valid_actions", "ppl_dialog_lm", "ttr_question",
                                  "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog", "eps_truncation", "histogram_answers",
                                  "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["return", "dialog", "bleu", "ppl_dialog_lm",
+                        default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
@@ -233,9 +237,13 @@ def get_output_path(args):
     out_folder = out_folder + '_graclip{}'.format(args.grad_clip)
 
     # temp args
-    if args.temperature != 1 and args.temp_factor != 1:
+    if args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
             args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max) + '_smax{}'.format(args.s_max)
+    if args.inv_schedule_step != 0:
+        out_folder = out_folder + '_invsch{}'.format(args.inv_schedule_step)
+    if args.schedule_start > 1:
+        out_folder = out_folder + '_schstart{}'.format(args.schedule_start)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,
