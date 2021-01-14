@@ -14,7 +14,8 @@ class REINFORCE(Agent):
                  eval_no_trunc=0, alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0,
                  epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1., temperature_step=1,
-                 temp_factor=1., temperature_min=1., temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0, schedule_start=1):
+                 temp_factor=1., temperature_min=1., temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
+                 schedule_start=1):
         Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, out_path=out_path, gamma=gamma,
                        lr=lr,
                        grad_clip=grad_clip,
@@ -30,7 +31,8 @@ class REINFORCE(Agent):
                        train_seed=train_seed, epsilon_truncated_rate=epsilon_truncated_rate,
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
                        top_p=top_p, temperature=temperature, temperature_step=temperature_step, temp_factor=temp_factor,
-                       temperature_min=temperature_min, temperature_max=temperature_max, s_min=s_min, s_max=s_max, inv_schedule_step=inv_schedule_step, schedule_start=schedule_start)
+                       temperature_min=temperature_min, temperature_max=temperature_max, s_min=s_min, s_max=s_max,
+                       inv_schedule_step=inv_schedule_step, schedule_start=schedule_start)
 
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
@@ -68,6 +70,8 @@ class REINFORCE(Agent):
         logprobs = torch.stack(self.memory.logprobs).to(self.device)
         logprobs_truncated = torch.stack(self.memory.logprobs_truncated).to(self.device)
         values = torch.stack(self.memory.values).to(self.device)
+        hts = torch.stack(self.memory.ht).squeeze().to(self.device).detach()
+        cts = torch.stack(self.memory.ct).squeeze().to(self.device).detach()
 
         advantages = returns - values.detach().squeeze()
         rl_loss_per_timestep = -logprobs.view(-1) * advantages
@@ -103,8 +107,8 @@ class REINFORCE(Agent):
 
         # compute new log_probs for comparison with old ones:
         states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
-        policy_dist, policy_dist_truncated, value = self.policy(states_text, torch.stack(self.memory.states_img),
-                                                                torch.stack(self.memory.states_answer))
+        policy_dist, policy_dist_truncated, value, _, _ = self.policy(states_text, torch.stack(self.memory.states_img),
+                                                                torch.stack(self.memory.states_answer), ht=hts, ct=cts)
         new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
         ratios = torch.exp(torch.log(new_probs) - logprobs).detach()
         self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)

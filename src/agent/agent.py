@@ -22,7 +22,9 @@ class Agent:
                  pretrain=False, update_every=50,
                  num_truncated=10, p_th=None, truncate_mode="top_k", log_interval=10, test_envs=[], eval_no_trunc=0,
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
-                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1, temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0, schedule_start=1):
+                 is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
+                 temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
+                 schedule_start=1):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -35,8 +37,8 @@ class Agent:
         self.alpha_logits_lm = alpha_logits
         self.alpha_decay_rate = alpha_decay_rate
         self.temperature = temperature
-        #self.temperature = 1.
-        #self.temperature_start = temperature
+        # self.temperature = 1.
+        # self.temperature_start = temperature
         self.temp_factor = temp_factor
         self.temperature_step = temperature_step
         self.temperature_min = temperature_min
@@ -57,7 +59,8 @@ class Agent:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
             self.truncation = truncations[truncate_mode](self, num_truncated=num_truncated,
                                                          p_th=p_th_, pretrained_lm=pretrained_lm,
-                                                         top_p=top_p, s_min=s_min, s_max=s_max)  # adding the truncation class.
+                                                         top_p=top_p, s_min=s_min,
+                                                         s_max=s_max)  # adding the truncation class.
         else:
             self.eval_trunc = {"no_trunc": False}
             self.truncation = truncations["no_trunc"](self, num_truncated=num_truncated, p_th=p_th_, top_p=top_p,
@@ -111,15 +114,15 @@ class Agent:
             self.temp_factor = 1 / self.temp_factor
             print("inversing the temperature schedule at episode {}".format(i_episode + 1))
         if (i_episode + 1) >= self.schedule_start:
-            #self.temperature = self.temperature_start
+            # self.temperature = self.temperature_start
             if (i_episode + 1) == self.schedule_start:
                 print("starting the temperature scheduling at episode {}".format(i_episode + 1))
             if self.temp_factor < 1:
-                #logger.info("DECREASING TEMPERATURE SCHEDULE")
+                # logger.info("DECREASING TEMPERATURE SCHEDULE")
                 if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min:
                     self.temperature *= self.temp_factor
             else:
-                #logger.info("INCREASING TEMPERATURE SCHEDULE")
+                # logger.info("INCREASING TEMPERATURE SCHEDULE")
                 if (i_episode + 1) % self.temperature_step == 0 and self.temperature < self.temperature_max:
                     self.temperature *= self.temp_factor
         self.writer.add_scalar('temperature', self.temperature, i_episode)
@@ -141,9 +144,9 @@ class Agent:
             log_prob_truncated), policy_dist, logits_lm, log_probas_lm, origin_log_probs_lm, ht, ct
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., ht=None, ct=None):
-        policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
-                                                                valid_actions=valid_actions,
-                                                                logits_lm=logits_lm, alpha=alpha, ht=ht, ct=ct)
+        policy_dist, policy_dist_truncated, value, ht, ct = self.policy(state.text, state.img, state.answer,
+                                                                        valid_actions=valid_actions,
+                                                                        logits_lm=logits_lm, alpha=alpha, ht=ht, ct=ct)
         return policy_dist, policy_dist_truncated, value, ht, ct
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling', forced=None):
