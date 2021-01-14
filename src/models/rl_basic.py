@@ -169,9 +169,10 @@ class PolicyLSTMBatch(nn.Module):
     def _get_embed_text(self, text, answer, img, ht, ct):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
+        batch_size = pad_embed.size(0)
         if self.fusion == "sat":
             img_transposed = img.transpose(2, 1).to(self.device)
-            h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
+            h, c = self.init_hidden_state(img_transposed) if ht is None else (ht, ct)
             answer_embedding = None
             if self.condition_answer == "attention":
                 answer_embedding = self.answer_embedding(answer.view(text.size(0), 1).to(self.device))
@@ -187,8 +188,14 @@ class PolicyLSTMBatch(nn.Module):
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
-        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
-        return ht[-1], ct
+        if ht is None:
+            ht, ct = self.init_hidden(pad_embed.size(0))
+
+        packed_output, (ht, ct) = self.lstm(pad_embed_pack, (ht.view(1, batch_size, -1), ct.view(1, batch_size, -1)))
+        return ht[-1], ct[-1]
+
+    def init_hidden(self, size_):
+        return torch.zeros((1, size_, self.hidden_size)), torch.zeros((1, size_, self.hidden_size))
 
 
 class PolicyLSTMBatch_SL(nn.Module):
@@ -258,6 +265,7 @@ class PolicyLSTMBatch_SL(nn.Module):
     def _get_embed_text(self, text, img, answer):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text)
+
         if self.fusion == "sat":
             output = torch.zeros(text.size(0), text.size(1), self.hidden_size).to(self.device)
             img_transposed = img.transpose(2, 1).to(self.device)
@@ -275,7 +283,7 @@ class PolicyLSTMBatch_SL(nn.Module):
             return output
 
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
-        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
+        packed_output, (ht, ct) = self.lstm(pad_embed_pack, )
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
         return output
 
@@ -307,7 +315,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         return embedding
 
     def forward(self, state_text, state_img, state_answer):
-        embed_text = self._get_embed_text(state_text, state_img, state_answer )
+        embed_text = self._get_embed_text(state_text, state_img, state_answer)
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(self.conv(img_feat))
