@@ -195,7 +195,8 @@ class PolicyLSTMBatch(nn.Module):
         return ht[-1], ct[-1]
 
     def init_hidden(self, size_):
-        return torch.zeros((1, size_, self.hidden_size)), torch.zeros((1, size_, self.hidden_size))
+        return torch.zeros((1, size_, self.hidden_size)).to(self.device), torch.zeros((1, size_, self.hidden_size)).to(
+            self.device)
 
 
 class PolicyLSTMBatch_SL(nn.Module):
