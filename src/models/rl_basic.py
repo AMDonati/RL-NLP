@@ -82,12 +82,6 @@ class PolicyLSTMBatch(nn.Module):
             self.gammabeta = nn.Linear(self.hidden_size, 2 * self.num_filters)
             self.film = contrib_nn.FiLM()
             self.fusion_dim = self.num_filters * h_out ** 2
-        elif self.fusion == "pool":
-            projection_size = 2
-            self.avg_pooling = nn.AvgPool1d(kernel_size=8)
-            self.projection = nn.Linear(256, projection_size)
-            self.merge = nn.Linear(101 * projection_size, hidden_size)
-            self.fusion_dim = 2 * hidden_size
         elif self.fusion == "sat":
             self.attention = Attention(101, self.hidden_size, attention_dim, word_emb_size)
             self.init_h = nn.Linear(101, hidden_size)  # linear layer to find initial hidden state of LSTMCell
