@@ -124,26 +124,27 @@ class Agent:
                     self.temperature *= self.temp_factor
         self.writer.add_scalar('temperature', self.temperature, i_episode)
 
-    def act(self, state, mode='sampling', truncation=True, forced=None):
+    def act(self, state, mode='sampling', truncation=True, forced=None, ht=None, ct=None):
         valid_actions, action_probs, logits_lm, log_probas_lm, origin_log_probs_lm = self.truncation.get_valid_actions(
             state, truncation, temperature=self.temperature)
         alpha = self.alpha_logits_lm
-        policy_dist, policy_dist_truncated, value = self.get_policy_distributions(state, valid_actions,
-                                                                                  logits_lm,
-                                                                                  alpha=alpha)
+        policy_dist, policy_dist_truncated, value, ht, ct = self.get_policy_distributions(state, valid_actions,
+                                                                                          logits_lm,
+                                                                                          alpha=alpha, ht=ht, ct=ct)
         action = self.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                     valid_actions=valid_actions, mode=mode, forced=forced)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
         return action, log_prob, value, (
-            valid_actions, action_probs, log_prob_truncated), policy_dist, logits_lm, log_probas_lm, origin_log_probs_lm
+            valid_actions, action_probs,
+            log_prob_truncated), policy_dist, logits_lm, log_probas_lm, origin_log_probs_lm, ht, ct
 
-    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0.):
+    def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., ht=None, ct=None):
         policy_dist, policy_dist_truncated, value = self.policy(state.text, state.img, state.answer,
                                                                 valid_actions=valid_actions,
-                                                                logits_lm=logits_lm, alpha=alpha)
-        return policy_dist, policy_dist_truncated, value
+                                                                logits_lm=logits_lm, alpha=alpha, ht=ht, ct=ct)
+        return policy_dist, policy_dist_truncated, value, ht, ct
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling', forced=None):
         policy_to_sample_from = policy_dist_truncated
@@ -189,21 +190,21 @@ class Agent:
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
-        state, ep_reward = env.reset(seed), 0
+        state, ep_reward, ht, ct = env.reset(seed), 0, None, None
         for t in range(0, env.max_len):
             forced = env.ref_question[t]
             action, log_probs, value, (
                 valid_actions, actions_probs,
-                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm = self.act(
+                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm, ht, ct = self.act(
                 state=state,
                 mode=test_mode,
                 truncation=truncation,
-                forced=forced)
+                forced=forced, ht=ht, ct=ct)
             new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
-                                     value, state.answer)
+                                     value, state.answer, ht, ct)
                 if self.env.reward_type == "vilbert" and done:
                     self.writer.add_scalar("vilbert_rank", pred_answer, i_episode)
             timestep += 1

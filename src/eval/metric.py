@@ -22,7 +22,6 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 logger = logging.getLogger()
 
 
-
 class Metric:
     def __init__(self, agent, train_test, key, type, env_mode, trunc, sampling):
         self.measure = []
@@ -330,14 +329,15 @@ class PPLMetric(Metric):
                 ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
                 # getting the probs for the complete policy
                 ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
-
+                ht, ct = None, None
                 for i, action in enumerate(ref_question[:, 1:].view(-1)):
                     forced_state = state.__class__(ref_question[:, :i + 1], state.img, state.answer)
-                    real_action, log_probs, _, _, dist, _, _, _ = self.agent.act(
+
+                    real_action, log_probs, _, _, dist, _, _, _, ht, ct = self.agent.act(
                         state=forced_state,
                         mode="forced",
                         truncation=True,
-                        forced=action)
+                        forced=action, ht=ht, ct=ct)
                     self.measure.append(log_probs)
 
     def compute_(self, **kwargs):

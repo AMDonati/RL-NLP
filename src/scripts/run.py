@@ -16,7 +16,7 @@ from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
 from torch import optim
 from torch.optim import lr_scheduler
-
+import sys
 
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimizer, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
@@ -76,6 +76,7 @@ def get_parser():
     parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
+    parser.add_argument("-attention_dim", type=int, default=512, help="dimension of the attention")
     parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
@@ -119,7 +120,8 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
-    parser.add_argument('-s_min', default=10, type=int, help="minimal size of the valid action space of the truncation function.")
+    parser.add_argument('-s_min', default=10, type=int,
+                        help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
@@ -158,8 +160,10 @@ def get_parser():
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions", "ppl_dialog_lm", "ttr_question",
-                                 "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog", "eps_truncation", "histogram_answers",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated"], help="train metrics")
+                                 "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog",
+                                 "eps_truncation", "histogram_answers",
+                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated",
+                                 "dialogimage"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert",
                                  "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
@@ -177,6 +181,10 @@ def get_parser():
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
     return parser
 
+def create_cmd_file(cmd_file_path):
+    cmd_file=open(cmd_file_path, 'w')
+    cmd_file.write(" ".join(sys.argv))
+    cmd_file.close()
 
 def create_config_file(conf_file, args):
     config = ConfigParser()
@@ -238,7 +246,8 @@ def get_output_path(args):
     # temp args
     if args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
-            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(args.temp_max) + '_smax{}'.format(args.s_max)
+            args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(
+            args.temp_max) + '_smax{}'.format(args.s_max)
     if args.inv_schedule_step != 0:
         out_folder = out_folder + '_invsch{}'.format(args.inv_schedule_step)
     if args.schedule_start > 1:
@@ -368,7 +377,9 @@ def run(args):
     conf_file = os.path.join(output_path, 'conf.ini')
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     out_policy_file = os.path.join(output_path, 'model.pth')
+    cmd_file =  os.path.join(output_path, 'cmd.txt')
     create_config_file(conf_file, args)
+    create_cmd_file(cmd_file)
     logger = create_logger(out_file_log, level=args.logger_level)
     writer = SummaryWriter(log_dir=os.path.join(output_path, "runs"))
 
@@ -392,11 +403,14 @@ def run(args):
                                 stride=args.stride, num_filters=args.num_filters,
                                 fusion=args.fusion, env=env,
                                 condition_answer=args.condition_answer,
-                                device=device)
+                                device=device, attention_dim=args.attention_dim)
     if args.policy_path is not None:
         pretrained = torch.load(args.policy_path, map_location=device)
         if pretrained.__class__ != OrderedDict:
-            pretrained = pretrained.state_dict()
+            if pretrained.__class__ == dict:
+                pretrained = pretrained["model_state_dict"]
+            else:
+                pretrained = pretrained.state_dict()
         policy.load_state_dict(pretrained, strict=False)
         policy.device = device
     optimizer, scheduler = get_optimizer(policy, args)
