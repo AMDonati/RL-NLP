@@ -41,12 +41,14 @@ if __name__ == '__main__':
     parser.add_argument("-features_path", type=str, default='../../data/vqa-v2/coco_trainval.lmdb')
     parser.add_argument("-out_path", type=str, default='../../output/temp')
     parser.add_argument("-model_path", type=str, help="path for loading the model if starting from a pre-trained model")
-    parser.add_argument("-min_data", type=int, default=0, help="for VQAv2 train on a subpart of the dataset and a reduced vocabulary.")
+    parser.add_argument("-min_data", type=int, default=0,
+                        help="for VQAv2 train on a subpart of the dataset and a reduced vocabulary.")
     # model params.
     parser.add_argument("-model", type=str, default="lstm", help="rnn model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-emb_size", type=int, default=512, help="dimension of the embedding layer")
     parser.add_argument("-hidden_size", type=int, default=512, help="dimension of the hidden state")
+    parser.add_argument("-attention_dim", type=int, default=512, help="attention dim for fusion")
     # policy network specific args.
     parser.add_argument("-kernel_size", default=1, type=int)
     parser.add_argument("-num_filters", default=3, type=int)
@@ -95,13 +97,13 @@ if __name__ == '__main__':
                 test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
             elif args.task == "policy":
                 train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
-                                                  h5_feats_path=train_feats_path,
-                                                  vocab_path=vocab_path,
-                                                  max_samples=args.max_samples)
+                                              h5_feats_path=train_feats_path,
+                                              vocab_path=vocab_path,
+                                              max_samples=args.max_samples)
                 val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
-                                                h5_feats_path=val_feats_path,
-                                                vocab_path=vocab_path,
-                                                max_samples=args.max_samples)
+                                            h5_feats_path=val_feats_path,
+                                            vocab_path=vocab_path,
+                                            max_samples=args.max_samples)
                 test_dataset = val_dataset
 
 
@@ -174,7 +176,9 @@ if __name__ == '__main__':
                                        stride=args.stride,
                                        fusion=args.fusion,
                                        condition_answer=args.condition_answer,
-                                       num_tokens_answer=train_dataset.len_vocab_answer, device=device).to(device)
+                                       num_tokens_answer=train_dataset.len_vocab_answer, device=device,
+                                       attention_dim=args.attention_dim).to(
+                device)
         if args.model_path is not None:
             print("Loading trained model...")
             model_ = torch.load(os.path.join(args.model_path, "model.pt"), map_location=torch.device('cpu'))
@@ -185,6 +189,7 @@ if __name__ == '__main__':
                 model = model_.to(device)
         return model
 
+
     def get_temperatures(args):
         temperatures = []
         if "sampling" in args.eval_modes:
@@ -193,9 +198,10 @@ if __name__ == '__main__':
             temperatures.append("greedy")
         return temperatures
 
+
     ################################################################################################################################################
-        # MAIN
-################################################################################################################################################
+    # MAIN
+    ################################################################################################################################################
     if args.model_path is not None:
         assert args.ep == 0, "if model path is provided, only evaluation should be done."
     model = get_model(args, train_dataset, device)
