@@ -123,9 +123,15 @@ class Agent:
             if self.temp_factor < 1:
                 if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min:
                     self.temperature *= self.temp_factor
+                    if self.temperature < self.temperature_min:
+                        logger.info("LAST TEMPERATURE UPDATE at temp {}".format(self.temperature_min))
+                        self.temperature = self.temperature_min
             else:
                 if (i_episode + 1) % self.temperature_step == 0 and self.temperature < self.temperature_max:
                     self.temperature *= self.temp_factor
+                    if self.temperature > self.temperature_max:
+                        logger.info("LAST TEMPERATURE UPDATE at temp {}".format(self.temperature_max))
+                        self.temperature = self.temperature_max
         self.writer.add_scalar('temperature', self.temperature, i_episode)
 
     def act(self, state, mode='sampling', truncation=True, forced=None, ht=None, ct=None):
