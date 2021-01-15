@@ -10,6 +10,8 @@ def get_parser():
     parser.add_argument("-models_path", type=str, required=True,
                         help="data folder containing models")
     parser.add_argument("-num_diversity", type=int, default=None, help="repeating on test the same image/answer")
+    parser.add_argument("-num_episodes_test", type=int, default=None, help="number of test episodes")
+
     return parser
 
 
@@ -45,7 +47,8 @@ def eval(args):
             defaults["policy_path"] = os.path.join(dir, "model.pth")
             if args.num_diversity is not None:
                 defaults["num_diversity"] = args.num_diversity
-
+            if args.num_episodes_test is not None:
+                defaults["num_episodes_test"] = args.num_episodes_test
             conf_parser = get_run_parser()
             conf_parser.set_defaults(**defaults)
             # args_list=list(np.array(list(defaults.items())).ravel())
