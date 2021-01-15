@@ -11,8 +11,10 @@ def get_parser():
                         help="data folder containing models")
     parser.add_argument("-num_diversity", type=int, default=None, help="repeating on test the same image/answer")
     parser.add_argument("-num_episodes_test", type=int, default=None, help="number of test episodes")
-    parser.add_argument('-test_metrics', nargs='+', type=str, default=None,
-                        help="test metrics")
+    parser.add_argument("-test_metrics", nargs='+', type=str,
+                        default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert", "size_valid_actions",
+                                 "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
+                                 "selfbleu", "dialogimage", "valid_actions"], help="test metrics")
     return parser
 
 
