@@ -52,6 +52,25 @@ def eval(args):
                 defaults["num_episodes_test"] = args.num_episodes_test
             if args.test_metrics is not None:
                 defaults["test_metrics"] = args.test_metrics
+
+            if "temp_factor" in defaults.keys():
+                if "inv_schedule_step" in defaults.keys():
+                    if defaults["inv_schedule_step"] == 0:
+                        if defaults["temp_factor"] < 1:
+                            defaults["temperature"] = defaults["temp_min"]
+                        elif defaults["temp_factor"] > 1:
+                            defaults["temperature"] = defaults["temp_max"]
+                    else:
+                        if defaults["temp_factor"] > 1:
+                            defaults["temperature"] = defaults["temp_min"]
+                        elif defaults["temp_factor"] < 1:
+                            defaults["temperature"] = defaults["temp_max"]
+                else:
+                    if defaults["temp_factor"] < 1:
+                        defaults["temperature"] = defaults["temp_min"]
+                    elif defaults["temp_factor"] > 1:
+                        defaults["temperature"] = defaults["temp_max"]
+
             conf_parser = get_run_parser()
             conf_parser.set_defaults(**defaults)
             # args_list=list(np.array(list(defaults.items())).ravel())
