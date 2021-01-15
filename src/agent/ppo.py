@@ -56,11 +56,12 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
-        policy_dist, _, value, _, _ = self.policy(state_text, state_img, states_answer, valid_actions=None,
-                                                  ht=old_ht_truncated, ct=old_ct_truncated)
+        policy_dist, policy_dist_truncated, value, _, _ = self.policy(state_text, state_img, states_answer,
+                                                                      valid_actions=None,
+                                                                      ht=old_ht_truncated, ct=old_ct_truncated)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
-        return log_prob, value, dist_entropy, policy_dist
+        return log_prob, value, dist_entropy, policy_dist, policy_dist_truncated
 
     def update(self):
         rewards = []
@@ -83,16 +84,20 @@ class PPO(Agent):
         old_ct_truncated = torch.stack(self.memory.ct).squeeze().to(self.device).detach()
 
         all_probs = torch.zeros((self.K_epochs, old_actions.size(0)))
+        all_probs_truncated = torch.zeros((self.K_epochs, old_actions.size(0)))
+
         all_advantages = torch.zeros((self.K_epochs, old_actions.size(0)))
 
         # Optimize policy for K epochs:
         for i in range(self.K_epochs):
             # Evaluating old actions and values:
             old_states_img.requires_grad = True
-            logprobs, state_values, dist_entropy, policy_dist = self.evaluate(old_states_text, old_states_img,
-                                                                              old_states_answer,
-                                                                              old_actions, old_ht_truncated,
-                                                                              old_ct_truncated)
+            logprobs, state_values, dist_entropy, policy_dist, policy_dist_truncated = self.evaluate(old_states_text,
+                                                                                                     old_states_img,
+                                                                                                     old_states_answer,
+                                                                                                     old_actions,
+                                                                                                     old_ht_truncated,
+                                                                                                     old_ct_truncated)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
@@ -110,6 +115,7 @@ class PPO(Agent):
             # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
 
             all_probs[i, :] = torch.gather(policy_dist.probs, -1, old_actions).squeeze()
+            all_probs_truncated[i, :] = torch.gather(policy_dist_truncated.probs, -1, old_actions).squeeze()
             all_advantages[i, :] = advantages
 
             if self.pretrain:
@@ -149,12 +155,12 @@ class PPO(Agent):
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
 
+        all_probs_ = all_probs - torch.exp(old_logprobs).view(1, -1)
         #all_probs_ = torch.cat([torch.exp(old_logprobs).view(1, -1), all_probs], dim=0)
-        all_probs_ = all_probs-torch.exp(old_logprobs).view(1,-1)
 
         df_probs = pd.DataFrame(all_probs_.cpu().detach().numpy())
-        #df_probs_diff=df_probs.diff()[1:].reset_index()
         df_advs = pd.DataFrame(torch.sign(all_advantages).numpy())
+        #df_probs_diff=df_probs.diff()[1:].reset_index()
         df = df_probs * df_advs
 
         (df.values >= 0).mean()
