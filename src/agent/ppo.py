@@ -87,11 +87,13 @@ class PPO(Agent):
         all_probs_truncated = torch.zeros((self.K_epochs, old_actions.size(0)))
 
         all_advantages = torch.zeros((self.K_epochs, old_actions.size(0)))
+        all_surr = torch.zeros((self.K_epochs, old_actions.size(0)))
+        all_ratios = torch.zeros((self.K_epochs, old_actions.size(0)))
 
         # Optimize policy for K epochs:
         for i in range(self.K_epochs):
             # Evaluating old actions and values:
-            old_states_img.requires_grad = True
+            # old_states_img.requires_grad = True
             logprobs, state_values, dist_entropy, policy_dist, policy_dist_truncated = self.evaluate(old_states_text,
                                                                                                      old_states_img,
                                                                                                      old_states_answer,
@@ -114,10 +116,6 @@ class PPO(Agent):
             advantages = rewards - state_values.detach().squeeze()
             # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
 
-            all_probs[i, :] = torch.gather(policy_dist.probs, -1, old_actions).squeeze()
-            all_probs_truncated[i, :] = torch.gather(policy_dist_truncated.probs, -1, old_actions).squeeze()
-            all_advantages[i, :] = advantages
-
             if self.pretrain:
                 advantages = 1.
             surr1 = ratios * advantages
@@ -127,6 +125,13 @@ class PPO(Agent):
 
             vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards)
             loss = surr + vf_loss - entropy_loss
+
+            all_probs[i, :] = torch.gather(policy_dist.probs, -1, old_actions).squeeze().cpu().detach()
+            all_probs_truncated[i, :] = torch.gather(policy_dist_truncated.probs, -1,
+                                                     old_actions).squeeze().cpu().detach()
+            all_advantages[i, :] = advantages
+            all_surr[i, :] = surr.cpu().detach()
+            all_ratios[i, :] = ratios.cpu().detach()
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
@@ -156,14 +161,18 @@ class PPO(Agent):
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         all_probs_ = all_probs - torch.exp(old_logprobs).view(1, -1)
-        #all_probs_ = torch.cat([torch.exp(old_logprobs).view(1, -1), all_probs], dim=0)
+        # all_probs_ = torch.cat([torch.exp(old_logprobs).view(1, -1), all_probs], dim=0)
 
         df_probs = pd.DataFrame(all_probs_.cpu().detach().numpy())
         df_advs = pd.DataFrame(torch.sign(all_advantages).numpy())
-        #df_probs_diff=df_probs.diff()[1:].reset_index()
+        # df_probs_diff=df_probs.diff()[1:].reset_index()
         df = df_probs * df_advs
 
         (df.values >= 0).mean()
+
+        all_probs_truncated_ = all_probs_truncated - torch.exp(old_logprobs_truncated).view(1, -1)
+        df_probs_truncated = pd.DataFrame(all_probs_truncated_.cpu().detach().numpy())
+        df_truncated = df_probs_truncated * df_advs
 
         return loss.mean()
 
