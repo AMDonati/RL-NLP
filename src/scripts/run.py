@@ -18,6 +18,7 @@ from torch import optim
 from torch.optim import lr_scheduler
 import sys
 
+
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimizer, args_):
     generic_kwargs = {"pretrained_lm": pretrained_lm,
                       "optimizer": optimizer,
@@ -166,7 +167,8 @@ def get_parser():
                                  "dialogimage"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert", "size_valid_actions",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage", "valid_actions"],
+                                 "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
+                                 "selfbleu", "dialogimage", "valid_actions"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
@@ -181,10 +183,12 @@ def get_parser():
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
     return parser
 
+
 def create_cmd_file(cmd_file_path):
-    cmd_file=open(cmd_file_path, 'w')
+    cmd_file = open(cmd_file_path, 'w')
     cmd_file.write(" ".join(sys.argv))
     cmd_file.close()
+
 
 def create_config_file(conf_file, args):
     config = ConfigParser()
@@ -377,7 +381,7 @@ def run(args):
     conf_file = os.path.join(output_path, 'conf.ini')
     out_file_log = os.path.join(output_path, 'RL_training_log.log')
     out_policy_file = os.path.join(output_path, 'model.pth')
-    cmd_file =  os.path.join(output_path, 'cmd.txt')
+    cmd_file = os.path.join(output_path, 'cmd.txt')
     create_config_file(conf_file, args)
     create_cmd_file(cmd_file)
     logger = create_logger(out_file_log, level=args.logger_level)

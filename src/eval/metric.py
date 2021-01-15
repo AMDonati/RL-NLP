@@ -838,15 +838,21 @@ class ActionProbsTruncated(Metric):
         Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
-        self.measure.append(kwargs["log_probs_truncated"])
+        action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
+        self.measure.append([kwargs["log_probs_truncated"], action_decoded])
 
     def compute_(self, **kwargs):
-        ep_log_probs_truncated = torch.stack(self.measure).clone().detach()
-        self.ep_probs_truncated = np.round(np.exp(ep_log_probs_truncated.cpu().squeeze().numpy()), decimals=5)
-        self.metric.append(np.mean(self.ep_probs_truncated))
+        self.ep_probs_truncated = {}
+        logprobs = [i[0] for i in self.measure]
+        ep_log_probs_truncated = torch.stack(logprobs).clone().detach()
+        self.ep_probs_truncated["actions"] = [i[1] for i in self.measure]
+        self.ep_probs_truncated ["probs"] = np.round(np.exp(ep_log_probs_truncated.cpu().view(-1).numpy()), decimals=5)
+        self.metric.append(np.mean(self.ep_probs_truncated["probs"]))
 
     def log(self, **kwargs):
-        logger.info('episode action probs truncated: {}'.format(self.ep_probs_truncated))
+        log_info = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
+                             zip(self.ep_probs_truncated["actions"], self.ep_probs_truncated["probs"])]
+        logger.info('episode action probs truncated: {}'.format(log_info))
 
 
 class LMActionProbs(Metric):
