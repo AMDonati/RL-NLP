@@ -886,7 +886,7 @@ class VilbertMetric(Metric):
                 question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
                                                                           ignored=["<SOS>"],
                                                                           stop_at_end=True)
-                ref_questions = kwargs["ref_questions_decoded"]
+                ref_questions = kwargs["ref_questions_decoded"][0]
                 score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
                                                 step_idx=None,
                                                 done=True)

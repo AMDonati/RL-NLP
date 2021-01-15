@@ -272,6 +272,8 @@ class VILBERT(Reward):
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None, entry=None):
         if not done:
             return 0, "N/A", None
+        if type(ep_questions_decoded) != str:
+            ep_questions_decoded = ep_questions_decoded[0]
         vil_prediction, target = self.get_preds(question)
         if self.reduced_answers:
             mask = torch.ones_like(vil_prediction) * float("-Inf")
