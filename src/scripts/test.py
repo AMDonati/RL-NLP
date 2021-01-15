@@ -11,7 +11,8 @@ def get_parser():
                         help="data folder containing models")
     parser.add_argument("-num_diversity", type=int, default=None, help="repeating on test the same image/answer")
     parser.add_argument("-num_episodes_test", type=int, default=None, help="number of test episodes")
-
+    parser.add_argument('-test_metrics', nargs='+', type=str, default=None,
+                        help="test metrics")
     return parser
 
 
@@ -49,6 +50,8 @@ def eval(args):
                 defaults["num_diversity"] = args.num_diversity
             if args.num_episodes_test is not None:
                 defaults["num_episodes_test"] = args.num_episodes_test
+            if args.test_metrics is not None:
+                defaults["test_metrics"] = args.test_metrics
             conf_parser = get_run_parser()
             conf_parser.set_defaults(**defaults)
             # args_list=list(np.array(list(defaults.items())).ravel())
