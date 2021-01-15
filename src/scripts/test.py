@@ -46,6 +46,24 @@ def eval(args):
             if args.num_diversity is not None:
                 defaults["num_diversity"] = args.num_diversity
 
+            if "temp_factor" in defaults.keys():
+                if "inv_schedule_step" in defaults.keys():
+                    if defaults["inv_schedule_step"] == 0:
+                        if defaults["temp_factor"] < 1:
+                            defaults["temperature"] = defaults["temp_min"]
+                        elif defaults["temp_factor"] > 1:
+                            defaults["temperature"] = defaults["temp_max"]
+                    else:
+                        if defaults["temp_factor"] > 1:
+                            defaults["temperature"] = defaults["temp_min"]
+                        elif defaults["temp_factor"] < 1:
+                            defaults["temperature"] = defaults["temp_max"]
+                else:
+                    if defaults["temp_factor"] < 1:
+                        defaults["temperature"] = defaults["temp_min"]
+                    elif defaults["temp_factor"] > 1:
+                        defaults["temperature"] = defaults["temp_max"]
+
             conf_parser = get_run_parser()
             conf_parser.set_defaults(**defaults)
             # args_list=list(np.array(list(defaults.items())).ravel())

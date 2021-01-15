@@ -165,8 +165,8 @@ def get_parser():
                                  "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated",
                                  "dialogimage"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
-                        default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert",
-                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage"],
+                        default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert", "size_valid_actions",
+                                 "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr", "selfbleu", "dialogimage", "valid_actions"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],

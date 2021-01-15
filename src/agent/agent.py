@@ -118,11 +118,9 @@ class Agent:
             if (i_episode + 1) == self.schedule_start:
                 print("starting the temperature scheduling at episode {}".format(i_episode + 1))
             if self.temp_factor < 1:
-                # logger.info("DECREASING TEMPERATURE SCHEDULE")
                 if (i_episode + 1) % self.temperature_step == 0 and self.temperature > self.temperature_min:
                     self.temperature *= self.temp_factor
             else:
-                # logger.info("INCREASING TEMPERATURE SCHEDULE")
                 if (i_episode + 1) % self.temperature_step == 0 and self.temperature < self.temperature_max:
                     self.temperature *= self.temp_factor
         self.writer.add_scalar('temperature', self.temperature, i_episode)
@@ -185,7 +183,7 @@ class Agent:
         return epoch, loss
 
     def test(self, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=1):
-        self.temperature = 1
+        #self.temperature = 1
         for env in self.test_envs:
             logger.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
@@ -255,6 +253,7 @@ class Agent:
         timestep = 1
         self.policy.eval()
         for i_episode in range(num_episodes):
+            print("temperature at test: {}".format(self.temperature))
             logger.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = i_episode if test_seed else np.random.randint(1000000)
             for key_trunc, trunc in self.eval_trunc.items():
@@ -267,6 +266,7 @@ class Agent:
                             truncation=trunc, metrics=metrics)
                     for _, metric in metrics.items():
                         metric.write()
+                        metric.log(valid_actions=valid_actions)
                 for _, metric in metrics.items():
                     metric.write_div()
         for key_trunc in self.eval_trunc.keys():
