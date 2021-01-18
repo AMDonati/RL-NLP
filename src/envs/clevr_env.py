@@ -55,7 +55,7 @@ class GenericEnv(gym.Env):
             self.reward_func = Differential(self.reward_func)
 
     def step(self, action):
-        action = torch.tensor(action).view(1, 1)
+        action = torch.tensor(action[0]).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
         done = self.check_if_done(action)
         question_tokens = self.state.text.numpy().ravel()

@@ -62,7 +62,7 @@ class PolicyLSTMBatch(nn.Module):
         self.num_tokens = num_tokens
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
+        self.word_embedding = nn.Embedding(num_tokens, word_emb_size, padding_idx=0)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         truncature = {"masked": mask_truncature, "masked_inf": mask_inf_truncature}
         self.truncate = truncature["masked_inf"]
@@ -186,8 +186,8 @@ class PolicyLSTMBatch(nn.Module):
         if self.condition_answer == "before_lstm" and answer is not None:
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
-        packed_output, (ht, ct) = self.lstm(pad_embed_pack)
+        #pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+        packed_output, (ht, ct) = self.lstm(pad_embed)
         return ht[-1], ct
 
 
@@ -307,7 +307,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         return embedding
 
     def forward(self, state_text, state_img, state_answer):
-        embed_text = self._get_embed_text(state_text, state_img, state_answer )
+        embed_text = self._get_embed_text(state_text, state_img, state_answer)
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(self.conv(img_feat))

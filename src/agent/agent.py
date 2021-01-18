@@ -12,6 +12,7 @@ from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
 from utils.utils_train import write_to_csv
+from torch.distributions import Categorical
 
 logger = logging.getLogger()
 
@@ -77,6 +78,7 @@ class Agent:
         self.init_metrics()
         self.start_episode = 1
         self.train_seed = train_seed
+        self.actions = []
 
     def init_metrics(self):
         self.metrics = {}
@@ -136,6 +138,7 @@ class Agent:
                                                                                           alpha=alpha, ht=ht, ct=ct)
         action = self.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                     valid_actions=valid_actions, mode=mode, forced=forced)
+        self.actions.append(action)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)
         log_prob_truncated = policy_dist_truncated.log_prob(action.to(self.device)).view(-1)
 
@@ -147,6 +150,9 @@ class Agent:
         policy_dist, policy_dist_truncated, value, ht, ct = self.policy(state.text, state.img, state.answer,
                                                                         valid_actions=valid_actions,
                                                                         logits_lm=logits_lm, alpha=alpha, ht=ht, ct=ct)
+        policy_dist = Categorical(policy_dist.probs)
+        policy_dist_truncated = Categorical(policy_dist_truncated.probs)
+
         return policy_dist, policy_dist_truncated, value, ht, ct
 
     def sample_action(self, policy_dist, policy_dist_truncated, valid_actions, mode='sampling', forced=None):

@@ -26,11 +26,12 @@ def mask_truncature(valid_actions, logits, device, num_tokens=86):
 
 def mask_inf_truncature(valid_actions, logits, device, num_tokens=86):
     mask = (torch.ones(logits.size(0), num_tokens) * -1e32).to(device)
-    mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
+    # mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
+    mask.scatter_(dim=-1, index=valid_actions, src=torch.gather(logits, -1, valid_actions))
     probs_truncated = F.softmax(mask, dim=-1)
     # check that the truncation is right.
-    if probs_truncated[:, valid_actions].sum(dim=-1) - 1 > 1e-6:
-        print("ERROR IN TRUNCATION FUNCTION")
+    #if probs_truncated[:, valid_actions].sum(dim=-1) - 1 > 1e-6:
+        #print("ERROR IN TRUNCATION FUNCTION")
     policy_dist_truncated = Categorical(probs_truncated)
     return policy_dist_truncated
 

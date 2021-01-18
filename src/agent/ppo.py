@@ -5,6 +5,10 @@ from torch.nn.utils.rnn import pad_sequence
 from RL_toolbox.RL_functions import compute_grad_norm
 from agent.agent import Agent
 import pandas as pd
+import logging
+from torch.distributions import Categorical
+
+logger = logging.getLogger()
 
 
 class PPO(Agent):
@@ -54,11 +58,23 @@ class PPO(Agent):
         self.entropy_coeff = entropy_coeff
         self.update_mode = "episode"
         self.writer_iteration = 0
+        self.states = []
+        self.policies = []
+        self.policies_1 = []
 
-    def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
+    def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated, alpha):
         policy_dist, policy_dist_truncated, value, _, _ = self.policy(state_text, state_img, states_answer,
                                                                       valid_actions=None,
-                                                                      ht=old_ht_truncated, ct=old_ct_truncated)
+                                                                      ht=old_ht_truncated, ct=old_ct_truncated,
+                                                                      alpha=alpha)
+        # policy_dist_0, policy_dist_truncated_0, value_0, _, _ = self.policy(state_text, state_img, states_answer,
+        #                                                                    valid_actions=None,
+        #                                                                    ht=old_ht_truncated, ct=old_ct_truncated,
+        #                                                                    alpha=alpha)
+
+        # same = (policy_dist.logits == policy_dist_0.logits).sum() / (
+        # policy_dist.logits.size(0) * policy_dist.logits.size(1))
+
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy, policy_dist, policy_dist_truncated
@@ -89,6 +105,7 @@ class PPO(Agent):
         all_advantages = torch.zeros((self.K_epochs, old_actions.size(0)))
         all_surr = torch.zeros((self.K_epochs, old_actions.size(0)))
         all_ratios = torch.zeros((self.K_epochs, old_actions.size(0)))
+        all_log_probs = torch.zeros((self.K_epochs, old_actions.size(0)))
 
         # Optimize policy for K epochs:
         for i in range(self.K_epochs):
@@ -99,8 +116,10 @@ class PPO(Agent):
                                                                                                      old_states_answer,
                                                                                                      old_actions,
                                                                                                      old_ht_truncated,
-                                                                                                     old_ct_truncated)
+                                                                                                     old_ct_truncated,
+                                                                                                     self.alpha_logits_lm)
 
+            self.policies_1.append(policy_dist)
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach().view(-1))
 
@@ -127,6 +146,8 @@ class PPO(Agent):
             loss = surr + vf_loss - entropy_loss
 
             all_probs[i, :] = torch.gather(policy_dist.probs, -1, old_actions).squeeze().cpu().detach()
+            all_log_probs[i, :] = torch.log(all_probs[i, :])
+
             all_probs_truncated[i, :] = torch.gather(policy_dist_truncated.probs, -1,
                                                      old_actions).squeeze().cpu().detach()
             all_advantages[i, :] = advantages
@@ -157,10 +178,7 @@ class PPO(Agent):
         if self.scheduler is not None:
             self.scheduler.step()
 
-        # Copy new weights into old policy:
-        self.policy_old.load_state_dict(self.policy.state_dict())
-
-        all_probs_ = all_probs - torch.exp(old_logprobs).view(1, -1)
+        all_probs_ = torch.log(all_probs) - old_logprobs.view(1, -1)
         # all_probs_ = torch.cat([torch.exp(old_logprobs).view(1, -1), all_probs], dim=0)
 
         df_probs = pd.DataFrame(all_probs_.cpu().detach().numpy())
@@ -168,18 +186,39 @@ class PPO(Agent):
         # df_probs_diff=df_probs.diff()[1:].reset_index()
         df = df_probs * df_advs
 
-        (df.values >= 0).mean()
+        logger.info((df.values >= 0).mean())
 
         all_probs_truncated_ = all_probs_truncated - torch.exp(old_logprobs_truncated).view(1, -1)
         df_probs_truncated = pd.DataFrame(all_probs_truncated_.cpu().detach().numpy())
         df_truncated = df_probs_truncated * df_advs
+        logger.info((df_truncated.values >= 0).mean())
 
+        # Copy new weights into old policy:
+        self.policy_old.load_state_dict(self.policy.state_dict())
         return loss.mean()
 
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False, ht=None,
                                  ct=None):
         policy = self.start_policy if baseline else self.policy_old
-        policy_dist, policy_dist_truncated, value, ht, ct = policy(state.text, state.img, state.answer,
-                                                                   valid_actions=valid_actions,
-                                                                   logits_lm=logits_lm, alpha=alpha, ht=ht, ct=ct)
+
+        state_text = state.text.repeat((2, 1))
+        state_img = state.img.repeat((2, 1, 1))
+        state_answer = state.answer.repeat((2))
+        state_valid_actions = valid_actions.repeat((2, 1)) if valid_actions is not None else None
+        state_logits_lm = logits_lm.repeat((2, 1)) if type(logits_lm)!= int else 0
+        if ht is not None:
+            ht = ht.repeat((1, 2, 1))
+            ct = ct.repeat((1, 2, 1))
+
+        policy_dist, policy_dist_truncated, value, ht, ct = policy(state_text, state_img, state_answer,
+                                                                   valid_actions=state_valid_actions,
+                                                                   logits_lm=state_logits_lm, alpha=alpha, ht=ht, ct=ct)
+
+        policy_dist = Categorical(policy_dist.probs[0:1])
+        policy_dist_truncated = Categorical(policy_dist_truncated.probs[0:1])
+        value = value[0:1]
+        ht = ht[0:1]
+        ct = ct[0:1]
+        self.states.append((state.text, state.img, state.answer, valid_actions, logits_lm, alpha, ht, ct))
+        self.policies.append(policy_dist)
         return policy_dist, policy_dist_truncated, value, ht, ct
