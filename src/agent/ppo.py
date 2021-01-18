@@ -178,20 +178,20 @@ class PPO(Agent):
         if self.scheduler is not None:
             self.scheduler.step()
 
-        all_probs_ = torch.log(all_probs) - old_logprobs.view(1, -1)
+        #all_probs_ = torch.log(all_probs) - old_logprobs.view(1, -1)
         # all_probs_ = torch.cat([torch.exp(old_logprobs).view(1, -1), all_probs], dim=0)
 
-        df_probs = pd.DataFrame(all_probs_.cpu().detach().numpy())
-        df_advs = pd.DataFrame(torch.sign(all_advantages).numpy())
+        #df_probs = pd.DataFrame(all_probs_.cpu().detach().numpy())
+        #df_advs = pd.DataFrame(torch.sign(all_advantages).numpy())
         # df_probs_diff=df_probs.diff()[1:].reset_index()
-        df = df_probs * df_advs
+        #df = df_probs * df_advs
 
-        logger.info((df.values >= 0).mean())
+        #logger.info((df.values >= 0).mean())
 
-        all_probs_truncated_ = all_probs_truncated - torch.exp(old_logprobs_truncated).view(1, -1)
-        df_probs_truncated = pd.DataFrame(all_probs_truncated_.cpu().detach().numpy())
-        df_truncated = df_probs_truncated * df_advs
-        logger.info((df_truncated.values >= 0).mean())
+        #all_probs_truncated_ = all_probs_truncated - torch.exp(old_logprobs_truncated).view(1, -1)
+        #df_probs_truncated = pd.DataFrame(all_probs_truncated_.cpu().detach().numpy())
+        #df_truncated = df_probs_truncated * df_advs
+        #logger.info((df_truncated.values >= 0).mean())
 
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
