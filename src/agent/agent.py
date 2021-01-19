@@ -186,7 +186,6 @@ class Agent:
         return epoch, loss
 
     def test(self, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=1):
-        #self.temperature = 1
         for env in self.test_envs:
             logger.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
@@ -252,11 +251,11 @@ class Agent:
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
     def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=10):
+        print("temperature at test: {}".format(self.temperature))
         env.reset()  # init env.
         timestep = 1
         self.policy.eval()
         for i_episode in range(num_episodes):
-            print("temperature at test: {}".format(self.temperature))
             logger.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
             seed = i_episode if test_seed else np.random.randint(1000000)
             for key_trunc, trunc in self.eval_trunc.items():
