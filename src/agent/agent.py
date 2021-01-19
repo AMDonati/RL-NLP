@@ -37,8 +37,6 @@ class Agent:
         self.alpha_logits_lm = alpha_logits
         self.alpha_decay_rate = alpha_decay_rate
         self.temperature = temperature
-        # self.temperature = 1.
-        # self.temperature_start = temperature
         self.temp_factor = temp_factor
         self.temperature_step = temperature_step
         self.temperature_min = temperature_min
@@ -193,7 +191,10 @@ class Agent:
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
-        state, ep_reward, ht, ct = env.reset(seed), 0, None, None
+        if train or seed is None:
+            state, ep_reward, ht, ct = env.reset(seed=seed), 0, None, None
+        else:
+            state, ep_reward, ht, ct = env.reset(i_episode=i_episode), 0, None, None
         for t in range(0, env.max_len):
             forced = env.ref_question[t]
             action, log_probs, value, (
@@ -257,7 +258,7 @@ class Agent:
         self.policy.eval()
         for i_episode in range(num_episodes):
             logger.info('-' * 20 + 'Test Episode: {}'.format(i_episode) + '-' * 20)
-            seed = i_episode if test_seed else np.random.randint(1000000)
+            seed = i_episode if test_seed else None
             for key_trunc, trunc in self.eval_trunc.items():
                 metrics = self.get_metrics(env.mode, key_trunc, test_mode)
                 for i in range(num_diversity):  # loop multiple time over the same image to measure langage diversity.
@@ -279,13 +280,10 @@ class Agent:
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logger.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
         logger.info('Last reward: {:.2f}'.format(ep_reward))
-        logger.info('LAST DIALOG: {}'.format(
-            self.env.dataset.question_tokenizer.decode(state.text[:, 1:].numpy()[0])))
-        logger.info('Closest Question: {}'.format(closest_question))
         for key, metric in self.metrics["train"].items():
             metric.log(valid_actions=valid_actions)
             metric.write()
-        logger.info("-" * 60)
+        logger.info("-" * 100)
 
     def learn(self, num_episodes=100):
         sampling_mode = "forced" if self.pretrain else "sampling"

@@ -109,14 +109,21 @@ class ClevrEnv(GenericEnv):
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
 
-    def reset(self, seed=None):
+    def get_env_img_idx(self, i_episode, range_images):
+        if i_episode is not None and i_episode < range_images[1]:
+            img_idx = i_episode
+        else:
+            img_idx = np.random.randint(range_images[0], range_images[1])
+        return img_idx
+
+    def reset(self, seed=None, i_episode=None):
         range_images = [int(self.debug[0]), int(self.debug[1])] if self.mode != "test_images" else [0,
                                                                                                     self.dataset.all_feats.shape[
                                                                                                         0]]
         if seed is not None:
             np.random.seed(seed)
         # getting the environment's elements: Img, ref_questions, ref_answers.
-        self.img_idx = np.random.randint(range_images[0], range_images[1])
+        self.img_idx = self.get_env_img_idx(i_episode, range_images)
         self.img_feats, questions, self.ref_answers = self.dataset.get_data_from_img_idx(self.img_idx)
         self.ref_questions = questions[:, :self.max_len]
 
@@ -205,11 +212,18 @@ class VQAEnv(GenericEnv):
             modes = {"train": "train", "test_images": "val", "test_text": "train"}
         return modes
 
-    def reset(self, seed=None):
+    def get_env_idx(self, i_episode, entries):
+        if i_episode is not None and i_episode < len(entries):
+            env_idx = i_episode
+        else:
+            env_idx = np.random.randint(0, len(entries))
+        return env_idx
+
+    def reset(self, seed=None, i_episode=None):
         if seed is not None:
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
-        self.env_idx = np.random.randint(0, len(entries))
+        self.env_idx = self.get_env_idx(i_episode, entries)
         self.entry = entries[self.env_idx]
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)
         labels, _ = self.dataset.get_answer_data(self.entry)

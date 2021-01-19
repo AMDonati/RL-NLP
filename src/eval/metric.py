@@ -197,22 +197,27 @@ class DialogMetric(Metric):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, :].numpy()[0],
                                                                    ignored=[])
-            if self.reward_type == 'vqa':
-                pred_answer_decoded = self.dataset.question_tokenizer.decode(kwargs["pred_answer"].numpy(),
-                                                                             decode_answers=True)
-                ref_answer_decoded = self.dataset.question_tokenizer.decode(
-                    text=[kwargs["ref_answer"].numpy().item()],
-                    decode_answers=True)
+            if self.reward_type == 'vqa' or self.reward_type == "vilbert":
+                pred_answer = [int(kwargs["pred_answer"].squeeze().numpy())]
+                pred_answer_decoded = self.dataset.answer_tokenizer.decode(text=pred_answer)
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
                 ref_question_decoded = kwargs["ref_questions_decoded"]
                 string = ' IMG {} - question index {}:'.format(kwargs["img_idx"],
-                                                               kwargs["question_idx"]) \
-                         + '\n' + 'DIALOG:' + state_decoded + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + 'REF QUESTION:' + \
-                         ref_question_decoded[0] + '\n' + '-' * 40
+                                                               kwargs[
+                                                                   "question_idx"]) + '\n' + 'DIALOG:' + state_decoded + '\n' + 'REF QUESTION:' + \
+                         ref_question_decoded[
+                             0] + '\n' + 'VQA ANSWER:' + pred_answer_decoded + '\n' + 'TRUE ANSWER:' + ref_answer_decoded + '\n' + '-' * 40
             else:
                 closest_question_decoded = kwargs["closest_question"]
                 string = 'IMG {}:'.format(kwargs[
                                               "img_idx"]) + state_decoded + '\n' + 'CLOSEST QUESTION:' + closest_question_decoded + '\n' + '-' * 40
-            self.metric.append(string)
+
+        self.metric.append(string)
+
+    def log(self, **kwargs):
+        if len(self.metric) > 0:
+            logger.info(self.metric[-1])
+            logger.info("-" * 40)
 
     def write_to_csv(self):
         '''save padded array of generated dialog for later use (for example with word cloud)'''
@@ -228,8 +233,6 @@ class DialogImageMetric(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "dialog_image", "text", env_mode, trunc, sampling)
-        # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.html')
-        # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = []
         self.condition_answer = agent.policy.condition_answer
         self.mode = agent.env.mode
@@ -364,7 +367,7 @@ class PPLDialogfromLM(Metric):
                 lm_model = torch.load("output/vqa_lm_model/model.pt", map_location=torch.device('cpu'))
         lm_model.eval()
         self.pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=self.dataset,
-                                           tokenizer=self.dataset.question_tokenizer, device=agent.device)
+                                                tokenizer=self.dataset.question_tokenizer, device=agent.device)
 
     def fill_(self, **kwargs):
         with torch.no_grad():
@@ -525,7 +528,7 @@ class HistogramOracle(Metric):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             self.post_treatment_()
             metric_history_sorted = dict(sorted(self.metric_history.items(), key=operator.itemgetter(1), reverse=True))
-            answer_history_sorted = {k:self.answer_history[k] for k in list(metric_history_sorted.keys())}
+            answer_history_sorted = {k: self.answer_history[k] for k in list(metric_history_sorted.keys())}
             df = pd.DataFrame.from_dict([metric_history_sorted, answer_history_sorted])
             df = df.transpose()
             df.to_csv(self.out_csv_file, index=True, header=["reward = 1", "answer freq"])
@@ -846,12 +849,12 @@ class ActionProbsTruncated(Metric):
         logprobs = [i[0] for i in self.measure]
         ep_log_probs_truncated = torch.stack(logprobs).clone().detach()
         self.ep_probs_truncated["actions"] = [i[1] for i in self.measure]
-        self.ep_probs_truncated ["probs"] = np.round(np.exp(ep_log_probs_truncated.cpu().view(-1).numpy()), decimals=5)
+        self.ep_probs_truncated["probs"] = np.round(np.exp(ep_log_probs_truncated.cpu().view(-1).numpy()), decimals=5)
         self.metric.append(np.mean(self.ep_probs_truncated["probs"]))
 
     def log(self, **kwargs):
         log_info = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                             zip(self.ep_probs_truncated["actions"], self.ep_probs_truncated["probs"])]
+                    zip(self.ep_probs_truncated["actions"], self.ep_probs_truncated["probs"])]
         logger.info('episode action probs truncated: {}'.format(log_info))
 
 

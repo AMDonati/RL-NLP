@@ -12,9 +12,9 @@ def get_parser():
     parser.add_argument("-num_diversity", type=int, default=None, help="repeating on test the same image/answer")
     parser.add_argument("-num_episodes_test", type=int, default=None, help="number of test episodes")
     parser.add_argument("-test_metrics", nargs='+', type=str,
-                        default=["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert", "size_valid_actions",
-                                 "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
-                                 "selfbleu", "dialogimage", "valid_actions"], help="test metrics")
+                        default=None, help="test metrics")
+    parser.add_argument("-test_modes", nargs='+', type=str,
+                        default=None, help="test metrics")
     return parser
 
 
@@ -54,6 +54,9 @@ def eval(args):
                 defaults["num_episodes_test"] = args.num_episodes_test
             if args.test_metrics is not None:
                 defaults["test_metrics"] = args.test_metrics
+
+            if "test_modes" in defaults.keys()and args.test_modes is not None:
+                defaults["test_modes"] = args.test_modes
 
             if "temp_factor" in defaults.keys():
                 if "inv_schedule_step" in defaults.keys():
