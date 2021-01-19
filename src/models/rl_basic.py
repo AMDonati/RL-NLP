@@ -186,7 +186,7 @@ class PolicyLSTMBatch(nn.Module):
         if self.condition_answer == "before_lstm" and answer is not None:
             pad_embed = torch.cat([pad_embed, self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)],
                                   dim=1)
-        #pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+        # pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed)
         return ht[-1], ct
 
@@ -208,7 +208,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         self.fusion = fusion
         self.condition_answer = condition_answer
 
-        self.word_embedding = nn.Embedding(num_tokens, word_emb_size)
+        self.word_embedding = nn.Embedding(num_tokens, word_emb_size, padding_idx=0)
         self.lstm = nn.LSTM(word_emb_size, self.hidden_size, batch_first=True)
         self.answer_embedding = nn.Embedding(num_tokens_answer, word_emb_size)
         self.conv = nn.Conv2d(in_channels=1024, out_channels=self.num_filters, kernel_size=self.kernel_size,
