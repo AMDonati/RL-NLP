@@ -170,6 +170,7 @@ class PolicyLSTMBatch(nn.Module):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.fusion == "sat":
+
             img_transposed = img.transpose(2, 1).to(self.device)
             h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
             answer_embedding = None
@@ -260,19 +261,34 @@ class PolicyLSTMBatch_SL(nn.Module):
         pad_embed = self.word_embedding(text)
         if self.fusion == "sat":
             output = torch.zeros(text.size(0), text.size(1), self.hidden_size).to(self.device)
+
+            caption_lengths, sort_ind = lens.squeeze().sort(dim=0, descending=True)
+            img = img[sort_ind]
+            answer = answer[sort_ind]
+            text = text[sort_ind]
+            pad_embed = pad_embed[sort_ind]
+
             img_transposed = img.transpose(2, 1).to(self.device)
+            decode_lengths = caption_lengths.tolist()
             h, c = self.init_hidden_state(img_transposed)
-            for t in range(text.size(1)):
+            for t in range(max(decode_lengths)):
+                batch_size_t = sum([l > t for l in decode_lengths])
                 answer_embedding = None
                 if self.condition_answer == "attention":
-                    answer_embedding = self.answer_embedding(answer.view(text.size(0), 1)).to(self.device)
+                    answer_embedding = self.answer_embedding(answer[:batch_size_t].unsqueeze(dim=1)).to(self.device)
 
-                attention_weighted_encoding, alpha = self.attention(img_transposed, h.to(self.device), answer_embedding)
-                gate = self.sigmoid(self.f_beta(h))
+                attention_weighted_encoding, alpha = self.attention(img_transposed[:batch_size_t],
+                                                                    h[:batch_size_t].to(self.device),
+                                                                    answer_embedding[::batch_size_t])
+                gate = self.sigmoid(self.f_beta(h[:batch_size_t]))
                 attention_weighted_encoding = gate * attention_weighted_encoding
-                h, c = self.decode_step(torch.cat([pad_embed[:, -1, :], attention_weighted_encoding], dim=1), (h, c))
-                output[:, t, :] = h
-            return output
+                h, c = self.decode_step(torch.cat([pad_embed[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
+                                        (h[:batch_size_t], c[:batch_size_t]))
+                output[:batch_size_t, t, :] = h
+            packed_output = pack_padded_sequence(output, caption_lengths, batch_first=True)
+            pad_output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
+            outputs = pad_output[sort_ind.argsort()]
+            return outputs
 
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
