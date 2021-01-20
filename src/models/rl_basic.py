@@ -279,7 +279,7 @@ class PolicyLSTMBatch_SL(nn.Module):
 
                 attention_weighted_encoding, alpha = self.attention(img_transposed[:batch_size_t],
                                                                     h[:batch_size_t].to(self.device),
-                                                                    answer_embedding[::batch_size_t])
+                                                                    answer_embedding[:batch_size_t])
                 gate = self.sigmoid(self.f_beta(h[:batch_size_t]))
                 attention_weighted_encoding = gate * attention_weighted_encoding
                 h, c = self.decode_step(torch.cat([pad_embed[:batch_size_t, t, :], attention_weighted_encoding], dim=1),
