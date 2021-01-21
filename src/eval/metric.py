@@ -605,8 +605,9 @@ class TTRQuestionMetric(Metric):
             self.measure = kwargs["new_state"].text.numpy()[0]
 
     def compute_(self, **kwargs):
-        diversity_metric = len(set(list(self.measure))) / len(self.measure)
-        self.metric.append(diversity_metric)
+        if len(self.measure) != 0:
+            diversity_metric = len(set(list(self.measure))) / len(self.measure)
+            self.metric.append(diversity_metric)
 
 
 class TrueWordRankOriginLM(Metric):
