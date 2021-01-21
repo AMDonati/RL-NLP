@@ -262,7 +262,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         if self.fusion == "sat":
             output = torch.zeros(text.size(0), text.size(1), self.hidden_size).to(self.device)
 
-            caption_lengths, sort_ind = lens.squeeze().sort(dim=0, descending=True)
+            caption_lengths, sort_ind = lens.sort(dim=0, descending=True)
             img = img[sort_ind]
             answer = answer[sort_ind]
             text = text[sort_ind]
