@@ -50,7 +50,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "s_min": args_.s_min,
                       "s_max": args_.s_max,
                       "inv_schedule_step": args_.inv_schedule_step,
-                      "schedule_start": args_.schedule_start}
+                      "schedule_start": args_.schedule_start,
+                      "max_len_episodes": args_.max_len_episodes}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -181,6 +182,8 @@ def get_parser():
     parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
+    parser.add_argument('-max_len_episodes', type=int, default=float("-Inf"), help="log interval")
+
     return parser
 
 

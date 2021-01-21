@@ -24,7 +24,7 @@ class Agent:
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
                  temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
-                 schedule_start=1):
+                 schedule_start=1, max_len_episodes=float("-Inf")):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -51,6 +51,7 @@ class Agent:
         self.epsilon_truncated = epsilon_truncated
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
+        self.max_len_episodes = max_len_episodes
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
 
         if self.truncate_mode is not None:
@@ -109,6 +110,9 @@ class Agent:
             logger.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
         self.update_temperature(i_episode)
+
+        if i_episode % self.max_len_episodes == 0:
+            self.env.max_len += 1
 
     def update_temperature(self, i_episode):
         if i_episode + 1 == self.inv_schedule_step:
