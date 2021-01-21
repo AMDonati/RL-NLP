@@ -52,6 +52,7 @@ class Agent:
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
         self.max_len_episodes = max_len_episodes
+        self.max_len_train = 1 if self.max_len_episodes != float("-Inf") else self.env.max_len
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
 
         if self.truncate_mode is not None:
@@ -112,7 +113,7 @@ class Agent:
         self.update_temperature(i_episode)
 
         if i_episode % self.max_len_episodes == 0:
-            self.env.max_len += 1
+            self.max_len_train += 1
 
     def update_temperature(self, i_episode):
         if i_episode + 1 == self.inv_schedule_step:
@@ -194,12 +195,12 @@ class Agent:
                           num_diversity=num_diversity)
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
-                             test_mode='sampling', metrics=[]):
+                             test_mode='sampling', metrics=[], max_len=10):
         if train or seed is None:
             state, ep_reward, ht, ct = env.reset(seed=seed), 0, None, None
         else:
             state, ep_reward, ht, ct = env.reset(i_episode=i_episode), 0, None, None
-        for t in range(0, env.max_len):
+        for t in range(0, max_len):
             forced = env.ref_question[t]
             action, log_probs, value, (
                 valid_actions, actions_probs,
@@ -270,7 +271,7 @@ class Agent:
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode,
-                            truncation=trunc, metrics=metrics)
+                            truncation=trunc, metrics=metrics, max_len=env.max_len)
                     for _, metric in metrics.items():
                         metric.write()
                         metric.log(valid_actions=valid_actions)
@@ -298,7 +299,7 @@ class Agent:
             seed = i_episode if self.train_seed else None
             state, ep_reward, closest_question, valid_actions, timestep, loss = self.generate_one_episode(
                 timestep=timestep, i_episode=i_episode, env=self.env, seed=seed,
-                metrics=self.metrics["train"], test_mode=sampling_mode)
+                metrics=self.metrics["train"], test_mode=sampling_mode, max_len=self.max_len_train)
             self.update_per_episode(i_episode=i_episode, num_episodes_train=num_episodes)
             if i_episode % self.log_interval == 0:
                 self.log_at_train(i_episode=i_episode, ep_reward=ep_reward, state=state,
