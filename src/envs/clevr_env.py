@@ -206,8 +206,8 @@ class VQAEnv(GenericEnv):
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
-        self.inv_freq_answers = self.dataset.get_answers_frequency()
         self.answer_sampling = answer_sampl
+        self.inv_freq_answers = self.dataset.get_answers_frequency()
 
     def update_mode(self, mode, answer_sampl):
         self.mode = mode
@@ -226,6 +226,10 @@ class VQAEnv(GenericEnv):
         else:
             env_idx = np.random.randint(0, len(entries))
         return env_idx
+
+    def decode_inv_frequency(self):
+        inv_freq_answers_decoded = {self.dataset.answer_tokenizer.decode([k]): round(v, 4) for k, v in self.inv_freq_answers.items()}
+        return inv_freq_answers_decoded
 
     def sample_answer_from_inv_freq_distrib(self):
         tensor_distrib = torch.tensor(list(self.inv_freq_answers.values()))

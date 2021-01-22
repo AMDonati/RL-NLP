@@ -72,12 +72,14 @@ class Agent:
         self.generated_text = []
         self.train_metrics_names = train_metrics
         self.test_metrics_names = test_metrics
-        # self.test_metrics_names = ["return", "dialog", "bleu", "ppl_dialog_lm", "vilbert", "size_valid_actions",
-        #  "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
-        #  "selfbleu", "dialogimage", "valid_actions"]
         self.init_metrics()
         self.start_episode = 1
         self.train_seed = train_seed
+        if self.env.answer_sampling == "inv_frequency":
+            inv_freq_answer_decoded = self.env.decode_inv_frequency()
+            logger.info("---------------- INV FREQ ANSWERS DISTRIBUTION FOR ANSWER SAMPLING--------------------------------")
+            logger.info(inv_freq_answer_decoded)
+            logger.info("-" * 100)
 
     def init_metrics(self):
         self.metrics = {}
