@@ -215,7 +215,8 @@ class VQADataset(Dataset):
     def get_answers_frequency(self):
         answers_idx = [entry["answer"]["labels"].cpu().squeeze().item() for entry in self.filtered_entries]
         freq_answers = Counter(answers_idx)
-        inv_freq_answers = {k: 1 - v / len(answers_idx) for k, v in freq_answers.items()}
+        print("ANSWERS FREQUENCY:", freq_answers)
+        inv_freq_answers = {k: (1 - (v / len(answers_idx))) for k, v in freq_answers.items()}
         return inv_freq_answers
 
     def get_masks_for_tokens(self, tokens):

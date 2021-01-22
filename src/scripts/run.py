@@ -225,7 +225,7 @@ def get_output_path(args):
     elif args.truncate_mode == "top_p":
         algo = "{}{}".format(args.truncate_mode, args.top_p)
 
-    out_folder = '{}_{}_{}'.format(args.env, args.reward, args.agent)
+    out_folder = '{}_{}_{}_answ-{}'.format(args.env, args.reward, args.agent, args.answer_sampl)
     if args.diff_reward:
         out_folder = out_folder + '_diffrew'
 
