@@ -104,6 +104,7 @@ def get_parser():
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
+    parser.add_argument('-answer_sampl', type=str, default="random", help="method to sample the (img, answer) sample in the RL training.")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -351,7 +352,7 @@ def get_rl_env(args, device):
                      reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
                      reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                     min_data=args.min_data, reduced_answers=args.reduced_answers)
+                     min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl=args.answer_sampl)
         if device.type == "cpu":
             test_envs = [env]
         else:
@@ -362,10 +363,10 @@ def get_rl_env(args, device):
                                         debug=args.debug,
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                                        min_data=args.min_data, reduced_answers=args.reduced_answers))
+                                        min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl="random"))
             if "test_text" in args.test_modes:
                 test_text_env = env
-                test_text_env.mode = "test_text"
+                test_text_env.update_mode("test_text", answer_sampl="random")
                 test_envs.append(test_text_env)
 
     return env, test_envs

@@ -16,6 +16,7 @@ from nltk.tokenize import word_tokenize
 from torch.utils.data import Dataset
 from data_provider.tokenizer import Tokenizer
 from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, clean_key
+from collections import Counter
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -127,6 +128,7 @@ class VQADataset(Dataset):
 
                 self.reduced_answers = [entry["answer"]["labels"] for entry in self.filtered_entries]
                 self.reduced_answers = torch.stack(self.reduced_answers).unique()
+                #self.get_unique_answers()
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
@@ -210,6 +212,18 @@ class VQADataset(Dataset):
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
+
+    def get_unique_answers(self):
+        df = pd.DataFrame.from_records(self.filtered_entries)
+        answers = df.answer
+        answers_idx = [ans["labels"].cpu().squeeze().numpy().item() for ans in answers]
+        self.answers_idx = list(set(answers_idx))
+
+    def get_answers_frequency(self):
+        answers_idx = [entry["answer"]["labels"].cpu().squeeze().item() for entry in self.filtered_entries]
+        freq_answers = Counter(answers_idx)
+        inv_freq_answers = {k:1-v/len(answers_idx) for k,v in freq_answers.items()}
+        return inv_freq_answers
 
     def get_masks_for_tokens(self, tokens):
         tokens = tokens[: self._max_seq_length - 2]

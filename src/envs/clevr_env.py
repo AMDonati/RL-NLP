@@ -13,6 +13,8 @@ from data_provider.vqa_tokenizer import VQATokenizer
 import numpy as np
 import torch
 import os
+import pandas as pd
+from collections import Counter
 
 
 class GenericEnv(gym.Env):
@@ -175,7 +177,7 @@ class VQAEnv(GenericEnv):
                  reward_path=None, mode="train", diff_reward=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=0,
                  num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), min_data=0,
-                 reduced_answers=False):
+                 reduced_answers=False, answer_sampl="uniform"):
         super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                      reward_path=reward_path, debug=debug, mode=mode, diff_reward=diff_reward,
                                      condition_answer=condition_answer, reward_vocab=reward_vocab,
@@ -204,6 +206,12 @@ class VQAEnv(GenericEnv):
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
+        self.inv_freq_answers = self.dataset.get_answers_frequency()
+        self.answer_sampling = answer_sampl
+
+    def update_mode(self, mode, answer_sampl):
+        self.mode = mode
+        self.answer_sampling = answer_sampl
 
     def get_modes(self, device, min_data):
         if min_data or device.type == "cpu":
@@ -219,19 +227,42 @@ class VQAEnv(GenericEnv):
             env_idx = np.random.randint(0, len(entries))
         return env_idx
 
+    def sample_answer_from_inv_freq_distrib(self):
+        tensor_distrib = torch.tensor(list(self.inv_freq_answers.values()))
+        ind_sampled = torch.multinomial(tensor_distrib ,num_samples=1)
+        prob_sampled = tensor_distrib[ind_sampled].item()
+        possible_answers = [k for k,v in self.inv_freq_answers.items() if round(v, 4) == round(prob_sampled, 4)]
+        return random.choice(possible_answers)
+
+    def sample_entry_from_answer(self, answer):
+        entries_answer = {i: entry for i, entry in enumerate(self.dataset.filtered_entries) if entry["answer"]["labels"] == answer}
+        env_idx = random.choice(list(entries_answer.keys()))
+        entry = entries_answer[env_idx]
+        return entry, env_idx
+
+    def sample_entry(self, entries, i_episode=None):
+        if self.answer_sampling == "random":
+            env_idx = self.get_env_idx(i_episode, entries)
+            entry = entries[env_idx]
+        elif self.answer_sampling == "uniform":
+            answer = random.choice(self.dataset.reduced_answers.cpu().numpy())
+            entry, env_idx = self.sample_entry_from_answer(answer)
+        elif self.answer_sampling == "inv_frequency":
+            answer = self.sample_answer_from_inv_freq_distrib()
+            entry, env_idx = self.sample_entry_from_answer(answer)
+        return entry, env_idx
+
     def reset(self, seed=None, i_episode=None):
         if seed is not None:
             np.random.seed(seed)
         entries = self.dataset.test_entries if self.mode == "test_text" else self.dataset.filtered_entries
-        self.env_idx = self.get_env_idx(i_episode, entries)
-        self.entry = entries[self.env_idx]
+        self.entry, self.env_idx = self.sample_entry(entries, i_episode)
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)
         labels, _ = self.dataset.get_answer_data(self.entry)
         self.ref_question_idx = self.entry["question_id"]
         self.ref_question = self.entry["q_token"][:self.max_len]
         self.ref_questions = self.ref_question.view(1, -1)
         self.ref_question_decoded = self.dataset.question_tokenizer.decode(self.entry["q_token"][:self.max_len].numpy())
-        # self.ref_question_decoded = " ".join(self.ref_question_decoded)
         self.ref_questions_decoded = [self.ref_question_decoded]
         self.ref_answer = labels
         self.img_idx = self.entry["image_id"]
@@ -264,9 +295,25 @@ if __name__ == '__main__':
 
     print("Testing VQA Env...")
     vqa_data_path = '../../data/vqa-v2'
-    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="mintrain",
-                     max_seq_length=16, debug="0,20")
-    env_vqa.mode = "test_text"
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+                     max_seq_length=16, debug="0,20", min_data=1, answer_sampl="random")
+    #env_vqa.mode = "test_text"
+    env_vqa.reset()
+    env_vqa.mode = "train"
+
+    print("Testing VQA Env with uniform answer sampling...")
+    vqa_data_path = '../../data/vqa-v2'
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+                     max_seq_length=16, debug="0,20", min_data=1, answer_sampl="uniform")
+    # env_vqa.mode = "test_text"
+    env_vqa.reset()
+    env_vqa.mode = "train"
+
+    print("Testing VQA Env with inv_frequency answer sampling...")
+    vqa_data_path = '../../data/vqa-v2'
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+                     max_seq_length=16, debug="0,20", min_data=1, answer_sampl="inv_frequency")
+    # env_vqa.mode = "test_text"
     env_vqa.reset()
     env_vqa.mode = "train"
 
