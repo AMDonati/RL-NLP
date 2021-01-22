@@ -233,7 +233,7 @@ class VQAEnv(GenericEnv):
 
     def sample_answer_from_inv_freq_distrib(self):
         tensor_distrib = torch.tensor(list(self.inv_freq_answers.values()))
-        ind_sampled = torch.multinomial(tensor_distrib ,num_samples=1)
+        ind_sampled = torch.multinomial(tensor_distrib, num_samples=1)
         prob_sampled = tensor_distrib[ind_sampled].item()
         possible_answers = [k for k,v in self.inv_freq_answers.items() if round(v, 4) == round(prob_sampled, 4)]
         return random.choice(possible_answers)

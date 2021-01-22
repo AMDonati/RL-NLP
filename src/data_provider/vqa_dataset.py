@@ -17,6 +17,7 @@ from torch.utils.data import Dataset
 from data_provider.tokenizer import Tokenizer
 from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, clean_key
 from collections import Counter
+import torch.nn.functional as F
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -215,8 +216,10 @@ class VQADataset(Dataset):
     def get_answers_frequency(self):
         answers_idx = [entry["answer"]["labels"].cpu().squeeze().item() for entry in self.filtered_entries]
         freq_answers = Counter(answers_idx)
-        print("ANSWERS FREQUENCY:", freq_answers)
-        inv_freq_answers = {k: (1 - (v / len(answers_idx))) for k, v in freq_answers.items()}
+        print('ANSWER FREQUENCY:', freq_answers)
+        inv_freq_norm = F.softmax(torch.tensor([1/item for item in list(freq_answers.values())], dtype=torch.float32))
+        inv_freq_answers = {k:inv_freq_norm[i].item() for i,k in enumerate(list(freq_answers.keys()))}
+        print('INV ANSWER FREQUENCY NORM:', inv_freq_answers)
         return inv_freq_answers
 
     def get_masks_for_tokens(self, tokens):
