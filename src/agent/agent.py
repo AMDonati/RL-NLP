@@ -209,7 +209,7 @@ class Agent:
                 mode=test_mode,
                 truncation=truncation,
                 forced=forced, ht=ht, ct=ct)
-            new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy())
+            new_state, (reward, closest_question, pred_answer), done, _ = env.step(action.cpu().numpy(), max_len)
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,

@@ -54,10 +54,10 @@ class GenericEnv(gym.Env):
         if diff_reward:
             self.reward_func = Differential(self.reward_func)
 
-    def step(self, action):
+    def step(self, action, max_len):
         action = torch.tensor(action).view(1, 1)
         self.state = self.State(torch.cat([self.state.text, action], dim=1), self.state.img, self.ref_answer)
-        done = self.check_if_done(action)
+        done = self.check_if_done(action, max_len)
         question_tokens = self.state.text.numpy().ravel()
         question = self.dataset.question_tokenizer.decode(question_tokens)  # remove the EOS token if needed.
         reward, closest_question, pred_answer = self.reward_func.get(question=question,
@@ -68,10 +68,10 @@ class GenericEnv(gym.Env):
         self.step_idx += 1
         return self.state, (reward, closest_question, pred_answer), done, {}
 
-    def check_if_done(self, action):
+    def check_if_done(self, action, max_len):
         done = False
         is_action_terminal = action.item() in [self.special_tokens.EOS_idx, self.special_tokens.question_mark_idx]
-        if is_action_terminal or self.step_idx == (self.max_len - 1):
+        if is_action_terminal or self.step_idx == (max_len - 1):
             done = True
         return done
 
