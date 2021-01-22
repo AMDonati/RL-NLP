@@ -41,6 +41,7 @@ class GenericEnv(gym.Env):
         self.img_idx, self.img_feats, self.ref_answer = None, None, None
         self.reduced_answers = reduced_answers
         self.min_data = 0
+        self.answer_sampling = "random"
 
     def set_special_tokens(self):
         SOS_idx = self.dataset.vocab_questions["<SOS>"]
