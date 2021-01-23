@@ -427,7 +427,7 @@ def run(args):
     # start training
     if args.resume_training is not None:
         epoch, loss = agent.load_ckpt(os.path.join(args.resume_training, "checkpoints"))
-        logger.info('resume training after {} episodes... current loss: {:2.2f}'.format(epoch, loss))
+        logger.info('resume training after {} episodes... current loss: {}'.format(epoch, loss))
         agent.start_episode = epoch + 1
     if args.num_episodes_train > 0:  # trick to avoid a bug inside the agent.learn function in case of no training.
         agent.learn(num_episodes=args.num_episodes_train)
