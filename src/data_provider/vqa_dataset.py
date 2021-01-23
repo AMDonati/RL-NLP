@@ -216,10 +216,8 @@ class VQADataset(Dataset):
     def get_answers_frequency(self):
         answers_idx = [entry["answer"]["labels"].cpu().squeeze().item() for entry in self.filtered_entries]
         freq_answers = Counter(answers_idx)
-        print('ANSWER FREQUENCY:', freq_answers)
         inv_freq_norm = F.softmax(torch.tensor([1/item for item in list(freq_answers.values())], dtype=torch.float32))
         inv_freq_answers = {k:inv_freq_norm[i].item() for i,k in enumerate(list(freq_answers.keys()))}
-        print('INV ANSWER FREQUENCY NORM:', inv_freq_answers)
         return inv_freq_answers
 
     def get_masks_for_tokens(self, tokens):
