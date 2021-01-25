@@ -185,7 +185,7 @@ class PolicyLSTMBatch(nn.Module):
             attention_weighted_encoding, alpha = self.attention(img_transposed, h.to(self.device), answer_embedding)
             gate = self.sigmoid(self.f_beta(h))
             attention_weighted_encoding = gate * attention_weighted_encoding
-            h, c = self.decode_step(torch.cat([pad_embed[:, -1, :], attention_weighted_encoding], dim=1), (h, c))
+            h, c = self.decode_step(torch.cat([last_word_embedding, attention_weighted_encoding], dim=1), (h, c))
             # self.last_states = (h, c)
             return h, c
 
