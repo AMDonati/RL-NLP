@@ -77,7 +77,8 @@ class Agent:
         self.train_seed = train_seed
         if self.env.answer_sampling == "inv_frequency":
             inv_freq_answer_decoded = self.env.decode_inv_frequency()
-            logger.info("---------------- INV FREQ ANSWERS DISTRIBUTION FOR ANSWER SAMPLING--------------------------------")
+            logger.info(
+                "---------------- INV FREQ ANSWERS DISTRIBUTION FOR ANSWER SAMPLING--------------------------------")
             logger.info(inv_freq_answer_decoded)
             logger.info("-" * 100)
 
@@ -106,9 +107,9 @@ class Agent:
                 logger.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                     self.alpha_logits_lm))
 
-        #if i_episode == int(self.epsilon_truncated_rate * num_episodes_train) + 1:
-            #self.epsilon_truncated = 1
-            #logger.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
+        # if i_episode == int(self.epsilon_truncated_rate * num_episodes_train) + 1:
+        # self.epsilon_truncated = 1
+        # logger.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
         self.update_temperature(i_episode)
 
@@ -196,17 +197,22 @@ class Agent:
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
                           num_diversity=num_diversity)
 
+    def init_hidden(self, state):
+        h, c = self.policy.init_hidden_state(state)
+        return h, c
+
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
                              test_mode='sampling', metrics=[]):
         if train or seed is None:
-            state, ep_reward, ht, ct = env.reset(seed=seed), 0, None, None
+            state, ep_reward = env.reset(seed=seed), 0
         else:
-            state, ep_reward, ht, ct = env.reset(i_episode=i_episode), 0, None, None
+            state, ep_reward = env.reset(i_episode=i_episode), 0
+        (ht, ct) = self.init_hidden(state)
         for t in range(0, env.max_len):
             forced = env.ref_question[t]
             action, log_probs, value, (
                 valid_actions, actions_probs,
-                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm, ht, ct = self.act(
+                log_probs_truncated), dist, logits_lm, log_probas_lm, origin_log_probs_lm, new_ht, new_ct = self.act(
                 state=state,
                 mode=test_mode,
                 truncation=truncation,
@@ -229,6 +235,8 @@ class Agent:
                             log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm,
                             alpha=self.alpha_logits_lm, ref_answer=env.ref_answer)
             state = new_state
+            ht = new_ht
+            ct = new_ct
             ep_reward += reward
 
             # update if its time

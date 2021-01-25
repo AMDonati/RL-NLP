@@ -332,7 +332,7 @@ class PPLMetric(Metric):
                 ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
                 # getting the probs for the complete policy
                 ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
-                ht, ct = None, None
+                ht, ct = self.agent.init_hidden(state)
                 for i, action in enumerate(ref_question[:, 1:].view(-1)):
                     forced_state = state.__class__(ref_question[:, :i + 1], state.img, state.answer)
 

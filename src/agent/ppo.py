@@ -141,6 +141,10 @@ class PPO(Agent):
 
         return loss.mean()
 
+    def init_hidden(self, state):
+        h, c = self.policy_old.init_hidden_state(state)
+        return h, c
+
     def get_policy_distributions(self, state, valid_actions, logits_lm=None, alpha=0., baseline=False, ht=None,
                                  ct=None):
         policy = self.start_policy if baseline else self.policy_old

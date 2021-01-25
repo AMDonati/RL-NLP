@@ -105,16 +105,21 @@ class PolicyLSTMBatch(nn.Module):
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
-    def init_hidden_state(self, encoder_out):
+    def init_hidden_state(self, state):
         """
         Creates the initial hidden and cell states for the decoder's LSTM based on the encoded images.
 
         :param encoder_out: encoded images, a tensor of dimension (batch_size, num_pixels, encoder_dim)
         :return: hidden state, cell state
         """
-        mean_encoder_out = encoder_out.mean(dim=1)
-        h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
-        c = self.init_c(mean_encoder_out.to(self.device))
+        h, c = None, None
+        if self.fusion == "sat":
+            (text, img, answer) = state
+            encoder_out = img.transpose(2, 1).to(self.device)
+            mean_encoder_out = encoder_out.mean(dim=1)
+            h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
+            c = self.init_c(mean_encoder_out.to(self.device))
+            h, c
         return h, c
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0., ht=None,
@@ -166,12 +171,13 @@ class PolicyLSTMBatch(nn.Module):
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
 
-    def _get_embed_text(self, text, answer, img, ht, ct):
+    def _get_embed_text(self, text, answer, img, h, c):
         lens = (text != 0).sum(dim=1)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.fusion == "sat":
+            last_word_embedding = pad_embed[torch.arange(pad_embed.size(0)), lens - 1]
             img_transposed = img.transpose(2, 1).to(self.device)
-            h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
+            #h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
             answer_embedding = None
             if self.condition_answer == "attention":
                 answer_embedding = self.answer_embedding(answer.view(text.size(0), 1).to(self.device))
@@ -322,7 +328,7 @@ class PolicyLSTMBatch_SL(nn.Module):
         return embedding
 
     def forward(self, state_text, state_img, state_answer):
-        embed_text = self._get_embed_text(state_text, state_img, state_answer )
+        embed_text = self._get_embed_text(state_text, state_img, state_answer)
         seq_len = embed_text.size(1)
         img_feat = state_img.to(self.device)
         img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(self.conv(img_feat))
