@@ -313,7 +313,7 @@ class VILBERT_rank2(VILBERT):
 
     def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
         reward = np.exp(-rank / 2)
-        if rank > self.params:
+        if self.params is not None and rank > self.params:
             reward = 0
         return reward
 
