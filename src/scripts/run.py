@@ -104,7 +104,8 @@ def get_parser():
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
-    parser.add_argument('-answer_sampl', type=str, default="random", help="method to sample the (img, answer) sample in the RL training.")
+    parser.add_argument('-answer_sampl', type=str, default="random",
+                        help="method to sample the (img, answer) sample in the RL training.")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -182,6 +183,8 @@ def get_parser():
     parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
+    parser.add_argument("-params_reward", type=int, default=10, help="params reward")
+
     return parser
 
 
@@ -340,19 +343,20 @@ def get_rl_env(args, device):
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                       reduced_answers=args.reduced_answers)
+                       reduced_answers=args.reduced_answers, params=args.params_reward)
         test_modes = args.test_modes
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                              reduced_answers=args.reduced_answers)
+                              reduced_answers=args.reduced_answers, params=args.params_reward)
                      for mode in test_modes]
     elif args.env == "vqa":
         env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
                      reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
                      reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                     min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl=args.answer_sampl)
+                     min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl=args.answer_sampl,
+                     params=args.params_reward)
         if device.type == "cpu":
             test_envs = [env]
         else:
@@ -363,7 +367,8 @@ def get_rl_env(args, device):
                                         debug=args.debug,
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                                        min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl="random"))
+                                        min_data=args.min_data, reduced_answers=args.reduced_answers,
+                                        answer_sampl="random", params=args.params_reward))
             if "test_text" in args.test_modes:
                 test_text_env = env
                 test_text_env.update_mode("test_text", answer_sampl="random")

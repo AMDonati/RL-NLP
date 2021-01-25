@@ -23,7 +23,7 @@ class GenericEnv(gym.Env):
 
     def __init__(self, data_path, max_len, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                  reward_type="levenshtein", reward_path=None, mode="train", diff_reward=False, debug=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False, reduced_answers=False):
+                 condition_answer=True, reward_vocab=None, mask_answers=False, reduced_answers=False, params=None):
         super(GenericEnv, self).__init__()
         self.mode = mode
         self.data_path = data_path
@@ -42,6 +42,7 @@ class GenericEnv(gym.Env):
         self.reduced_answers = reduced_answers
         self.min_data = 0
         self.answer_sampling = "random"
+        self.params = params
 
     def set_special_tokens(self):
         SOS_idx = self.dataset.vocab_questions["<SOS>"]
@@ -92,11 +93,12 @@ class ClevrEnv(GenericEnv):
     def __init__(self, data_path, max_len, reward_type="levenshtein",
                  reward_path=None, max_samples=None, debug=None, mode="train", num_questions=10, diff_reward=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False,
-                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), reduced_answers=False):
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), reduced_answers=False,
+                 params=None):
         super(ClevrEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                        reward_path=reward_path, mode=mode, debug=debug, diff_reward=diff_reward,
                                        condition_answer=condition_answer, reward_vocab=reward_vocab, mask_answers=False,
-                                       device=device, reduced_answers=reduced_answers)
+                                       device=device, reduced_answers=reduced_answers, params=params)
 
         modes = {"train": "train", "test_images": "val", "test_text": "train"}
         h5_questions_path = os.path.join(data_path, '{}_questions.h5'.format(modes[self.mode]))
@@ -178,11 +180,12 @@ class VQAEnv(GenericEnv):
                  reward_path=None, mode="train", diff_reward=False,
                  condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=0,
                  num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), min_data=0,
-                 reduced_answers=False, answer_sampl="uniform"):
+                 reduced_answers=False, answer_sampl="uniform", params=None):
         super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
                                      reward_path=reward_path, debug=debug, mode=mode, diff_reward=diff_reward,
                                      condition_answer=condition_answer, reward_vocab=reward_vocab,
-                                     mask_answers=mask_answers, device=device, reduced_answers=reduced_answers)
+                                     mask_answers=mask_answers, device=device, reduced_answers=reduced_answers,
+                                     params=params)
 
         # Loading VQA Dataset.
         num_images = int(self.debug[1]) if self.debug is not None else self.debug
@@ -229,18 +232,20 @@ class VQAEnv(GenericEnv):
         return env_idx
 
     def decode_inv_frequency(self):
-        inv_freq_answers_decoded = {self.dataset.answer_tokenizer.decode([k]): round(v, 4) for k, v in self.inv_freq_answers.items()}
+        inv_freq_answers_decoded = {self.dataset.answer_tokenizer.decode([k]): round(v, 4) for k, v in
+                                    self.inv_freq_answers.items()}
         return inv_freq_answers_decoded
 
     def sample_answer_from_inv_freq_distrib(self):
         tensor_distrib = torch.tensor(list(self.inv_freq_answers.values()))
         ind_sampled = torch.multinomial(tensor_distrib, num_samples=1)
         prob_sampled = tensor_distrib[ind_sampled].item()
-        possible_answers = [k for k,v in self.inv_freq_answers.items() if round(v, 4) == round(prob_sampled, 4)]
+        possible_answers = [k for k, v in self.inv_freq_answers.items() if round(v, 4) == round(prob_sampled, 4)]
         return random.choice(possible_answers)
 
     def sample_entry_from_answer(self, answer):
-        entries_answer = {i: entry for i, entry in enumerate(self.dataset.filtered_entries) if entry["answer"]["labels"] == answer}
+        entries_answer = {i: entry for i, entry in enumerate(self.dataset.filtered_entries) if
+                          entry["answer"]["labels"] == answer}
         env_idx = random.choice(list(entries_answer.keys()))
         entry = entries_answer[env_idx]
         return entry, env_idx
@@ -302,7 +307,7 @@ if __name__ == '__main__':
     vqa_data_path = '../../data/vqa-v2'
     env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
                      max_seq_length=16, debug="0,20", min_data=1, answer_sampl="random")
-    #env_vqa.mode = "test_text"
+    # env_vqa.mode = "test_text"
     env_vqa.reset()
     env_vqa.mode = "train"
 
