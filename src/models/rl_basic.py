@@ -113,7 +113,8 @@ class PolicyLSTMBatch(nn.Module):
         :return: hidden state, cell state
         """
         (text, img, answer) = state
-        h, c = torch.zeros((img.size(0), self.hidden_size)), torch.zeros((img.size(0), 1, self.hidden_size))
+        h, c = torch.zeros((img.size(0), self.hidden_size)).to(self.device), torch.zeros(
+            (img.size(0), 1, self.hidden_size)).to(self.device)
         if self.fusion == "sat":
             encoder_out = img.transpose(2, 1).to(self.device)
             mean_encoder_out = encoder_out.mean(dim=1)
