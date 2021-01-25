@@ -99,7 +99,7 @@ class PolicyLSTMBatch(nn.Module):
         else:
             self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size
 
-        if self.condition_answer == "after_fusion":
+        if self.condition_answer in ["after_fusion", "attention"]:
             self.fusion_dim += word_emb_size
 
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
