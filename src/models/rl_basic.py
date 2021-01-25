@@ -112,9 +112,9 @@ class PolicyLSTMBatch(nn.Module):
         :param encoder_out: encoded images, a tensor of dimension (batch_size, num_pixels, encoder_dim)
         :return: hidden state, cell state
         """
-        h, c = None, None
+        (text, img, answer) = state
+        h, c = torch.zeros((img.size(0), self.hidden_size)), torch.zeros((img.size(0), 1, self.hidden_size))
         if self.fusion == "sat":
-            (text, img, answer) = state
             encoder_out = img.transpose(2, 1).to(self.device)
             mean_encoder_out = encoder_out.mean(dim=1)
             h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
@@ -177,7 +177,7 @@ class PolicyLSTMBatch(nn.Module):
         if self.fusion == "sat":
             last_word_embedding = pad_embed[torch.arange(pad_embed.size(0)), lens - 1]
             img_transposed = img.transpose(2, 1).to(self.device)
-            #h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
+            # h, c = self.init_hidden_state(img_transposed) if pad_embed.size(1) == 1 else (ht, ct)
             answer_embedding = None
             if self.condition_answer == "attention":
                 answer_embedding = self.answer_embedding(answer.view(text.size(0), 1).to(self.device))
