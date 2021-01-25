@@ -167,7 +167,7 @@ class PolicyLSTMBatch(nn.Module):
         else:
             img_feat__ = img_feat_.view(img_feat.size(0), -1)
             embedding = torch.cat((img_feat__, embed_text), dim=-1)  # (B,S,hidden_size).
-        if self.condition_answer == "after_fusion" and answer is not None:
+        if self.condition_answer in ["after_fusion", "attention"] and answer is not None:
             embedding = torch.cat([embedding, self.answer_embedding(answer.view(-1))], dim=1)
         return embedding
 
