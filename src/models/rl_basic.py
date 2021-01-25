@@ -42,7 +42,7 @@ class Attention(nn.Module):
         att_sum = att1 + att2.unsqueeze(1)
         if answer_embedding != None:
             att3 = self.answer_att(answer_embedding)
-            att_sum += att3
+            att_sum += att3.view(answer_embedding.size(0), 1, -1)
         att = self.full_att(self.relu(att_sum)).squeeze(2)  # (batch_size, num_pixels)
         alpha = self.softmax(att)  # (batch_size, num_pixels)
         attention_weighted_encoding = (encoder_out * alpha.unsqueeze(2)).sum(dim=1)  # (batch_size, encoder_dim)
@@ -201,11 +201,11 @@ class PolicyLSTMBatch(nn.Module):
                 ht[:batch_size_t, :] = h
                 ct[:batch_size_t, :] = c
 
-            #packed_output = pack_padded_sequence(output, caption_lengths, batch_first=True)
-            #pad_output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
+            # packed_output = pack_padded_sequence(output, caption_lengths, batch_first=True)
+            # pad_output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
             ht = ht[sort_ind.argsort()]
             ct = ct[sort_ind.argsort()]
-            #outputs = pad_output[sort_ind.argsort()]
+            # outputs = pad_output[sort_ind.argsort()]
             return ht, ct
 
         if self.condition_answer == "before_lstm" and answer is not None:
