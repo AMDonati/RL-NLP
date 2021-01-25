@@ -252,7 +252,7 @@ def get_output_path(args):
     if args.temp_factor != 1:
         out_folder = out_folder + '_temp{}'.format(args.temperature) + '_div{}'.format(
             args.temp_factor) + '_step{}'.format(args.temp_step) + '_tmin{}'.format(args.temp_min) + '_tmax{}'.format(
-            args.temp_max) + '_smax{}'.format(args.s_max)
+            args.temp_max) + '_smin{}_smax{}'.format(args.s_min, args.s_max)
     if args.inv_schedule_step != 0:
         out_folder = out_folder + '_invsch{}'.format(args.inv_schedule_step)
     if args.schedule_start > 1:
