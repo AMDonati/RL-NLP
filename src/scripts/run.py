@@ -77,7 +77,7 @@ def get_parser():
     parser.add_argument('-model', type=str, default="lstm", help="model")
     parser.add_argument("-num_layers", type=int, default=1, help="num layers for language model")
     parser.add_argument("-word_emb_size", type=int, default=32, help="dimension of the embedding layer")
-    parser.add_argument("-attention_dim", type=int, default=512, help="dimension of the attention")
+    parser.add_argument("-attention_dim", type=int, default=64, help="dimension of the attention")
     parser.add_argument("-hidden_size", type=int, default=64, help="dimension of the hidden state")
     parser.add_argument('-conv_kernel', type=int, default=1, help="conv kernel")
     parser.add_argument('-stride', type=int, default=2, help="stride conv")
