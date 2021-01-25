@@ -188,7 +188,7 @@ class PolicyLSTMBatch(nn.Module):
                 batch_size_t = sum([l > t for l in decode_lengths])
                 answer_embedding = None
                 if self.condition_answer == "attention":
-                    answer_embedding = self.answer_embedding(answer[:batch_size_t].unsqueeze(dim=1)).to(self.device)
+                    answer_embedding = self.answer_embedding(answer[:batch_size_t]).to(self.device)
 
                 attention_weighted_encoding, alpha = self.attention(img_transposed[:batch_size_t],
                                                                     h[:batch_size_t].to(self.device),
