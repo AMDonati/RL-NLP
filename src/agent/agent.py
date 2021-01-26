@@ -24,7 +24,7 @@ class Agent:
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
                  temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
-                 schedule_start=1):
+                 schedule_start=1, curriculum=0):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -51,7 +51,11 @@ class Agent:
         self.epsilon_truncated = epsilon_truncated
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
+        self.curriculum = curriculum
+        if self.curriculum > 0:
+            self.env.update_mode(mode=env.mode, answer_sampl="random")
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
+
 
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
@@ -106,12 +110,16 @@ class Agent:
                 self.alpha_logits_lm *= (1 - self.alpha_decay_rate)
                 logger.info("decaying alpha logits parameter at Episode #{} - new value: {}".format(i_episode,
                                                                                                     self.alpha_logits_lm))
-
         # if i_episode == int(self.epsilon_truncated_rate * num_episodes_train) + 1:
         # self.epsilon_truncated = 1
         # logger.info("setting epsilon for truncation equal to 1 - starting fine-tuning with all space policy")
 
         self.update_temperature(i_episode)
+        if i_episode == self.curriculum:
+            print(self.env.answer_sampling)
+            logger.info("UPDATING ANSWER SAMPLING FROM RANDOM TO UNIFORM...")
+            self.env.update_mode(mode=self.env.mode, answer_sampl="uniform")
+            print(self.env.answer_sampling)
 
     def update_temperature(self, i_episode):
         if i_episode + 1 == self.inv_schedule_step:
