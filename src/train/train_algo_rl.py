@@ -324,7 +324,7 @@ class SLAlgo:
 
             # estimate the loss using one MonteCarlo rollout
             log_probs_gts = log_probs_actions * gts
-            loss = log_probs_gts.sum(dim=1)
+            loss = -log_probs_gts.sum(dim=1)
             # for sample_batch in log_probs_gts:
             # loss=-sample_batch.sum()
             # loss.backward()
