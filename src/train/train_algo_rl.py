@@ -285,7 +285,8 @@ class SLAlgo:
                 dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
                 dist_truncated = mask_inf_truncature(valid_actions, logits[:, -1, :], self.device, logits.size(-1))
                 actions = dist_truncated.sample().to(self.device)
-                log_probs[:, t] = torch.log(dist.probs.gather(-1, actions.view(-1, 1)).view(-1)).to(self.device)
+                prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
+                log_probs[:, t] = torch.log(prob_actions).to(self.device)
                 inputs_ = torch.cat([inputs_, actions.view(-1, 1)], dim=-1)
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                       inputs_.squeeze().cpu().numpy()]
