@@ -38,7 +38,7 @@ class SLAlgo:
         self.optimizer = torch.optim.Adam(params=model.parameters(), lr=self.lr)
         PAD_IDX = train_dataset.vocab_questions["<PAD>"]
         self.criterion = torch.nn.NLLLoss(ignore_index=PAD_IDX)
-        self.mse = torch.nn.MSELoss()
+        self.mse = torch.nn.MSELoss(reduction="none")
 
         self.EPOCHS = args.ep
         self.grad_clip = args.grad_clip if args.grad_clip is not None else 5.
@@ -323,10 +323,10 @@ class SLAlgo:
             advs = gts - values.cpu().detach()
             # estimate the loss using one MonteCarlo rollout
             log_probs_gts = log_probs_actions * advs
-            loss = -log_probs_gts.sum(dim=1)
+            loss = -log_probs_gts.sum(dim=1).mean()
             loss += self.mse(values, gts)
             self.optimizer.zero_grad()
-            loss.mean().backward()
+            loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
             self.optimizer.step()
 
