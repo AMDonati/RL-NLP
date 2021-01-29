@@ -17,6 +17,9 @@ from torch.distributions import Categorical
 from RL_toolbox.truncation_rl import TopK, mask_inf_truncature
 from RL_toolbox.reward import Bleu_sf2
 from torch.nn.utils import clip_grad_norm_
+import logging
+
+logger = logging.getLogger()
 
 
 class SLAlgo:
@@ -280,9 +283,11 @@ class SLAlgo:
                 logits, _ = model(state_text=inputs_, state_img=feats,
                                   state_answer=answers)  # output = logits (S, num_tokens)
                 # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
+                dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
+                logger.info(logits[0, -1, :])
+                logger.info('logits nan values:{}'.format(torch.sum(torch.isnan(logits[0, -1, :])).item()))
                 valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(inputs_,
                                                                                                              True, 1.)
-                dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
                 dist_truncated = mask_inf_truncature(valid_actions, logits[:, -1, :], self.device, logits.size(-1))
                 actions = dist_truncated.sample().to(self.device)
                 prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)

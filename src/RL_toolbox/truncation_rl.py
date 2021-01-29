@@ -28,7 +28,7 @@ def mask_inf_truncature(valid_actions, logits, device, num_tokens=86):
     mask = (torch.ones(logits.size(0), num_tokens) * -1e32).to(device)
     # mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
     logger.info("valid actions  {}".format(valid_actions[0].cpu().detach().numpy()))
-    logger.info("logits_actions {}".format(logits.gather(-1,valid_actions)[0]))
+    logger.info("logits_actions {}".format(logits.gather(-1, valid_actions)[0]))
     mask = mask.scatter_(-1, valid_actions, logits)
     probs_truncated = F.softmax(mask, dim=-1)
     policy_dist_truncated = Categorical(probs_truncated)
