@@ -16,7 +16,6 @@ from train.train_algo_rl import SLAlgo
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 
-
 '''
 training script for LM network. 
 Inspired from: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
@@ -36,6 +35,7 @@ def get_pretrained_lm(args, dataset, device):
         pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=dataset,
                                            tokenizer=dataset.question_tokenizer, device=device)
     return pretrained_lm
+
 
 if __name__ == '__main__':
 
@@ -168,15 +168,14 @@ if __name__ == '__main__':
     if args.model_path is not None:
         assert args.ep == 0, "if model path is provided, only evaluation should be done."
 
-    lm=get_pretrained_lm(args, train_dataset,device)
+    lm = get_pretrained_lm(args, train_dataset, device)
 
     model = get_model(args, train_dataset, device)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                      args=args, lm=lm)
     if args.ep > 0:
         sl_algo.train()
-    sl_algo.generate_text()
+    # sl_algo.generate_text()
     print("computing langage metrics...")
-    dict_metrics = sl_algo.compute_language_metrics()
+    dict_metrics = sl_algo.compute_language_metrics([1.])
     sl_algo.logger.info("language metrics: {}".format(dict_metrics))
-

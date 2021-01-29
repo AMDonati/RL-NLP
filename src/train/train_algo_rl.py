@@ -139,22 +139,22 @@ class SLAlgo:
                                                       print_interval=self.print_interval)
             self.logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
             self.logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-            val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
-                                          device=self.device)
-            self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+            #val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
+            #                              device=self.device)
+           # self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
             # saving loss and metrics information.
             train_loss_history.append(train_loss)
             train_ppl_history.append(math.exp(train_loss))
-            val_loss_history.append(val_loss)
-            val_ppl_history.append(math.exp(val_loss))
+            #val_loss_history.append(val_loss)
+            #val_ppl_history.append(math.exp(val_loss))
             self.logger.info('-' * 89)
 
             # Save the model if the validation loss is the best we've seen so far.
-            if not best_val_loss or val_loss < best_val_loss:
+            if not best_val_loss or train_loss < best_val_loss:
                 with open(self.model_path, 'wb') as f:
                     torch.save(self.model, f)
-                best_val_loss = val_loss
+                best_val_loss = train_loss
 
         self.logger.info("saving loss and metrics information...")
         hist_keys = ['train_loss', 'train_ppl', 'val_loss', 'val_ppl']
@@ -198,7 +198,7 @@ class SLAlgo:
                     logits, _ = self.model(state_text=input_idx, state_img=img_feats,
                                            state_answer=answer)  # output = logits (S, num_tokens)
 
-                    word_idx = logits[-1].squeeze().argmax()
+                    word_idx = logits[:,-1].squeeze().argmax()
                     input_idx = torch.cat([input_idx, word_idx.view(1, 1)], dim=-1)
                 words = self.val_dataset.question_tokenizer.decode(input_idx.squeeze().cpu().numpy())
             dict_words[temp] = words
