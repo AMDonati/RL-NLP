@@ -272,7 +272,7 @@ class SLAlgo:
 
             answers = answers.squeeze()
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
-            inputs_ = inputs[:, 0:1]
+            inputs_ = inputs[:, 0:1].to(device)
             max_len = 5
             log_probs = torch.zeros((inputs.size(0), max_len)).to(self.device)
             model.zero_grad()
@@ -287,7 +287,7 @@ class SLAlgo:
                 actions = dist_truncated.sample().to(self.device)
                 prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
                 log_probs[:, t] = torch.log(prob_actions).to(self.device)
-                inputs_ = torch.cat([inputs_, actions.view(-1, 1)], dim=-1)
+                inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                       inputs_.squeeze().cpu().numpy()]
             print(dialog)
