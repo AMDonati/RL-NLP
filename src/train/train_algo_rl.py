@@ -278,36 +278,44 @@ class SLAlgo:
             inputs_ = inputs[:, 0:1].to(device)
             max_len = 5
             log_probs = torch.zeros((inputs.size(0), max_len)).to(self.device)
-            model.zero_grad()
-            for t in range(max_len):
-                logits, _ = model(state_text=inputs_, state_img=feats,
-                                  state_answer=answers)  # output = logits (S, num_tokens)
-                # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
-                dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
-                logger.info("inputs {}".format(inputs_))
-                logger.info("answers {}".format(answers))
 
-                logger.info(logits[0, -1, :])
-                logger.info(logits[0, -1, :].size())
-                logger.info('logits nan values:{}'.format(torch.sum(torch.isnan(logits[0, -1, :])).item()))
-                valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(inputs_,
-                                                                                                             True, 1.)
-                dist_truncated = mask_inf_truncature(valid_actions, logits[:, -1, :], self.device, logits.size(-1))
-                actions = dist_truncated.sample().to(self.device)
-                prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
-                log_probs[:, t] = torch.log(prob_actions).to(self.device)
-                inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
+            with torch.no_grad():
+                for t in range(max_len):
+                    logits, _ = model(state_text=inputs_, state_img=feats,
+                                      state_answer=answers)  # output = logits (S, num_tokens)
+                    # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
+                    dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
+                    logger.info("inputs {}".format(inputs_))
+                    logger.info("answers {}".format(answers))
+
+                    logger.info(logits[0, -1, :])
+                    logger.info(logits[0, -1, :].size())
+                    logger.info('logits nan values:{}'.format(torch.sum(torch.isnan(logits[0, -1, :])).item()))
+                    valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
+                        inputs_,
+                        True, 1.)
+                    dist_truncated = mask_inf_truncature(valid_actions, logits[:, -1, :], self.device, logits.size(-1))
+                    actions = dist_truncated.sample().to(self.device)
+                    prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
+                    log_probs[:, t] = torch.log(prob_actions).to(self.device)
+                    inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
+
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                       inputs_.squeeze().cpu().numpy()]
+            model.zero_grad()
+            logits, _ = model(state_text=inputs_, state_img=feats,
+                              state_answer=answers)
+            log_probs_all = F.log_softmax(logits, dim=-1)
+            log_probs_actions = log_probs_all.gather(-1, inputs_.unsqueeze(dim=-1)).squeeze()
             print(dialog)
             targets_dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                               targets.squeeze().cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
                        range(len(dialog))]
-            rewards_ = torch.zeros_like(log_probs)
+            rewards_ = torch.zeros_like(log_probs_actions)
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
-            gts = torch.zeros_like(log_probs)
+            gts = torch.zeros_like(log_probs_actions)
 
             discounted_reward = 0
             for timestep in range(max_len):
@@ -315,7 +323,7 @@ class SLAlgo:
                 gts[:, -timestep - 1] = discounted_reward
 
             # estimate the loss using one MonteCarlo rollout
-            log_probs_gts = log_probs * gts
+            log_probs_gts = log_probs_actions * gts
             loss = log_probs_gts.sum(dim=1)
             # for sample_batch in log_probs_gts:
             # loss=-sample_batch.sum()
