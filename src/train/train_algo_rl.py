@@ -38,7 +38,7 @@ class SLAlgo:
         self.optimizer = torch.optim.Adam(params=model.parameters(), lr=self.lr)
         PAD_IDX = train_dataset.vocab_questions["<PAD>"]
         self.criterion = torch.nn.NLLLoss(ignore_index=PAD_IDX)
-        self.mse = torch.nn.MSELoss(reduction="none")
+        self.mse = torch.nn.MSELoss()
 
         self.EPOCHS = args.ep
         self.grad_clip = args.grad_clip if args.grad_clip is not None else 5.
