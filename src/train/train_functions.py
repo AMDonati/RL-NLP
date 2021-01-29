@@ -3,8 +3,9 @@ import torch
 import torch.nn.functional as F
 import os
 
+
 def assert_correctness_batch(inputs, targets):
-    assert torch.all(torch.eq(inputs[:,1:], targets[:,:-1])) == 1, "error in inputs/targets"
+    assert torch.all(torch.eq(inputs[:, 1:], targets[:, :-1])) == 1, "error in inputs/targets"
 
 
 def train_one_epoch(model, train_generator, optimizer, criterion, device, grad_clip=None, print_interval=10):
@@ -80,7 +81,7 @@ def train_one_epoch_policy(model, train_generator, optimizer, criterion, device,
         targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
         model.zero_grad()
         logits, _ = model(inputs, feats, answers)  # output (S * B, V)
-        log_probs = F.log_softmax(logits, dim=-1) # (S*B, V)
+        log_probs = F.log_softmax(logits, dim=-1)  # (S*B, V)
         loss = criterion(log_probs, targets)
         loss.backward()
         # clip grad norm:
@@ -142,6 +143,7 @@ def evaluate_policy(model, val_generator, criterion, device):
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             targets = targets.view(targets.size(1) * targets.size(0)).to(device)
             logits, _ = model(inputs, feats, answers)
+            logits = logits.view(-1, logits.size(-1))
             log_probs = F.log_softmax(logits, dim=-1)
             total_loss += criterion(log_probs, targets).item()
     print("Evaluation time {:5.2f}".format(time.time() - start_time))
@@ -171,6 +173,7 @@ def generate_text_lm(model, val_dataset, temperatures, logger, device, out_path,
                         print('| Generated {}/{} words'.format(i, words))
                 f.close()
 
+
 def generate_text_policy(model, val_dataset, temperatures, device, logger, out_path, words):
     input = val_dataset.vocab_questions["<SOS>"]
     input = torch.LongTensor([input]).view(1, 1).to(device)
@@ -184,7 +187,7 @@ def generate_text_policy(model, val_dataset, temperatures, device, logger, out_p
                 with torch.no_grad():
                     for i in range(words):
                         output, hidden = model(state_text=input, state_img=img_feats,
-                                                  state_answer=None)  # output (1, num_tokens)
+                                               state_answer=None)  # output (1, num_tokens)
                         if temp is not None:
                             word_weights = output.squeeze().div(
                                 temp).exp()  # (exp(1/temp * log_sofmax)) = (p_i^(1/T))

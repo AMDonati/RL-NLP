@@ -139,15 +139,15 @@ class SLAlgo:
                                                       print_interval=self.print_interval)
             self.logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
             self.logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-            #val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
-            #                              device=self.device)
-           # self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+            val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
+                                          device=self.device)
+            self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
             # saving loss and metrics information.
             train_loss_history.append(train_loss)
             train_ppl_history.append(math.exp(train_loss))
-            #val_loss_history.append(val_loss)
-            #val_ppl_history.append(math.exp(val_loss))
+            val_loss_history.append(val_loss)
+            val_ppl_history.append(math.exp(val_loss))
             self.logger.info('-' * 89)
 
             # Save the model if the validation loss is the best we've seen so far.
@@ -285,12 +285,6 @@ class SLAlgo:
                                       state_answer=answers)  # output = logits (S, num_tokens)
                     # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
                     dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
-                    #logger.info("inputs {}".format(inputs_))
-                    #logger.info("answers {}".format(answers))
-
-                    #logger.info(logits[0, -1, :])
-                    #logger.info(logits[0, -1, :].size())
-                    #logger.info('logits nan values:{}'.format(torch.sum(torch.isnan(logits[0, -1, :])).item()))
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
                         inputs_,
                         True, 1.)
@@ -325,24 +319,12 @@ class SLAlgo:
             # estimate the loss using one MonteCarlo rollout
             log_probs_gts = log_probs_actions * gts
             loss = -log_probs_gts.sum(dim=1)
-            # for sample_batch in log_probs_gts:
-            # loss=-sample_batch.sum()
-            # loss.backward()
+
             self.optimizer.zero_grad()
             loss.mean().backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
             self.optimizer.step()
 
-            # targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
-            # model.zero_grad()
-            # logits, _ = model(inputs, feats, answers)  # output (S * B, V)
-            # log_probs = F.log_softmax(logits, dim=-1)  # (S*B, V)
-            # loss = criterion(log_probs, targets)
-            # loss.backward()
-            # clip grad norm:
-            # if grad_clip is not None:
-            # torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=grad_clip)
-            # optimizer.step()
             total_loss += loss.mean().item()
             # print loss every number of batches
             if (batch + 1) % print_interval == 0:
