@@ -315,13 +315,12 @@ class SLAlgo:
             rewards_ = torch.zeros_like(log_probs_actions)
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
-            advs = torch.zeros_like(log_probs_actions)
 
             discounted_reward = 0
             for timestep in range(max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
                 gts[:, -timestep - 1] = discounted_reward
-            advs = gts - values
+            advs = gts - values.cpu().detach()
             # estimate the loss using one MonteCarlo rollout
             log_probs_gts = log_probs_actions * advs
             loss = -log_probs_gts.sum(dim=1)
