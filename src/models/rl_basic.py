@@ -296,7 +296,7 @@ class PolicyLSTMBatch_SL(nn.Module):
             outputs = pad_output[sort_ind.argsort()]
             return outputs
 
-        pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
+        pad_embed_pack = pack_padded_sequence(pad_embed, lens.detach().cpu().numpy(), batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         output, input_sizes = pad_packed_sequence(packed_output, batch_first=True, total_length=text.size(1))
         return output
