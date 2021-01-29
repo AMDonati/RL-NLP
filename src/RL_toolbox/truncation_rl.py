@@ -30,6 +30,7 @@ def mask_inf_truncature(valid_actions, logits, device, num_tokens=86):
     mask = mask.scatter_(-1, valid_actions, logits)
     probs_truncated = F.softmax(mask, dim=-1)
     policy_dist_truncated = Categorical(probs_truncated)
+    logger.info("probs neg {}".format((policy_dist_truncated.probs<0).sum()))
     return policy_dist_truncated
 
 
