@@ -284,8 +284,8 @@ class SLAlgo:
                                                                                                              True, 1.)
                 dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
                 dist_truncated = mask_inf_truncature(valid_actions, logits[:, -1, :], self.device, logits.size(-1))
-                actions = dist_truncated.sample()
-                log_probs[:, t] = torch.log(dist.probs.gather(-1, actions.view(-1, 1)).view(-1))
+                actions = dist_truncated.sample().to(self.device)
+                log_probs[:, t] = torch.log(dist.probs.gather(-1, actions.view(-1, 1)).view(-1)).to(self.device)
                 inputs_ = torch.cat([inputs_, actions.view(-1, 1)], dim=-1)
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                       inputs_.squeeze().cpu().numpy()]
@@ -315,16 +315,16 @@ class SLAlgo:
             clip_grad_norm_(model.parameters(), self.grad_clip)
             self.optimizer.step()
 
-            #targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
-            #model.zero_grad()
-            #logits, _ = model(inputs, feats, answers)  # output (S * B, V)
-            #log_probs = F.log_softmax(logits, dim=-1)  # (S*B, V)
-            #loss = criterion(log_probs, targets)
-            #loss.backward()
+            # targets = targets.view(targets.size(1) * targets.size(0)).to(device)  # targets (S*B)
+            # model.zero_grad()
+            # logits, _ = model(inputs, feats, answers)  # output (S * B, V)
+            # log_probs = F.log_softmax(logits, dim=-1)  # (S*B, V)
+            # loss = criterion(log_probs, targets)
+            # loss.backward()
             # clip grad norm:
-            #if grad_clip is not None:
-                #torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=grad_clip)
-            #optimizer.step()
+            # if grad_clip is not None:
+            # torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=grad_clip)
+            # optimizer.step()
             total_loss += loss.mean().item()
             # print loss every number of batches
             if (batch + 1) % print_interval == 0:
