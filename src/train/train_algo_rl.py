@@ -18,6 +18,7 @@ from RL_toolbox.truncation_rl import TopK, mask_inf_truncature
 from RL_toolbox.reward import Bleu_sf2
 from torch.nn.utils import clip_grad_norm_
 import logging
+import numpy as np
 
 logger = logging.getLogger()
 
@@ -198,7 +199,7 @@ class SLAlgo:
                     logits, _ = self.model(state_text=input_idx, state_img=img_feats,
                                            state_answer=answer)  # output = logits (S, num_tokens)
 
-                    word_idx = logits[:,-1].squeeze().argmax()
+                    word_idx = logits[:, -1].squeeze().argmax()
                     input_idx = torch.cat([input_idx, word_idx.view(1, 1)], dim=-1)
                 words = self.val_dataset.question_tokenizer.decode(input_idx.squeeze().cpu().numpy())
             dict_words[temp] = words
@@ -301,12 +302,13 @@ class SLAlgo:
                               state_answer=answers)
             log_probs_all = F.log_softmax(logits, dim=-1)
             log_probs_actions = log_probs_all.gather(-1, inputs_.unsqueeze(dim=-1)).squeeze()
-            #print(dialog)
+            # print(dialog)
             targets_dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                               targets.squeeze().cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
                        range(len(dialog))]
+            logger.info(np.mean(rewards))
             rewards_ = torch.zeros_like(log_probs_actions)
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
