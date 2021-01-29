@@ -26,11 +26,12 @@ def mask_truncature(valid_actions, logits, device, num_tokens=86):
 
 def mask_inf_truncature(valid_actions, logits, device, num_tokens=86):
     mask = (torch.ones(logits.size(0), num_tokens) * -1e32).to(device)
-    #mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
+    # mask[:, valid_actions] = logits[:, valid_actions].clone().detach()
     mask = mask.scatter_(-1, valid_actions, logits)
     probs_truncated = F.softmax(mask, dim=-1)
     policy_dist_truncated = Categorical(probs_truncated)
-    logger.info("probs neg {}".format((policy_dist_truncated.probs<0).sum()))
+    logger.info("probs neg {}".format((policy_dist_truncated.probs < 0).sum()))
+    logger.info('nan values:{}'.format(torch.sum(torch.isnan(policy_dist_truncated.probs)).item()))
     return policy_dist_truncated
 
 
@@ -84,15 +85,15 @@ class TopK(Truncation):
     def truncate(self, log_probas, logits):
         top_k_weights, top_k_indices = torch.topk(log_probas, self.num_truncated, sorted=True)
         top_k_weights = top_k_weights.exp()
-        #top_k_indices, top_k_weights = self.trim_zero_probabilities(top_k_weights, top_k_indices)
+        # top_k_indices, top_k_weights = self.trim_zero_probabilities(top_k_weights, top_k_indices)
         return top_k_indices, top_k_weights
 
 
 class ProbaThreshold(Truncation):
     '''See OverLeaf for details on this truncation fn.'''
 
-    def __init__(self,  **kwargs):
-        Truncation.__init__(self,  pretrained_lm=kwargs["pretrained_lm"])
+    def __init__(self, **kwargs):
+        Truncation.__init__(self, pretrained_lm=kwargs["pretrained_lm"])
         self.p_th = kwargs["p_th"]
         self.top_k_min = TopK(agent, pretrained_lm=kwargs["pretrained_lm"], num_truncated=kwargs["s_min"])
         self.top_k_max = TopK(agent, pretrained_lm=kwargs["pretrained_lm"], num_truncated=kwargs["s_max"])
