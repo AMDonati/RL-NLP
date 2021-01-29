@@ -249,6 +249,7 @@ class PolicyLSTMBatch_SL(nn.Module):
             self.fusion_dim += word_emb_size
 
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
+        self.value_head = nn.Linear(self.fusion_dim, 1)
 
     def init_hidden_state(self, encoder_out):
         """
@@ -341,7 +342,7 @@ class PolicyLSTMBatch_SL(nn.Module):
             print("not ok ")
 
         # logits = logits.view(-1, self.num_tokens)  # (S*B, num_tokens)
-        value = None
+        value = self.value_head(embedding)
         return logits, value
 
 
