@@ -274,7 +274,7 @@ class SLAlgo:
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             inputs_ = inputs[:, 0:1]
             max_len = 5
-            log_probs = torch.zeros((inputs.size(0), max_len))
+            log_probs = torch.zeros((inputs.size(0), max_len)).to(self.device)
             model.zero_grad()
             for t in range(max_len):
                 logits, _ = model(state_text=inputs_, state_img=feats,
