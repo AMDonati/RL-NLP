@@ -329,7 +329,7 @@ class SLAlgo:
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
 
-            loss = rl_loss #+ 0.5 * value_loss
+            loss = rl_loss  # + 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
@@ -343,6 +343,9 @@ class SLAlgo:
                 logger.info('rl loss {}'.format(np.mean(rl_all)))
                 logger.info('value loss {}'.format(np.mean(vf_all)))
                 logger.info("rewards:{}".format(np.mean(rewards_all)))
+                logger.info("dialog:{}".format(dialog))
+                logger.info("true dialog:{}".format(targets_dialog))
+
                 rl_all, vf_all, rewards_all = [], [], []
                 start_time = time.time()
 
