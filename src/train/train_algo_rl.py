@@ -323,8 +323,12 @@ class SLAlgo:
             advs = gts - values.cpu().detach()
             # estimate the loss using one MonteCarlo rollout
             log_probs_advs = log_probs_actions * advs
-            loss = -log_probs_advs.sum(dim=1).mean()
-            loss += 0.5 * torch.square(gts.view(-1) - values.view(-1)).sum()
+            rl_loss = -log_probs_advs.sum(dim=1).mean()
+            value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
+            logger.info(' rl loss {}'.format(rl_loss))
+            logger.info(' value loss {}'.format(value_loss))
+
+            loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
