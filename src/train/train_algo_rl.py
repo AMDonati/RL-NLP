@@ -322,9 +322,9 @@ class SLAlgo:
                 gts[:, -timestep - 1] = discounted_reward
             advs = gts - values.cpu().detach()
             # estimate the loss using one MonteCarlo rollout
-            log_probs_gts = log_probs_actions * advs
-            loss = -log_probs_gts.sum(dim=1).mean()
-            loss += self.mse(values.view(-1), gts.view(-1))
+            log_probs_advs = log_probs_actions * advs
+            loss = -log_probs_advs.sum(dim=1).mean()
+            loss += 0.5 * torch.square(gts.view(-1) - values.view(-1))
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
