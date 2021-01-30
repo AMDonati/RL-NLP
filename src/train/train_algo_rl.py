@@ -324,7 +324,7 @@ class SLAlgo:
             # estimate the loss using one MonteCarlo rollout
             log_probs_gts = log_probs_actions * advs
             loss = -log_probs_gts.sum(dim=1).mean()
-            loss += self.mse(values, gts)
+            loss += self.mse(values.view(-1), gts.view(-1))
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
