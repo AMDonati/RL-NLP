@@ -329,7 +329,7 @@ class SLAlgo:
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
 
-            loss = rl_loss + 0.5 * value_loss
+            loss = rl_loss #+ 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
