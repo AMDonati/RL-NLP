@@ -140,7 +140,7 @@ class SLAlgo:
                                                       device=self.device,
                                                       grad_clip=self.grad_clip,
                                                       print_interval=self.print_interval)
-            self.logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
+            self.logger.info('train loss {:5.3f} '.format(train_loss))
             self.logger.info('time for one epoch...{:5.2f}'.format(elapsed))
             # val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
             #                              device=self.device)
