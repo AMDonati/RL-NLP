@@ -24,7 +24,7 @@ logger = logging.getLogger()
 
 
 class SLAlgo:
-    def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm):
+    def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
@@ -51,6 +51,7 @@ class SLAlgo:
         self.truncation = TopK(pretrained_lm=self.lm, num_truncated=10)
         self.reward_function = Bleu_sf2()
         self.gamma = 0.99
+        self.max_len = max_len
         self.language_metrics = {k: v for k, v in zip(["bleu-1", "bleu-2", "bleu"],
                                                       [Bleu_sf0(sf_id=args.bleu_sf, n_gram=2),
                                                        Bleu_sf0(sf_id=args.bleu_sf, n_gram=3),
@@ -148,7 +149,7 @@ class SLAlgo:
 
             # saving loss and metrics information.
             train_loss_history.append(train_loss)
-            #train_ppl_history.append(math.exp(train_loss))
+            # train_ppl_history.append(math.exp(train_loss))
             # val_loss_history.append(val_loss)
             # val_ppl_history.append(math.exp(val_loss))
             self.logger.info('-' * 89)
@@ -284,7 +285,7 @@ class SLAlgo:
             log_probs = torch.zeros((inputs.size(0), max_len)).to(self.device)
 
             with torch.no_grad():
-                for t in range(max_len):
+                for t in range(self.max_len):
                     logits, _ = model(state_text=inputs_, state_img=feats,
                                       state_answer=answers)  # output = logits (S, num_tokens)
                     # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
@@ -307,7 +308,7 @@ class SLAlgo:
             log_probs_all = F.log_softmax(logits, dim=-1)
             log_probs_actions = log_probs_all.gather(-1, inputs_.unsqueeze(dim=-1)).squeeze()
             # print(dialog)
-            targets_dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
+            targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:max_len]) for question in
                               targets.squeeze().cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
@@ -329,7 +330,7 @@ class SLAlgo:
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
 
-            loss = rl_loss  + 0.5 * value_loss
+            loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)

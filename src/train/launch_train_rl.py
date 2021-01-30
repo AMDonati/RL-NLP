@@ -91,6 +91,7 @@ if __name__ == '__main__':
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
     parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
     parser.add_argument('-lm_path', type=str, default="gpt")
+    parser.add_argument("-max_len", type=int, default=10, help="max len")
 
     args = parser.parse_args()
 
@@ -172,7 +173,7 @@ if __name__ == '__main__':
 
     model = get_model(args, train_dataset, device)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
-                     args=args, lm=lm)
+                     args=args, lm=lm, max_len=args.max_len)
     if args.ep > 0:
         sl_algo.train()
     # sl_algo.generate_text()
