@@ -281,7 +281,7 @@ class SLAlgo:
             answers = answers.squeeze()
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             inputs_ = inputs[:, 0:1].to(device)
-            log_probs = torch.zeros((inputs.size(0),self.max_len)).to(self.device)
+            log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
 
             with torch.no_grad():
                 for t in range(self.max_len):
@@ -298,15 +298,16 @@ class SLAlgo:
                     log_probs[:, t] = torch.log(prob_actions).to(self.device)
                     inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
 
-            dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
-                      inputs_.squeeze().cpu().numpy()]
             model.zero_grad()
             logits, values = model(state_text=inputs_, state_img=feats,
                                    state_answer=answers)
-            values = values.squeeze()
-            log_probs_all = F.log_softmax(logits, dim=-1)
-            log_probs_actions = log_probs_all.gather(-1, inputs_.unsqueeze(dim=-1)).squeeze()
-            # print(dialog)
+            values = values.squeeze()[:, 1:]
+            log_probs_all = F.log_softmax(logits[:, 1:], dim=-1)
+            log_probs_actions = log_probs_all.gather(-1, inputs_[:, 1:].unsqueeze(dim=-1)).view(
+                log_probs_all.size(0), log_probs_all.size(1))
+
+            dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
+                      inputs_.squeeze().cpu().numpy()]
             targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:self.max_len]) for question in
                               targets.squeeze().cpu().numpy()]
 
