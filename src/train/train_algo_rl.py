@@ -148,7 +148,7 @@ class SLAlgo:
 
             # saving loss and metrics information.
             train_loss_history.append(train_loss)
-            train_ppl_history.append(math.exp(train_loss))
+            #train_ppl_history.append(math.exp(train_loss))
             # val_loss_history.append(val_loss)
             # val_ppl_history.append(math.exp(val_loss))
             self.logger.info('-' * 89)
