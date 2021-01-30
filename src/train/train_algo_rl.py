@@ -142,15 +142,15 @@ class SLAlgo:
                                                       print_interval=self.print_interval)
             self.logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
             self.logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-            val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
-                                          device=self.device)
-            self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+            #val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
+            #                              device=self.device)
+            #self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
             # saving loss and metrics information.
             train_loss_history.append(train_loss)
             train_ppl_history.append(math.exp(train_loss))
-            val_loss_history.append(val_loss)
-            val_ppl_history.append(math.exp(val_loss))
+            #val_loss_history.append(val_loss)
+            #val_ppl_history.append(math.exp(val_loss))
             self.logger.info('-' * 89)
 
             # Save the model if the validation loss is the best we've seen so far.
