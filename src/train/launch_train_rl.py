@@ -120,13 +120,13 @@ if __name__ == '__main__':
                                    question_tokenizer=question_tokenizer,
                                    image_features_reader=images_feature_reader,
                                    reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                   num_images=None, vocab_path=vocab_path,
+                                   num_images=args.max_samples, vocab_path=vocab_path,
                                    filter_entries=True, rl=False)
         val_dataset = VQADataset(split=val_split, dataroot=args.data_path,
                                  question_tokenizer=question_tokenizer,
                                  image_features_reader=images_feature_reader,
                                  reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
-                                 num_images=None, vocab_path=vocab_path,
+                                 num_images=args.max_samples, vocab_path=vocab_path,
                                  filter_entries=True, rl=False)
         test_dataset = val_dataset
 
