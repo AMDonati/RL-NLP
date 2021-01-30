@@ -281,8 +281,7 @@ class SLAlgo:
             answers = answers.squeeze()
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             inputs_ = inputs[:, 0:1].to(device)
-            max_len = 5
-            log_probs = torch.zeros((inputs.size(0), max_len)).to(self.device)
+            log_probs = torch.zeros((inputs.size(0),self.max_len)).to(self.device)
 
             with torch.no_grad():
                 for t in range(self.max_len):
@@ -308,7 +307,7 @@ class SLAlgo:
             log_probs_all = F.log_softmax(logits, dim=-1)
             log_probs_actions = log_probs_all.gather(-1, inputs_.unsqueeze(dim=-1)).squeeze()
             # print(dialog)
-            targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:max_len]) for question in
+            targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:self.max_len]) for question in
                               targets.squeeze().cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
@@ -319,7 +318,7 @@ class SLAlgo:
             gts = torch.zeros_like(log_probs_actions)
 
             discounted_reward = 0
-            for timestep in range(max_len):
+            for timestep in range(self.max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
                 gts[:, -timestep - 1] = discounted_reward
             advs = gts - values.cpu().detach()
