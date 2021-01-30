@@ -142,15 +142,15 @@ class SLAlgo:
                                                       print_interval=self.print_interval)
             self.logger.info('train loss {:5.3f} - train perplexity {:8.3f}'.format(train_loss, math.exp(train_loss)))
             self.logger.info('time for one epoch...{:5.2f}'.format(elapsed))
-            #val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
+            # val_loss = self.eval_function(model=self.model, val_generator=self.val_generator, criterion=self.criterion,
             #                              device=self.device)
-            #self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
+            # self.logger.info('val loss: {:5.3f} - val perplexity: {:8.3f}'.format(val_loss, math.exp(val_loss)))
 
             # saving loss and metrics information.
             train_loss_history.append(train_loss)
             train_ppl_history.append(math.exp(train_loss))
-            #val_loss_history.append(val_loss)
-            #val_ppl_history.append(math.exp(val_loss))
+            # val_loss_history.append(val_loss)
+            # val_ppl_history.append(math.exp(val_loss))
             self.logger.info('-' * 89)
 
             # Save the model if the validation loss is the best we've seen so far.
@@ -270,6 +270,7 @@ class SLAlgo:
         total_loss = 0.
         start_time = time.time()
         start_time_epoch = time.time()
+        rl_all, vf_all, rewards_all = [], [], []
         for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
             if isinstance(img, list):
                 feats = img[0]
@@ -311,7 +312,7 @@ class SLAlgo:
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
                        range(len(dialog))]
-            logger.info("rewards:{}".format(np.mean(rewards)))
+            rewards_all.append(np.mean(rewards))
             rewards_ = torch.zeros_like(log_probs_actions)
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
@@ -325,8 +326,8 @@ class SLAlgo:
             log_probs_advs = log_probs_actions * advs
             rl_loss = -log_probs_advs.sum(dim=1).mean()
             value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
-            logger.info(' rl loss {}'.format(rl_loss))
-            logger.info(' value loss {}'.format(value_loss))
+            vf_all.append(value_loss.detach().item())
+            rl_all.append(rl_loss.detach().item())
 
             loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
@@ -339,6 +340,10 @@ class SLAlgo:
             if (batch + 1) % print_interval == 0:
                 print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
                 print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
+                logger.info('rl loss {}'.format(np.mean(rl_all)))
+                logger.info('value loss {}'.format(np.mean(vf_all)))
+                logger.info("rewards:{}".format(np.mean(rewards_all)))
+                rl_all, vf_all, rewards_all = [], [], []
                 start_time = time.time()
 
         curr_loss = total_loss / (batch + 1)
