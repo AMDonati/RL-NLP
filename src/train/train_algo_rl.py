@@ -25,7 +25,7 @@ logger = logging.getLogger()
 
 class SLAlgo:
     def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len, alpha_lm,
-                 truncation_params=None):
+                 truncation_params=10):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
