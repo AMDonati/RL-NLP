@@ -49,7 +49,7 @@ class SLAlgo:
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
         self.check_batch()
-        self.truncation = TopK(pretrained_lm=self.lm, num_truncated=10)
+        self.truncation = TopK(pretrained_lm=self.lm, num_truncated=self.truncation_params)
         self.reward_function = Bleu_sf2()
         self.gamma = 0.99
         self.max_len = max_len
@@ -284,15 +284,17 @@ class SLAlgo:
             inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             inputs_ = inputs[:, 0:1].to(device)
             log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
+            ranks = torch.zeros_like(log_probs)
 
             with torch.no_grad():
                 for t in range(self.max_len):
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
                         inputs_, True, 1.)
+                    sort_lm, sort_lm_ind = torch.sort(logits_lm, descending=True)
+                    ranks[:, t] = (sort_lm_ind == targets[:, t].view(-1, 1)).nonzero()[1, :]
                     logits_, _ = model(state_text=inputs_, state_img=feats,
                                        state_answer=answers)  # output = logits (S, num_tokens)
-                    last_logits = logits_[:, -1, :]
-                    last_logits += self.alpha_lm * logits_lm
+                    last_logits = logits_[:, -1, :] + self.alpha_lm * logits_lm
                     probs = F.softmax(last_logits, dim=-1)
                     dist = Categorical(probs)
 
@@ -303,7 +305,6 @@ class SLAlgo:
                                   in range(sort_ind.size(0))]
                     logger.debug("sort words {}".format(sort_words))
                     logger.debug("sort probs {}".format(sort_probs[:, :10]))
-                    targets[:, t]
 
                     actions = dist_truncated.sample().to(self.device)
                     prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
