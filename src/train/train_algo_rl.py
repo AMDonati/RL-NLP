@@ -277,9 +277,8 @@ class SLAlgo:
                 feats = img[0]
             else:
                 feats = img
-            targets = targets[0:1]
             answers = answers.squeeze()
-            inputs, feats, answers = inputs[0:1].to(device), feats[0:1].to(device), answers[0:1].to(device)
+            inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
             inputs_ = inputs[:, 0:1].to(device)
             log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
 
@@ -346,15 +345,15 @@ class SLAlgo:
             self.optimizer.step()
 
             # verif
-            _logits, _values = model(state_text=inputs_to_compute, state_img=feats,
-                                     state_answer=answers)
-            _values = _values.squeeze()
-            _log_probs_all = F.log_softmax(_logits, dim=-1)
-            _log_probs_actions = _log_probs_all.gather(-1, inputs_[:, 1:].unsqueeze(dim=-1)).view(
-                log_probs_all.size(0), log_probs_all.size(1))
+            # _logits, _values = model(state_text=inputs_to_compute, state_img=feats,
+            #                         state_answer=answers)
+            # _values = _values.squeeze()
+            # _log_probs_all = F.log_softmax(_logits, dim=-1)
+            # _log_probs_actions = _log_probs_all.gather(-1, inputs_[:, 1:].unsqueeze(dim=-1)).view(
+            #    log_probs_all.size(0), log_probs_all.size(1))
             # vals, inds = torch.sort((_log_probs_all - log_probs_all), dim=-1, descending=True)
-            diff_advs = torch.sign(advs) * (_log_probs_actions - log_probs_actions)
-            logger.info("diff advs {}".format(diff_advs))
+            # diff_advs = torch.sign(advs) * (_log_probs_actions - log_probs_actions)
+            # logger.info("diff advs {}".format(diff_advs))
 
             total_loss += loss.mean().item()
             # print loss every number of batches
