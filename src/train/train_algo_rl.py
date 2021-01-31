@@ -285,7 +285,6 @@ class SLAlgo:
             inputs_ = inputs[:, 0:1].to(device)
             log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
             ranks = torch.zeros_like(log_probs)
-
             with torch.no_grad():
                 for t in range(self.max_len):
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
@@ -367,18 +366,17 @@ class SLAlgo:
             # print loss every number of batches
             if (batch + 1) % print_interval == 0:
                 print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
-            print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
-            logger.debug('rl loss {}'.format(np.mean(rl_all)))
-            logger.debug('value loss {}'.format(np.mean(vf_all)))
-            logger.debug("rewards:{}".format(np.mean(rewards_all)))
-            logger.debug("dialog:{}".format(dialog))
-            logger.debug("true dialog:{}".format(targets_dialog))
-            ranks_medians = torch.cat(ranks_all, dim=0)
+                print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
+                logger.debug('rl loss {}'.format(np.mean(rl_all)))
+                logger.debug('value loss {}'.format(np.mean(vf_all)))
+                logger.info("rewards:{}".format(np.mean(rewards_all)))
+                logger.debug("dialog:{}".format(dialog))
+                logger.debug("true dialog:{}".format(targets_dialog))
+                ranks_medians = torch.cat(ranks_all, dim=0)
+                logger.debug("ranks :{}".format(ranks_medians))
 
-            logger.debug("ranks :{}".format(ranks_medians))
-
-            rl_all, vf_all, rewards_all = [], [], []
-            start_time = time.time()
+                rl_all, vf_all, rewards_all = [], [], []
+                start_time = time.time()
 
             curr_loss = total_loss / (batch + 1)
             elapsed = time.time() - start_time_epoch
