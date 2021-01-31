@@ -277,7 +277,7 @@ class SLAlgo:
                 feats = img[0]
             else:
                 feats = img
-
+            targets = targets[0:1]
             answers = answers.squeeze()
             inputs, feats, answers = inputs[0:1].to(device), feats[0:1].to(device), answers[0:1].to(device)
             inputs_ = inputs[:, 0:1].to(device)
@@ -316,9 +316,9 @@ class SLAlgo:
                 log_probs_all.size(0), log_probs_all.size(1))
 
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
-                      inputs_.squeeze().cpu().numpy()]
+                      inputs_.cpu().numpy()]
             targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:self.max_len]) for question in
-                              targets.squeeze().cpu().numpy()]
+                              targets.cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
                        range(len(dialog))]
