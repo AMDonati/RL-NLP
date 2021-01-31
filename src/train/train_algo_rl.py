@@ -285,24 +285,33 @@ class SLAlgo:
 
             with torch.no_grad():
                 for t in range(self.max_len):
-                    logits, _ = model(state_text=inputs_, state_img=feats,
-                                      state_answer=answers)  # output = logits (S, num_tokens)
+                    logits_, _ = model(state_text=inputs_, state_img=feats,
+                                       state_answer=answers)  # output = logits (S, num_tokens)
                     # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
-                    dist = Categorical(F.softmax(logits[:, -1, :], dim=-1))
+                    dist = Categorical(F.softmax(logits_[:, -1, :], dim=-1))
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
                         inputs_,
                         True, 1.)
-                    dist_truncated = mask_inf_truncature(valid_actions, logits[:, -1, :], self.device, logits.size(-1))
+                    dist_truncated = mask_inf_truncature(valid_actions, logits_[:, -1, :], self.device,
+                                                         logits_.size(-1))
+                    sort_probs, sort_ind = torch.sort(dist_truncated.probs, descending=True)
+                    sort_words = [self.train_dataset.question_tokenizer.decode(sort_ind[j, :10].numpy()).split() for j
+                                  in
+                                  range(sort_ind.size(0))]
+                    logger.info("sort words {}".format(sort_words))
+                    logger.info("sort probs {}".format(sort_probs[:, :10]))
+
                     actions = dist_truncated.sample().to(self.device)
                     prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
                     log_probs[:, t] = torch.log(prob_actions).to(self.device)
                     inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
 
             model.zero_grad()
-            logits, values = model(state_text=inputs_, state_img=feats,
+            inputs_to_compute = inputs_[:, :-1]
+            logits, values = model(state_text=inputs_to_compute, state_img=feats,
                                    state_answer=answers)
-            values = values.squeeze()[:, 1:]
-            log_probs_all = F.log_softmax(logits[:, 1:], dim=-1)
+            values = values.squeeze()
+            log_probs_all = F.log_softmax(logits, dim=-1)
             log_probs_actions = log_probs_all.gather(-1, inputs_[:, 1:].unsqueeze(dim=-1)).view(
                 log_probs_all.size(0), log_probs_all.size(1))
 
@@ -330,7 +339,7 @@ class SLAlgo:
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
 
-            loss = rl_loss + 2 * value_loss
+            loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
