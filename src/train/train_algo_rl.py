@@ -345,6 +345,17 @@ class SLAlgo:
             # clip_grad_norm_(model.parameters(), self.grad_clip)
             self.optimizer.step()
 
+            # verif
+            _logits, _values = model(state_text=inputs_to_compute, state_img=feats,
+                                     state_answer=answers)
+            _values = _values.squeeze()
+            _log_probs_all = F.log_softmax(_logits, dim=-1)
+            _log_probs_actions = _log_probs_all.gather(-1, inputs_[:, 1:].unsqueeze(dim=-1)).view(
+                log_probs_all.size(0), log_probs_all.size(1))
+            # vals, inds = torch.sort((_log_probs_all - log_probs_all), dim=-1, descending=True)
+            diff_advs = torch.sign(advs) * (_log_probs_actions - log_probs_actions)
+            logger.info("diff advs {}".format(diff_advs))
+
             total_loss += loss.mean().item()
             # print loss every number of batches
             if (batch + 1) % print_interval == 0:
