@@ -291,7 +291,7 @@ class SLAlgo:
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
                         inputs_, True, 1.)
                     sort_lm, sort_lm_ind = torch.sort(logits_lm, descending=True)
-                    ranks[:, t] = (sort_lm_ind == targets[:, t].view(-1, 1)).nonzero()[1, :]
+                    ranks[:, t] = (sort_lm_ind == targets[:, t].view(-1, 1)).nonzero()[:, -1]
                     logits_, _ = model(state_text=inputs_, state_img=feats,
                                        state_answer=answers)  # output = logits (S, num_tokens)
                     last_logits = logits_[:, -1, :] + self.alpha_lm * logits_lm
@@ -374,8 +374,8 @@ class SLAlgo:
             logger.debug("dialog:{}".format(dialog))
             logger.debug("true dialog:{}".format(targets_dialog))
             ranks_medians = torch.cat(ranks_all, dim=0)
-            
-            logger.debug("ranks :{}".format(ranks_medians.mean(dim=-1)))
+
+            logger.debug("ranks :{}".format(ranks_medians))
 
             rl_all, vf_all, rewards_all = [], [], []
             start_time = time.time()
