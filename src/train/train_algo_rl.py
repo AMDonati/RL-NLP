@@ -279,7 +279,7 @@ class SLAlgo:
                 feats = img
 
             answers = answers.squeeze()
-            inputs, feats, answers = inputs.to(device), feats.to(device), answers.to(device)
+            inputs, feats, answers = inputs[0:1].to(device), feats[0:1].to(device), answers[0:1].to(device)
             inputs_ = inputs[:, 0:1].to(device)
             log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
 
@@ -331,7 +331,7 @@ class SLAlgo:
             for timestep in range(self.max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
                 gts[:, -timestep - 1] = discounted_reward
-            advs = gts #- values.cpu().detach().view(gts.size(0), gts.size(1))
+            advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
             # estimate the loss using one MonteCarlo rollout
             log_probs_advs = log_probs_actions * advs
             rl_loss = -log_probs_advs.sum(dim=1).mean()
@@ -339,10 +339,10 @@ class SLAlgo:
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
 
-            loss = rl_loss #+ 0.5 * value_loss
+            loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
-            #clip_grad_norm_(model.parameters(), self.grad_clip)
+            # clip_grad_norm_(model.parameters(), self.grad_clip)
             self.optimizer.step()
 
             total_loss += loss.mean().item()
