@@ -92,6 +92,8 @@ if __name__ == '__main__':
     parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
     parser.add_argument('-lm_path', type=str, default="gpt")
     parser.add_argument("-max_len", type=int, default=10, help="max len")
+    parser.add_argument("-alpha_lm", type=float, default=0.)
+    parser.add_argument("-truncation_params", type=int, default=10, help="truncation parameters")
 
     args = parser.parse_args()
 
@@ -173,7 +175,8 @@ if __name__ == '__main__':
 
     model = get_model(args, train_dataset, device)
     sl_algo = SLAlgo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
-                     args=args, lm=lm, max_len=args.max_len)
+                     args=args, lm=lm, max_len=args.max_len, alpha_lm=args.alpha_lm,
+                     truncation_params=args.truncation_params)
     if args.ep > 0:
         sl_algo.train()
     # sl_algo.generate_text()

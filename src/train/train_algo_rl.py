@@ -24,7 +24,8 @@ logger = logging.getLogger()
 
 
 class SLAlgo:
-    def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len):
+    def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len, alpha_lm,
+                 truncation_params=None):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
@@ -52,6 +53,8 @@ class SLAlgo:
         self.reward_function = Bleu_sf2()
         self.gamma = 0.99
         self.max_len = max_len
+        self.alpha_lm = alpha_lm
+        self.truncation_params = truncation_params
         self.language_metrics = {k: v for k, v in zip(["bleu-1", "bleu-2", "bleu"],
                                                       [Bleu_sf0(sf_id=args.bleu_sf, n_gram=2),
                                                        Bleu_sf0(sf_id=args.bleu_sf, n_gram=3),
@@ -284,21 +287,23 @@ class SLAlgo:
 
             with torch.no_grad():
                 for t in range(self.max_len):
+                    valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
+                        inputs_, True, 1.)
                     logits_, _ = model(state_text=inputs_, state_img=feats,
                                        state_answer=answers)  # output = logits (S, num_tokens)
-                    # last_log_probas_lm, logits_lm, log_probas_lm = self.lm.forward(inputs_)
-                    dist = Categorical(F.softmax(logits_[:, -1, :], dim=-1))
-                    valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
-                        inputs_,
-                        True, 1.)
+                    last_logits = logits_[:, -1, :]
+                    last_logits += self.alpha_lm * logits_lm
+                    probs = F.softmax(last_logits, dim=-1)
+                    dist = Categorical(probs)
+
                     dist_truncated = mask_inf_truncature(valid_actions, logits_[:, -1, :], self.device,
                                                          logits_.size(-1))
                     sort_probs, sort_ind = torch.sort(dist_truncated.probs, descending=True)
                     sort_words = [self.train_dataset.question_tokenizer.decode(sort_ind[j, :10].numpy()).split() for j
-                                  in
-                                  range(sort_ind.size(0))]
-                    logger.info("sort words {}".format(sort_words))
-                    logger.info("sort probs {}".format(sort_probs[:, :10]))
+                                  in range(sort_ind.size(0))]
+                    logger.debug("sort words {}".format(sort_words))
+                    logger.debug("sort probs {}".format(sort_probs[:, :10]))
+                    targets[:, t]
 
                     actions = dist_truncated.sample().to(self.device)
                     prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
@@ -316,7 +321,8 @@ class SLAlgo:
 
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                       inputs_.cpu().numpy()]
-            targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:self.max_len]) for question in
+            targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:self.max_len]) for question
+                              in
                               targets.cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
@@ -329,7 +335,7 @@ class SLAlgo:
             discounted_reward = 0
             for timestep in range(self.max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
-                gts[:, -timestep - 1] = discounted_reward
+            gts[:, -timestep - 1] = discounted_reward
             advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
             # estimate the loss using one MonteCarlo rollout
             log_probs_advs = log_probs_actions * advs
@@ -359,17 +365,17 @@ class SLAlgo:
             # print loss every number of batches
             if (batch + 1) % print_interval == 0:
                 print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
-                print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
-                logger.info('rl loss {}'.format(np.mean(rl_all)))
-                logger.info('value loss {}'.format(np.mean(vf_all)))
-                logger.info("rewards:{}".format(np.mean(rewards_all)))
-                logger.info("dialog:{}".format(dialog))
-                logger.info("true dialog:{}".format(targets_dialog))
+            print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
+            logger.debug('rl loss {}'.format(np.mean(rl_all)))
+            logger.debug('value loss {}'.format(np.mean(vf_all)))
+            logger.debug("rewards:{}".format(np.mean(rewards_all)))
+            logger.info("dialog:{}".format(dialog))
+            logger.info("true dialog:{}".format(targets_dialog))
 
-                rl_all, vf_all, rewards_all = [], [], []
-                start_time = time.time()
+            rl_all, vf_all, rewards_all = [], [], []
+            start_time = time.time()
 
-        curr_loss = total_loss / (batch + 1)
-        elapsed = time.time() - start_time_epoch
+            curr_loss = total_loss / (batch + 1)
+            elapsed = time.time() - start_time_epoch
 
         return curr_loss, elapsed
