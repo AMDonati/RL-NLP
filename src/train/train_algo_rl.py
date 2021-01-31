@@ -49,12 +49,12 @@ class SLAlgo:
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
         self.check_batch()
+        self.truncation_params = truncation_params
         self.truncation = TopK(pretrained_lm=self.lm, num_truncated=self.truncation_params)
         self.reward_function = Bleu_sf2()
         self.gamma = 0.99
         self.max_len = max_len
         self.alpha_lm = alpha_lm
-        self.truncation_params = truncation_params
         self.language_metrics = {k: v for k, v in zip(["bleu-1", "bleu-2", "bleu"],
                                                       [Bleu_sf0(sf_id=args.bleu_sf, n_gram=2),
                                                        Bleu_sf0(sf_id=args.bleu_sf, n_gram=3),
@@ -274,7 +274,7 @@ class SLAlgo:
         total_loss = 0.
         start_time = time.time()
         start_time_epoch = time.time()
-        rl_all, vf_all, rewards_all = [], [], []
+        rl_all, vf_all, rewards_all, ranks_all = [], [], [], []
         for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
             if isinstance(img, list):
                 feats = img[0]
@@ -310,7 +310,8 @@ class SLAlgo:
                     prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
                     log_probs[:, t] = torch.log(prob_actions).to(self.device)
                     inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
-
+            ranks_median, _ = ranks.median(dim=-1)
+            ranks_all.append(ranks_median.view(1, -1))
             model.zero_grad()
             inputs_to_compute = inputs_[:, :-1]
             logits, values = model(state_text=inputs_to_compute, state_img=feats,
@@ -370,8 +371,11 @@ class SLAlgo:
             logger.debug('rl loss {}'.format(np.mean(rl_all)))
             logger.debug('value loss {}'.format(np.mean(vf_all)))
             logger.debug("rewards:{}".format(np.mean(rewards_all)))
-            logger.info("dialog:{}".format(dialog))
-            logger.info("true dialog:{}".format(targets_dialog))
+            logger.debug("dialog:{}".format(dialog))
+            logger.debug("true dialog:{}".format(targets_dialog))
+            ranks_medians = torch.cat(ranks_all, dim=0)
+            
+            logger.debug("ranks :{}".format(ranks_medians.mean(dim=-1)))
 
             rl_all, vf_all, rewards_all = [], [], []
             start_time = time.time()
