@@ -274,7 +274,7 @@ class SLAlgo:
         total_loss = 0.
         start_time = time.time()
         start_time_epoch = time.time()
-        rl_all, vf_all, rewards_all, ranks_all = [], [], [], []
+        rl_all, vf_all, rewards_all, ranks_all, dialog_all = [], [], [], [], []
         for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
             if isinstance(img, list):
                 feats = img[0]
@@ -328,6 +328,7 @@ class SLAlgo:
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
                        range(len(dialog))]
+            dialog_all.append([dialog[0], targets_dialog[0]])
             rewards_all.append(np.mean(rewards))
             rewards_ = torch.zeros_like(log_probs_actions)
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
@@ -367,18 +368,23 @@ class SLAlgo:
             if (batch + 1) % print_interval == 0:
                 print('loss for batch {}: {:5.3f}'.format(batch + 1, total_loss / (batch + 1)))
                 print('time for {} training steps: {:5.2f}'.format(print_interval, time.time() - start_time))
-                logger.debug('rl loss {}'.format(np.mean(rl_all)))
-                logger.debug('value loss {}'.format(np.mean(vf_all)))
-                logger.info("rewards:{}".format(np.mean(rewards_all)))
+                logger.debug('rl loss {}'.format(np.mean(rl_all[-print_interval:])))
+                logger.debug('value loss {}'.format(np.mean(vf_all[-print_interval:])))
+                logger.info("rewards:{}".format(np.mean(rewards_all[-print_interval:])))
                 logger.debug("dialog:{}".format(dialog))
                 logger.debug("true dialog:{}".format(targets_dialog))
-                ranks_medians = torch.cat(ranks_all, dim=0)
+                ranks_medians = torch.cat(ranks_all[-print_interval:], dim=0)
                 logger.debug("ranks :{}".format(ranks_medians))
 
-                rl_all, vf_all, rewards_all = [], [], []
+                # rl_all, vf_all, rewards_all = [], [], []
                 start_time = time.time()
 
             curr_loss = total_loss / (batch + 1)
             elapsed = time.time() - start_time_epoch
+
+        pd.DataFrame(rewards_all).to_csv(os.path.join(self.out_path, "rewards.csv"), index=False, header=False)
+        pd.DataFrame(rl_all).to_csv(os.path.join(self.out_path, "rl_losses.csv"), index=False, header=False)
+        pd.DataFrame(vf_all).to_csv(os.path.join(self.out_path, "vf_losses.csv"), index=False, header=False)
+        pd.DataFrame(dialog_all).to_csv(os.path.join(self.out_path, "dialogs.csv"), index=False, header=False)
 
         return curr_loss, elapsed
