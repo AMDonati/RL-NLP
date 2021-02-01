@@ -26,7 +26,7 @@ logger = logging.getLogger()
 
 class SLAlgo:
     def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len, alpha_lm,
-                 truncation_params=10):
+                 truncation_params=10, is_correction=False):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
@@ -63,6 +63,7 @@ class SLAlgo:
                                                        Bleu_sf0(sf_id=args.bleu_sf, n_gram=3),
                                                        Bleu_sf0(sf_id=args.bleu_sf, n_gram=4)])}
         self.writer_iteration = 0
+        self.is_correction = is_correction
 
     def create_out_path(self, args):
         if args.model_path is not None:
@@ -344,6 +345,8 @@ class SLAlgo:
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
 
+            is_ratios = torch.exp(log_probs.detach() - log_probs_truncated.detach())
+
             discounted_reward = 0
             for timestep in range(self.max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
@@ -351,7 +354,11 @@ class SLAlgo:
             advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
             # estimate the loss using one MonteCarlo rollout
             log_probs_advs = log_probs_actions * advs
-            rl_loss = -log_probs_advs.sum(dim=1).mean()
+            rl_loss_per_episode = -log_probs_advs.sum(dim=1)
+            if self.is_correction:
+                prod_ratios = torch.prod(is_ratios, dim=-1)
+                rl_loss_per_episode *= prod_ratios
+            rl_loss = rl_loss_per_episode.mean()
             value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
