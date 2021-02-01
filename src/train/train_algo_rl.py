@@ -345,17 +345,17 @@ class SLAlgo:
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
 
-            is_ratios = torch.exp(log_probs.detach() - log_probs_truncated.detach())
 
             discounted_reward = 0
             for timestep in range(self.max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
-            gts[:, -timestep - 1] = discounted_reward
+                gts[:, -timestep - 1] = discounted_reward
             advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
             # estimate the loss using one MonteCarlo rollout
             log_probs_advs = log_probs_actions * advs
             rl_loss_per_episode = -log_probs_advs.sum(dim=1)
             if self.is_correction:
+                is_ratios = torch.exp(log_probs.detach() - log_probs_truncated.detach())
                 prod_ratios = torch.prod(is_ratios, dim=-1)
                 rl_loss_per_episode *= prod_ratios
             rl_loss = rl_loss_per_episode.mean()
