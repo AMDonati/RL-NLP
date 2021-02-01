@@ -336,7 +336,7 @@ class SLAlgo:
                        range(len(dialog))]
             dialog_all.append([dialog[0], targets_dialog[0]])
             rewards_all.append(np.mean(rewards))
-            self.writer.add_scalar("rewards", np.mean(rewards), batch)
+
             rewards_ = torch.zeros_like(log_probs_actions)
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
@@ -352,6 +352,9 @@ class SLAlgo:
             value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
+            self.writer.add_scalar("rewards", np.mean(rewards), batch)
+            self.writer.add_scalar("vf_loss", value_loss.detach().item(), batch)
+            self.writer.add_scalar("rl_loss", rl_loss.detach().item(), batch)
 
             loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
