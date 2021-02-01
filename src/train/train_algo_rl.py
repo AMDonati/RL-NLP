@@ -371,7 +371,9 @@ class SLAlgo:
                 logger.debug('rl loss {}'.format(np.mean(rl_all[-print_interval:])))
                 logger.debug('value loss {}'.format(np.mean(vf_all[-print_interval:])))
                 logger.info("rewards:{}".format(np.mean(rewards_all[-print_interval:])))
-                logger.info("conv :{}".format(np.exp(np.mean(log_probs_truncated_all[-print_interval:]))))
+                logger.info("convergence :{}".format(np.exp(np.mean(log_probs_truncated_all[-print_interval:]))))
+                first_log_probs_tr = np.array(log_probs_truncated_all[-print_interval:])[:, :, 0]
+                logger.info(" 1rst prob trunc :{}".format(np.exp(np.mean(first_log_probs_tr))))
 
                 logger.info("dialog:{}".format(dialog[0]))
                 logger.info("true dialog:{}".format(targets_dialog[0]))
