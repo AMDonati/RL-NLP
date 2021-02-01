@@ -43,7 +43,6 @@ class VQADataset(Dataset):
             max_seq_length=23,
             max_region_num=101,
             filter_entries=True,
-            min_len_questions=6,
             num_answers=1,
             filter_yes_no=True,
             num_images=None,
@@ -120,7 +119,7 @@ class VQADataset(Dataset):
 
             # filter entries if needed.
             if filter_entries:
-                self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
+                self.filter_entries(num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
                 if rl:
@@ -173,23 +172,23 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=None):
+    def filter_entries(self, num_answers=1, filter_yes_no=True, num_images=None):
         self.filtered_entries = []
         self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
         for entry in self.entries:
-            len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
-            if len_q >= min_len_questions and number_of_answers == num_answers:
+            if num_answers is None or number_of_answers == num_answers:
                 if filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
+                    else:
+                        self.remaining_entries.append(entry)
                 else:
                     self.filtered_entries.append(entry)
             else:
-                if entry["answer"]["labels"] is not None:
-                    self.remaining_entries.append(entry)
+                self.remaining_entries.append(entry)
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = df.image_id.sort_values().unique()
@@ -201,6 +200,7 @@ class VQADataset(Dataset):
 
     def split_entries(self):
         train_entries, test_entries = [], []
+        self.answer_img_map = {k:[] for k in self.images_idx}
         for img_idx in self.images_idx:
             img_entries = [entry for entry in self.filtered_entries if entry["image_id"] == img_idx]
             if len(img_entries) > 1:
@@ -208,6 +208,7 @@ class VQADataset(Dataset):
                 img_entries.pop()
             for l in img_entries:
                 train_entries.append(l)
+                self.answer_img_map[img_idx].extend([ans for ans in l["answer"]["labels"].cpu().squeeze()])
         self.filtered_entries = train_entries
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
