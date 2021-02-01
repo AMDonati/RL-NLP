@@ -279,6 +279,7 @@ class SLAlgo:
         start_time = time.time()
         start_time_epoch = time.time()
         rl_all, vf_all, rewards_all, ranks_all, dialog_all, in_va_all = [], [], [], [], [], []
+        log_probs_truncated_all = []
         for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
             if isinstance(img, list):
                 feats = img[0]
@@ -290,6 +291,8 @@ class SLAlgo:
             log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
             ranks = torch.zeros_like(log_probs)
             in_valid_actions = torch.zeros_like(log_probs)
+            log_probs_truncated = torch.zeros_like(log_probs)
+
             with torch.no_grad():
                 for t in range(self.max_len):
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
@@ -310,8 +313,8 @@ class SLAlgo:
                                   in range(sort_ind.size(0))]
                     logger.debug("sort words {}".format(sort_words))
                     logger.debug("sort probs {}".format(sort_probs[:, :10]))
-
                     actions = dist_truncated.sample().to(self.device)
+                    log_probs_truncated[:, t] = torch.log(dist_truncated.probs.gather(-1, actions.view(-1, 1)).view(-1))
                     prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
                     log_probs[:, t] = torch.log(prob_actions).to(self.device)
                     inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
@@ -330,8 +333,7 @@ class SLAlgo:
             dialog = [self.train_dataset.question_tokenizer.decode(question) for question in
                       inputs_.cpu().numpy()]
             targets_dialog = [self.train_dataset.question_tokenizer.decode(question[:self.max_len]) for question
-                              in
-                              targets.cpu().numpy()]
+                              in targets.cpu().numpy()]
 
             rewards = [self.reward_function.get(dialog[t_], [targets_dialog[t_]], done=True)[0] for t_ in
                        range(len(dialog))]
@@ -353,6 +355,7 @@ class SLAlgo:
             value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
+            log_probs_truncated_all.append(log_probs_truncated.detach().tolist())
 
             loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
@@ -368,8 +371,10 @@ class SLAlgo:
                 logger.debug('rl loss {}'.format(np.mean(rl_all[-print_interval:])))
                 logger.debug('value loss {}'.format(np.mean(vf_all[-print_interval:])))
                 logger.info("rewards:{}".format(np.mean(rewards_all[-print_interval:])))
-                logger.debug("dialog:{}".format(dialog))
-                logger.debug("true dialog:{}".format(targets_dialog))
+                logger.info("conv :{}".format(np.exp(np.mean(log_probs_truncated_all[-print_interval:]))))
+
+                logger.info("dialog:{}".format(dialog[0]))
+                logger.info("true dialog:{}".format(targets_dialog[0]))
                 ranks_medians = torch.cat(ranks_all[-print_interval:], dim=0)
                 logger.debug("ranks :{}".format(ranks_medians))
                 self.writer.add_scalar("rewards", np.mean(rewards), self.writer_iteration)
