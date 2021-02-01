@@ -353,10 +353,6 @@ class SLAlgo:
             value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
-            self.writer.add_scalar("rewards", np.mean(rewards), self.writer_iteration)
-            self.writer.add_scalar("vf_loss", value_loss.detach().item(), self.writer_iteration)
-            self.writer.add_scalar("rl_loss", rl_loss.detach().item(), self.writer_iteration)
-            self.writer_iteration += 1
 
             loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
@@ -376,8 +372,11 @@ class SLAlgo:
                 logger.debug("true dialog:{}".format(targets_dialog))
                 ranks_medians = torch.cat(ranks_all[-print_interval:], dim=0)
                 logger.debug("ranks :{}".format(ranks_medians))
+                self.writer.add_scalar("rewards", np.mean(rewards), self.writer_iteration)
+                self.writer.add_scalar("vf_loss", value_loss.detach().item(), self.writer_iteration)
+                self.writer.add_scalar("rl_loss", rl_loss.detach().item(), self.writer_iteration)
+                self.writer_iteration += 1
 
-                # rl_all, vf_all, rewards_all = [], [], []
                 start_time = time.time()
 
             curr_loss = total_loss / (batch + 1)
