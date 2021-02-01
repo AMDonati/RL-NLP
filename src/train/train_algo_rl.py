@@ -274,7 +274,7 @@ class SLAlgo:
         total_loss = 0.
         start_time = time.time()
         start_time_epoch = time.time()
-        rl_all, vf_all, rewards_all, ranks_all, dialog_all = [], [], [], [], []
+        rl_all, vf_all, rewards_all, ranks_all, dialog_all, in_va_all = [], [], [], [], [], []
         for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
             if isinstance(img, list):
                 feats = img[0]
@@ -285,15 +285,17 @@ class SLAlgo:
             inputs_ = inputs[:, 0:1].to(device)
             log_probs = torch.zeros((inputs.size(0), self.max_len)).to(self.device)
             ranks = torch.zeros_like(log_probs)
+            in_valid_actions = torch.zeros_like(log_probs)
             with torch.no_grad():
                 for t in range(self.max_len):
                     valid_actions, action_probs, logits_lm, log_probas_lm, _ = self.truncation.get_valid_actions(
                         inputs_, True, 1.)
                     sort_lm, sort_lm_ind = torch.sort(logits_lm, descending=True)
                     ranks[:, t] = (sort_lm_ind == targets[:, t].view(-1, 1)).nonzero()[:, -1]
+                    in_valid_actions[:, t] = (targets[:, t].view(-1, 1) == valid_actions).sum(dim=1)
                     logits_, _ = model(state_text=inputs_, state_img=feats,
                                        state_answer=answers)  # output = logits (S, num_tokens)
-                    last_logits = logits_[:, -1, :] + self.alpha_lm * logits_lm
+                    last_logits = (1 - self.alpha_lm) * logits_[:, -1, :] + self.alpha_lm * logits_lm
                     probs = F.softmax(last_logits, dim=-1)
                     dist = Categorical(probs)
 
@@ -311,6 +313,7 @@ class SLAlgo:
                     inputs_ = torch.cat([inputs_.to(device), actions.view(-1, 1)], dim=-1)
             ranks_median, _ = ranks.median(dim=-1)
             ranks_all.append(ranks_median.view(1, -1))
+            in_va_all.append(in_valid_actions.mean(dim=0).tolist())
             model.zero_grad()
             inputs_to_compute = inputs_[:, :-1]
             logits, values = model(state_text=inputs_to_compute, state_img=feats,
@@ -386,5 +389,6 @@ class SLAlgo:
         pd.DataFrame(rl_all).to_csv(os.path.join(self.out_path, "rl_losses.csv"), index=False, header=False)
         pd.DataFrame(vf_all).to_csv(os.path.join(self.out_path, "vf_losses.csv"), index=False, header=False)
         pd.DataFrame(dialog_all).to_csv(os.path.join(self.out_path, "dialogs.csv"), index=False, header=False)
+        pd.DataFrame(in_va_all).to_csv(os.path.join(self.out_path, "in_vas.csv"), index=False, header=False)
 
         return curr_loss, elapsed
