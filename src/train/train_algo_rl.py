@@ -26,7 +26,7 @@ logger = logging.getLogger()
 
 class SLAlgo:
     def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len, alpha_lm,
-                 truncation_params=10, is_correction=False):
+                 truncation_params=10, is_correction=False, baseline=True):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
@@ -64,6 +64,7 @@ class SLAlgo:
                                                        Bleu_sf0(sf_id=args.bleu_sf, n_gram=4)])}
         self.writer_iteration = 0
         self.is_correction = is_correction
+        self.baseline = baseline
 
     def create_out_path(self, args):
         if args.model_path is not None:
@@ -345,12 +346,13 @@ class SLAlgo:
             rewards_[:, -1] = torch.tensor(rewards).view(-1)
             gts = torch.zeros_like(log_probs_actions)
 
-
             discounted_reward = 0
             for timestep in range(self.max_len):
                 discounted_reward = rewards_[:, -timestep - 1] + (self.gamma * discounted_reward)
                 gts[:, -timestep - 1] = discounted_reward
-            advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
+            advs = gts
+            if self.baseline:
+                advs -= values.cpu().detach().view(gts.size(0), gts.size(1))
             # estimate the loss using one MonteCarlo rollout
             log_probs_advs = log_probs_actions * advs
             rl_loss_per_episode = -log_probs_advs.sum(dim=1)
@@ -364,7 +366,9 @@ class SLAlgo:
             rl_all.append(rl_loss.detach().item())
             log_probs_truncated_all.append(log_probs_truncated.detach().tolist())
 
-            loss = rl_loss + 0.5 * value_loss
+            loss = rl_loss
+            if self.baseline:
+                loss += 0.5 * value_loss
             self.optimizer.zero_grad()
             loss.backward()
             clip_grad_norm_(model.parameters(), self.grad_clip)
