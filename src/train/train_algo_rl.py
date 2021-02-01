@@ -278,6 +278,7 @@ class SLAlgo:
         start_time = time.time()
         start_time_epoch = time.time()
         rl_all, vf_all, rewards_all, ranks_all, dialog_all, in_va_all = [], [], [], [], [], []
+        writer_iteration = 0
         for batch, ((inputs, targets), answers, img) in enumerate(train_generator):
             if isinstance(img, list):
                 feats = img[0]
@@ -352,9 +353,10 @@ class SLAlgo:
             value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
             vf_all.append(value_loss.detach().item())
             rl_all.append(rl_loss.detach().item())
-            self.writer.add_scalar("rewards", np.mean(rewards), batch)
-            self.writer.add_scalar("vf_loss", value_loss.detach().item(), batch)
-            self.writer.add_scalar("rl_loss", rl_loss.detach().item(), batch)
+            self.writer.add_scalar("rewards", np.mean(rewards), writer_iteration)
+            self.writer.add_scalar("vf_loss", value_loss.detach().item(), writer_iteration)
+            self.writer.add_scalar("rl_loss", rl_loss.detach().item(), writer_iteration)
+            writer_iteration += 1
 
             loss = rl_loss + 0.5 * value_loss
             self.optimizer.zero_grad()
