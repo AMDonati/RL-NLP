@@ -195,7 +195,7 @@ class VQADataset(Dataset):
                 if filter_floats:
                     if entry["answer"]["labels"][0] in floats:
                         self.filtered_entries.append(entry)
-                if filter_yes_no:
+                elif filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
                 else:
