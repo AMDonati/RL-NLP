@@ -107,7 +107,8 @@ def get_parser():
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
     parser.add_argument('-answer_sampl', type=str, default="uniform",
                         help="method to sample the (img, answer) sample in the RL training.")
-    parser.add_argument('-curriculum', type=int, default=0, help="if > 0, changing the answer sampling mode from random to uniform")
+    parser.add_argument('-curriculum', type=int, default=0,
+                        help="if > 0, changing the answer sampling mode from random to uniform")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -153,6 +154,7 @@ def get_parser():
     parser.add_argument('-init_text', type=str)
     parser.add_argument('-custom_init', type=int, default=0)
     parser.add_argument('-add_answers', type=int, default=0)
+
     # train / test pipeline:
     parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
@@ -186,6 +188,7 @@ def get_parser():
                         help="number of sampling for the same image/answer for test")
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
     parser.add_argument("-params_reward", type=int, default=10, help="params reward")
+    parser.add_argument('-filter_numbers', type=int, default=0)
 
     return parser
 
@@ -358,7 +361,7 @@ def get_rl_env(args, device):
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
                      reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
                      min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl=args.answer_sampl,
-                     params=args.params_reward)
+                     params=args.params_reward, filter_numbers=args.filter_numbers)
         if device.type == "cpu":
             test_envs = [env]
         else:
@@ -370,7 +373,8 @@ def get_rl_env(args, device):
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
                                         min_data=args.min_data, reduced_answers=args.reduced_answers,
-                                        answer_sampl="random", params=args.params_reward))
+                                        answer_sampl="random", params=args.params_reward,
+                                        filter_numbers=args.filter_numbers))
             if "test_text" in args.test_modes:
                 test_text_env = env
                 test_text_env.update_mode("test_text", answer_sampl="random")
