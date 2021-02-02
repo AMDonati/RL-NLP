@@ -174,7 +174,7 @@ def get_parser():
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "size_valid_actions",
                                  "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
-                                 "selfbleu", "dialogimage", "valid_actions", "language_score"],
+                                 "selfbleu", "dialogimage", "valid_actions"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
