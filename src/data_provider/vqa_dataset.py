@@ -187,13 +187,14 @@ class VQADataset(Dataset):
         self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
-        floats = [v for k, v in self.ans2label.items() if isfloat(k)]
+        # floats = [v for k, v in self.ans2label.items() if isfloat(k)]
+        numbers_idx = [self.ans2label[str(i)] for i in range(20) if str(i) in self.ans2label]
         for entry in self.entries:
             len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
             if len_q >= min_len_questions and number_of_answers == num_answers:
                 if filter_floats:
-                    if entry["answer"]["labels"][0] in floats:
+                    if entry["answer"]["labels"][0] in numbers_idx:
                         self.filtered_entries.append(entry)
                 elif filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
