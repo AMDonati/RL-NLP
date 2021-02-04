@@ -85,6 +85,15 @@ class Agent:
                 "---------------- INV FREQ ANSWERS DISTRIBUTION FOR ANSWER SAMPLING--------------------------------")
             logger.info(inv_freq_answer_decoded)
             logger.info("-" * 100)
+        if self.env.answer_sampling == "img_sampling":
+            logger.info(
+                "---------------- ANSWER / IMG STATS ---------------------------------------------------------------")
+            min, mean, max = self.env.dataset.get_answer_img_stats()
+            logger.info("number MIN of answers per img:{}".format(min))
+            logger.info("number MEAN of answers per img:{}".format(mean))
+            logger.info("number MAX of answers per img:{}".format(max))
+            logger.info("-" * 100)
+
 
     def init_metrics(self):
         self.metrics = {}

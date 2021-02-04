@@ -18,6 +18,7 @@ from data_provider.tokenizer import Tokenizer
 from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, clean_key
 from collections import Counter
 import torch.nn.functional as F
+from collections import OrderedDict
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -126,7 +127,7 @@ class VQADataset(Dataset):
                     if self.split == 'train' or self.split == 'mintrain':
                         self.split_entries()
 
-                self.reduced_answers = [entry["answer"]["labels"] for entry in self.filtered_entries]
+                self.reduced_answers = [torch.tensor(item, dtype=torch.int) for l in list(self.answer_img_map.values()) for item in l]
                 self.reduced_answers = torch.stack(self.reduced_answers).unique()
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
@@ -179,7 +180,7 @@ class VQADataset(Dataset):
         no_idx = self.ans2label["no"]
         for entry in self.entries:
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
-            if num_answers is None or number_of_answers == num_answers:
+            if (num_answers is None or number_of_answers == num_answers) and number_of_answers > 0:
                 if filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
@@ -208,14 +209,22 @@ class VQADataset(Dataset):
                 img_entries.pop()
             for l in img_entries:
                 train_entries.append(l)
-                self.answer_img_map[img_idx].extend([ans for ans in l["answer"]["labels"].cpu().squeeze()])
+                self.answer_img_map[img_idx].extend([ans.item() for ans in l["answer"]["labels"].cpu()])
+        self.answer_img_map = {k:list(set(v)) for k,v in self.answer_img_map.items()}
         self.filtered_entries = train_entries
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
 
+    def get_answer_img_stats(self):
+        num_answer_dict = {k:len(v) for k,v in self.answer_img_map.items()}
+        min = np.min(list(num_answer_dict.values()))
+        mean = np.mean(list(num_answer_dict.values()))
+        max = np.max(list(num_answer_dict.values()))
+        return min, mean, max
+
     def get_answers_frequency(self):
-        answers_idx = [entry["answer"]["labels"].cpu().squeeze().item() for entry in self.filtered_entries]
+        answers_idx = [item for entry in self.filtered_entries for item in entry["answer"]["labels"].cpu()]
         freq_answers = Counter(answers_idx)
         inv_freq_norm = F.softmax(torch.tensor([1/item for item in list(freq_answers.values())], dtype=torch.float32))
         inv_freq_answers = {k:inv_freq_norm[i].item() for i,k in enumerate(list(freq_answers.keys()))}

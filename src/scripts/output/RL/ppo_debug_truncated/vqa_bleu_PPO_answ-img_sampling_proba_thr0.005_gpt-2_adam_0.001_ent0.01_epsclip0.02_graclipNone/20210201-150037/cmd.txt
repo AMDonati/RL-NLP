@@ -1,0 +1,1 @@
+/home/alice/Documents/000_Boulot_Polytechnique/07_PhD_Thesis/RL-NLP/src/scripts/run.py -env vqa -data_path data/vqa-v2 -truncate_mode proba_thr -p_th 0.005 -min_data 1 -lm_path gpt -answer_sampl img_sampling -out_path output/RL/ppo_debug_truncated -reward bleu
