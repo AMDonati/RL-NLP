@@ -8,8 +8,8 @@ from data_provider.vqa_dataset import VQADataset
 from data_provider.vqa_tokenizer import VQATokenizer
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 from transformers import BertTokenizer, GPT2Tokenizer
-from train.rl.rl_basic import PolicyLSTMBatch_SL
-from train.rl.train_algo_rl import SLAlgo, PPO_algo
+from train.rl.model import PolicyLSTMBatch_SL
+from train.rl.algo import SLAlgo, PPO_algo
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 import json

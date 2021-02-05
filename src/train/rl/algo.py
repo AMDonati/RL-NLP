@@ -12,7 +12,7 @@ import pandas as pd
 import time
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from train.rl.truncation_rl import mask_inf_truncature, truncations
+from train.rl.truncation import mask_inf_truncature, truncations
 from RL_toolbox.reward import Bleu_sf2
 import logging
 import numpy as np
