@@ -51,7 +51,7 @@ class ProbaThreshold(Truncation):
 
     def __init__(self, **kwargs):
         Truncation.__init__(self, pretrained_lm=kwargs["pretrained_lm"])
-        self.p_th = kwargs["p_th"]
+        self.p_th = float(kwargs["truncation_params"])
         self.s_min = kwargs["s_min"]
         self.s_max = kwargs["s_max"]
 

@@ -22,9 +22,9 @@ import copy
 logger = logging.getLogger()
 
 
-class SLAlgo:
+class RLAlgo:
     def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len, alpha_lm, truncate_mode,
-                 truncation_params={}, is_correction=False, baseline=True):
+                 truncation_params=None, is_correction=False, baseline=True, s_min=1, s_max=-1):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
@@ -50,10 +50,12 @@ class SLAlgo:
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
         self.check_batch()
+        self.s_min = s_min
+        self.s_max = s_max
         self.truncation_params = truncation_params
         self.truncation = truncations[truncate_mode](pretrained_lm=self.lm,
-                                                     **truncation_params)  # adding the truncation class.
-        # self.truncation = TopK(pretrained_lm=self.lm, num_truncated=self.truncation_params)
+                                                     s_min=s_min, s_max=s_max,
+                                                     truncation_params=truncation_params)  # adding the truncation class.
         self.reward_function = Bleu_sf2()
         self.gamma = 0.99
         self.max_len = max_len
@@ -309,9 +311,7 @@ class SLAlgo:
         log_probs_actions = log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
             log_probs_all.size(0), log_probs_all.size(1))
 
-        advs = gts
-        if self.baseline:
-            advs -= values.cpu().detach().view(gts.size(0), gts.size(1))
+        advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
 
         log_probs_advs = log_probs_actions * advs
         rl_loss_per_episode = -log_probs_advs.sum(dim=1)
@@ -322,9 +322,13 @@ class SLAlgo:
         rl_loss = rl_loss_per_episode.mean()
         value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
 
-        loss = rl_loss
-        if self.baseline:
-            loss += 0.5 * value_loss
+        loss = rl_loss + 0.5 * value_loss
+
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+        # clip grad norm:
+        self.optimizer.step()
+        
         return loss, rl_loss, value_loss
 
     def train_one_epoch_policy(self, model, train_generator, optimizer, criterion, device, grad_clip,
@@ -448,7 +452,7 @@ class SLAlgo:
         pd.DataFrame(self.in_va_all).to_csv(os.path.join(self.out_path, "in_vas.csv"), index=False, header=False)
 
 
-class PPO_algo(SLAlgo):
+class PPO_algo(RLAlgo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.K_epochs = 5
