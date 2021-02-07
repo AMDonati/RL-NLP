@@ -313,7 +313,9 @@ class RLAlgo:
         log_probs_actions = log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
             log_probs_all.size(0), log_probs_all.size(1))
 
-        advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
+        advs = gts.clone()
+        if self.baseline:
+            advs -= values.cpu().detach().view(gts.size(0), gts.size(1))
 
         log_probs_advs = log_probs_actions * advs
         rl_loss_per_episode = -log_probs_advs.sum(dim=1)
@@ -322,16 +324,17 @@ class RLAlgo:
             prod_ratios = torch.prod(is_ratios, dim=-1)
             rl_loss_per_episode *= prod_ratios
         rl_loss = rl_loss_per_episode.mean()
-        value_loss = self.mse(gts.view(-1), values.view(-1)).sum()
+        value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
 
-        loss = rl_loss + 0.5 * value_loss
+        loss = rl_loss
+        if self.baseline:
+            loss += 0.5 * value_loss
 
         self.optimizer.zero_grad()
         loss.mean().backward()
+
         clip_grad_norm_(self.model.parameters(), self.grad_clip)
-
         self.optimizer.step()
-
         return loss, rl_loss, value_loss
 
     def train_one_epoch_policy(self, train_generator, optimizer, criterion, device, grad_clip,
