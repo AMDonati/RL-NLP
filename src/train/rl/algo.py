@@ -318,11 +318,11 @@ class RLAlgo:
             advs -= values.cpu().detach().view(gts.size(0), gts.size(1))
 
         log_probs_advs = log_probs_actions * advs
-        rl_loss_per_episode = -log_probs_advs.sum(dim=1)
         if self.is_correction:
             is_ratios = torch.exp(log_probs.detach() - log_probs_truncated.detach())
-            prod_ratios = torch.prod(is_ratios, dim=-1)
-            rl_loss_per_episode *= prod_ratios
+            cumprod_ratios = torch.cumprod(is_ratios, dim=-1)
+            log_probs_advs *= cumprod_ratios
+        rl_loss_per_episode = -log_probs_advs.sum(dim=1)
         rl_loss = rl_loss_per_episode.mean()
         value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
 
@@ -501,7 +501,7 @@ class PPO_algo(RLAlgo):
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
-            clip_grad_norm_(self.model.parameters(), self.grad_clip)
+            clip_grad_norm_(self.new_model.parameters(), self.grad_clip)
             self.optimizer.step()
         # return loss, rl_loss, value_loss
         self.model.load_state_dict(self.new_model.state_dict())
