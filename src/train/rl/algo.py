@@ -302,14 +302,14 @@ class RLAlgo:
         df.to_csv(self.out_lm_metrics, index_label="metrics", columns=temperatures)
         return result_metrics
 
-    def update(self, log_probs, log_probs_truncated, gts, inputs, feats, answers):
+    def update(self, log_probs, log_probs_truncated, gts, inputs, targets, feats, answers):
 
         self.model.zero_grad()
         logits, values = self.model(state_text=inputs, state_img=feats,
                                     state_answer=answers)
         values = values.squeeze()
         log_probs_all = F.log_softmax(logits, dim=-1)
-        log_probs_actions = log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
+        log_probs_actions = log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
             log_probs_all.size(0), log_probs_all.size(1))
 
         advs = gts - values.cpu().detach().view(gts.size(0), gts.size(1))
@@ -381,10 +381,10 @@ class RLAlgo:
 
             gts, rewards, dialog, targets_dialog = self.compute_rewards(inputs_, targets)
 
-            if (self.episode_idx + 1) % self.update_iteration == 0:
-                # estimate the loss using one MonteCarlo rollout
-                loss, rl_loss, value_loss = self.update(log_probs, log_probs_truncated, gts, inputs_[:, :-1], feats,
-                                                        answers)
+            # estimate the loss using one MonteCarlo rollout
+            inputs_sampled, targets_sampled = inputs_[:, :-1], inputs_[:, 1:]
+            loss, rl_loss, value_loss = self.update(log_probs, log_probs_truncated, gts, inputs_sampled,
+                                                    targets_sampled, feats, answers)
 
             total_loss += loss.mean().item()
 
@@ -464,14 +464,14 @@ class PPO_algo(RLAlgo):
         self.entropy_coeff = 0.01
         self.update_iteration = 1
 
-    def update(self, log_probs, log_probs_truncated, gts, inputs, feats, answers):
+    def update(self, log_probs, log_probs_truncated, gts, inputs, targets, feats, answers):
 
         self.model.zero_grad()
         old_logits, old_values = self.model(state_text=inputs, state_img=feats,
                                             state_answer=answers)
         old_values = old_values.squeeze()
         old_log_probs_all = F.log_softmax(old_logits, dim=-1)
-        old_log_probs_actions = old_log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
+        old_log_probs_actions = old_log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
             old_log_probs_all.size(0), old_log_probs_all.size(1))
 
         advs = gts.clone()
@@ -484,7 +484,7 @@ class PPO_algo(RLAlgo):
                                             state_answer=answers)
             values = values.squeeze()
             log_probs_all = F.log_softmax(logits, dim=-1)
-            log_probs_actions = log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
+            log_probs_actions = log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
                 log_probs_all.size(0), log_probs_all.size(1))
             ratios = torch.exp(log_probs_actions - old_log_probs_actions.detach())
             surr1 = ratios * advs
