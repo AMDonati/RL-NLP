@@ -207,6 +207,8 @@ class VQAEnv(GenericEnv):
                                   max_seq_length=max_seq_length,
                                   num_answers=num_answers_, num_images=num_images, filter_entries=True,
                                   vocab_path=vocab_path)
+        duplicate_entries = True if answer_sampl == "img_sampling" else False
+        self.dataset.split_entries(duplicate_entries)
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
@@ -254,7 +256,6 @@ class VQAEnv(GenericEnv):
         if self.answer_sampling == "random":
             env_idx = self.get_env_idx(i_episode, entries)
             entry = entries[env_idx]
-            #answer = entry["answer"]["labels"][0]
         elif self.answer_sampling == "uniform":
             answer = random.choice(self.dataset.reduced_answers.cpu().numpy())
             entry, env_idx = self.sample_entry_from_answer(answer)
@@ -275,7 +276,6 @@ class VQAEnv(GenericEnv):
         self.entry, self.env_idx = self.sample_entry(entries, i_episode)
         (features, image_mask, spatials) = self.dataset.get_img_data(self.entry)
         labels, _ = self.dataset.get_answer_data(self.entry)
-        print("answer", labels)
         self.ref_question_idx = self.entry["question_id"]
         self.ref_question = self.entry["q_token"][:self.max_len]
         self.ref_questions = self.ref_question.view(1, -1)

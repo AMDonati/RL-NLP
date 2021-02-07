@@ -19,6 +19,7 @@ from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, 
 from collections import Counter
 import torch.nn.functional as F
 from collections import OrderedDict
+import copy
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -123,12 +124,6 @@ class VQADataset(Dataset):
                 self.filter_entries(num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
-                if rl:
-                    if self.split == 'train' or self.split == 'mintrain':
-                        self.split_entries()
-
-                self.reduced_answers = [torch.tensor(item, dtype=torch.int) for l in list(self.answer_img_map.values()) for item in l]
-                self.reduced_answers = torch.stack(self.reduced_answers).unique()
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
@@ -199,7 +194,7 @@ class VQADataset(Dataset):
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries
 
-    def split_entries(self):
+    def split_entries(self, duplicate_entries=False):
         train_entries, test_entries = [], []
         self.answer_img_map = {k:[] for k in self.images_idx}
         for img_idx in self.images_idx:
@@ -208,13 +203,30 @@ class VQADataset(Dataset):
                 test_entries.append(img_entries[-1])
                 img_entries.pop()
             for l in img_entries:
-                train_entries.append(l)
-                self.answer_img_map[img_idx].extend([ans.item() for ans in l["answer"]["labels"].cpu()])
+                if duplicate_entries:
+                    self.duplicate_entries(train_entries, l)
+                else:
+                    train_entries.append(l)
+                self.answer_img_map[img_idx].extend([ans.item() for ans in l["answer"]["labels"].view(-1).cpu()])
         self.answer_img_map = {k:list(set(v)) for k,v in self.answer_img_map.items()}
         self.filtered_entries = train_entries
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
+        self.reduced_answers = [torch.tensor(item, dtype=torch.int) for l in list(self.answer_img_map.values()) for item in l]
+        self.reduced_answers = torch.stack(self.reduced_answers).unique()
+
+    def duplicate_entries(self, train_entries, entry):
+        answers = entry["answer"]["labels"].cpu()
+        if answers.shape[0] > 1:
+            for label, score in zip(entry["answer"]["labels"], entry["answer"]["scores"]):
+                new_entry = entry
+                new_entry["answer"]["labels"] = label.view(1)
+                new_entry["answer"]["scores"] = score.view(1)
+                train_entries.append(copy.deepcopy(new_entry))
+        else:
+            train_entries.append(entry)
+
 
     def get_answer_img_stats(self):
         num_answer_dict = {k:len(v) for k,v in self.answer_img_map.items()}
@@ -224,7 +236,7 @@ class VQADataset(Dataset):
         return min, mean, max
 
     def get_answers_frequency(self):
-        answers_idx = [item for entry in self.filtered_entries for item in entry["answer"]["labels"].cpu()]
+        answers_idx = [item for entry in self.filtered_entries for item in entry["answer"]["labels"].view(-1).cpu()]
         freq_answers = Counter(answers_idx)
         inv_freq_norm = F.softmax(torch.tensor([1/item for item in list(freq_answers.values())], dtype=torch.float32))
         inv_freq_answers = {k:inv_freq_norm[i].item() for i,k in enumerate(list(freq_answers.keys()))}

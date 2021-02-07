@@ -200,7 +200,7 @@ class DialogMetric(Metric):
             if self.reward_type == 'vqa' or self.reward_type == "vilbert":
                 pred_answer = [int(kwargs["pred_answer"].squeeze().numpy())]
                 pred_answer_decoded = self.dataset.answer_tokenizer.decode(text=pred_answer)
-                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy()[0]])
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 ref_question_decoded = kwargs["ref_questions_decoded"]
                 string = ' IMG {} - question index {}:'.format(kwargs["img_idx"],
                                                                kwargs[
@@ -503,7 +503,7 @@ class HistogramOracle(Metric):
     def fill_(self, **kwargs):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             if kwargs["done"]:
-                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy()[0]])
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 if kwargs["reward"] == 1.:
                     self.metric_history = self.fill_history(self.metric_history, ref_answer_decoded, kwargs["reward"])
                     self.answer_history = self.fill_history(self.answer_history, ref_answer_decoded, 1)
