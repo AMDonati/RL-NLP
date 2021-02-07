@@ -12,6 +12,7 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -327,7 +328,8 @@ class RLAlgo:
 
         self.optimizer.zero_grad()
         loss.mean().backward()
-        # clip grad norm:
+        clip_grad_norm_(self.model.parameters(), self.grad_clip)
+
         self.optimizer.step()
 
         return loss, rl_loss, value_loss
@@ -496,7 +498,7 @@ class PPO_algo(RLAlgo):
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
-            # clip grad norm:
+            clip_grad_norm_(self.model.parameters(), self.grad_clip)
             self.optimizer.step()
         # return loss, rl_loss, value_loss
         self.model.load_state_dict(self.new_model.state_dict())
