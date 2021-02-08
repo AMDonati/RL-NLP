@@ -57,7 +57,7 @@ class ProbaThreshold(Truncation):
         probas = torch.exp(log_probas)
         min_max_mask, sorted_probs, sorted_indices = self.min_max_truncation(probas)
         p_th_mask = torch.ge(probas, self.p_th)
-        final_mask = torch.logical_and(min_max_mask, p_th_mask)
+        final_mask = torch.logical_or(min_max_mask, p_th_mask)
         return final_mask
 
 

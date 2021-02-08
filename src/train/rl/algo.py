@@ -461,7 +461,7 @@ class RLAlgo:
 class PPO_algo(RLAlgo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.K_epochs = 5
+        self.K_epochs = 1
         self.eps_clip = 0.02
         self.new_model = copy.deepcopy(self.model)
         self.new_model.load_state_dict(self.model.state_dict())
@@ -492,6 +492,10 @@ class PPO_algo(RLAlgo):
             log_probs_actions = log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
                 log_probs_all.size(0), log_probs_all.size(1))
             ratios = torch.exp(log_probs_actions - old_log_probs_actions.detach())
+            if self.is_correction:
+                # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
+                is_ratios = torch.exp(log_probs - log_probs_truncated.to(self.device))
+                ratios = ratios * is_ratios
             surr1 = ratios * advs
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advs
             surr = -torch.min(surr1, surr2)
