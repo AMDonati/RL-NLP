@@ -263,7 +263,7 @@ class DialogImageMetric(Metric):
             values["in_valid_actions"] = self.measure
 
             if self.condition_answer != "none":
-                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].detach().numpy()[0]])
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 values["ref_answer"] = ref_answer_decoded
 
             if kwargs["pred_answer"] != None:
