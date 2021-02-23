@@ -51,7 +51,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "s_max": args_.s_max,
                       "inv_schedule_step": args_.inv_schedule_step,
                       "schedule_start": args_.schedule_start,
-                      "curriculum": args_.curriculum}
+                      "curriculum": args_.curriculum,
+                      "KL_coeff": args_.KL_coeff}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -128,6 +129,7 @@ def get_parser():
     parser.add_argument('-s_min', default=10, type=int,
                         help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
+    parser.add_argument('-KL_coeff', default=0.1, type=float, help="adding KL divergence term in the loss if truncation")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
     parser.add_argument('-temp_step', type=int, default=1,
