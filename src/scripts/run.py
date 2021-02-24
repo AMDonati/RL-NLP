@@ -129,7 +129,7 @@ def get_parser():
     parser.add_argument('-s_min', default=10, type=int,
                         help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
-    parser.add_argument('-KL_coeff', default=0.1, type=float, help="adding KL divergence term in the loss if truncation")
+    parser.add_argument('-KL_coeff', default=0, type=float, help="adding KL divergence term in the loss if truncation")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
     parser.add_argument('-temp_step', type=int, default=1,
