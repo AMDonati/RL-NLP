@@ -141,7 +141,9 @@ class ClevrEnv(GenericEnv):
             self.ref_answers = self.ref_answers[self.num_questions:]
 
         # getting the ref_idx for the couple (question, answer).
-        self.ref_question_idx = random.choice(range(self.ref_questions.size(0)))
+        if i_episode is not None:
+            np.random.seed(i_episode)
+        self.ref_question_idx = np.random.randint(0,self.ref_questions.size(0))
         self.ref_question = self.ref_questions[self.ref_question_idx]
         self.ref_answer = self.ref_answers[self.ref_question_idx]
 

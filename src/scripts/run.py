@@ -105,7 +105,7 @@ def get_parser():
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
-    parser.add_argument('-answer_sampl', type=str, default="uniform",
+    parser.add_argument('-answer_sampl', type=str, default="img_sampling",
                         help="method to sample the (img, answer) sample in the RL training.")
     parser.add_argument('-curriculum', type=int, default=0, help="if > 0, changing the answer sampling mode from random to uniform")
     parser.add_argument('-debug', type=str, default="0,69000",
