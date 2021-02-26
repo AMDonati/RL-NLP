@@ -126,10 +126,10 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
-    parser.add_argument('-s_min', default=10, type=int,
+    parser.add_argument('-s_min', default=1, type=int,
                         help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
-    parser.add_argument('-KL_coeff', default=0, type=float, help="adding KL divergence term in the loss if truncation")
+    parser.add_argument('-KL_coeff', default=0., type=float, help="adding KL divergence term in the loss if truncation")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
     parser.add_argument('-temp_step', type=int, default=1,
@@ -264,6 +264,9 @@ def get_output_path(args):
         out_folder = out_folder + '_invsch{}'.format(args.inv_schedule_step)
     if args.schedule_start > 1:
         out_folder = out_folder + '_schstart{}'.format(args.schedule_start)
+
+    if args.KL_coeff > 0:
+        out_folder = out_folder + '_KLdiv{}'.format(args.KL_coeff)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,

@@ -123,7 +123,8 @@ class PPO(Agent):
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
-            self.writer.add_scalar('KL_div', KL_div.mean(), self.writer_iteration + 1)
+            if self.KL_coeff > 0.:
+                self.writer.add_scalar('KL_div', KL_div.mean(), self.writer_iteration + 1)
 
             # take gradient step
             self.optimizer.zero_grad()
