@@ -23,7 +23,7 @@ class PPO(Agent):
                  epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temperature_step=1,
                  temp_factor=1, temperature_min=1., temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
-                 schedule_start=1, curriculum=0):
+                 schedule_start=1, curriculum=0, KL_coeff=0.):
         Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, pretrained_lm=pretrained_lm,
                        out_path=out_path,
                        gamma=gamma, lr=lr,
@@ -42,7 +42,7 @@ class PPO(Agent):
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
                        top_p=top_p, temperature=temperature, temperature_step=temperature_step, temp_factor=temp_factor,
                        temperature_min=temperature_min, temperature_max=temperature_max, s_min=s_min, s_max=s_max,
-                       inv_schedule_step=inv_schedule_step, schedule_start=schedule_start, curriculum=curriculum)
+                       inv_schedule_step=inv_schedule_step, schedule_start=schedule_start, curriculum=curriculum, KL_coeff=KL_coeff)
         self.policy_old = policy
         self.policy_old.to(self.device)
         self.K_epochs = K_epochs
@@ -58,7 +58,7 @@ class PPO(Agent):
                                             ht=old_ht_truncated, ct=old_ct_truncated)
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
-        return log_prob, value, dist_entropy
+        return log_prob, value, dist_entropy, policy_dist.probs.log()
 
     def update(self):
         rewards = []
@@ -79,12 +79,13 @@ class PPO(Agent):
         old_logprobs_truncated = torch.stack(self.memory.logprobs_truncated).to(self.device).detach()
         old_ht_truncated = torch.stack(self.memory.ht).squeeze().to(self.device).detach()
         old_ct_truncated = torch.stack(self.memory.ct).squeeze().to(self.device).detach()
+        logprobs_lm = torch.stack(self.memory.logprobs_lm).squeeze().to(self.device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values:
             old_states_img.requires_grad = True
-            logprobs, state_values, dist_entropy = self.evaluate(old_states_text, old_states_img, old_states_answer,
+            logprobs, state_values, dist_entropy, policy_logprobs = self.evaluate(old_states_text, old_states_img, old_states_answer,
                                                                  old_actions, old_ht_truncated, old_ct_truncated)
 
             # Finding the ratio (pi_theta / pi_theta__old):
@@ -108,12 +109,21 @@ class PPO(Agent):
             surr = -torch.min(surr1, surr2)
             entropy_loss = self.entropy_coeff * dist_entropy
 
+            # adding KL_divergence term
+            if self.truncate_mode is not None and self.KL_coeff > 0:
+                # KL(LM(p) || pi (q)] = sum p * log (p/q)
+                KL_term = logprobs_lm.exp() * (logprobs_lm - policy_logprobs)
+                KL_div = KL_term.sum(-1)
+            else:
+                KL_div = 0.
+
             vf_loss = 0.5 * self.MSE_loss(state_values.squeeze(), rewards)
-            loss = surr + vf_loss - entropy_loss
+            loss = surr + vf_loss - entropy_loss + self.KL_coeff * KL_div
 
             self.writer.add_scalar('loss', loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('loss_vf', vf_loss.mean(), self.writer_iteration + 1)
             self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)
+            self.writer.add_scalar('KL_div', KL_div.mean(), self.writer_iteration + 1)
 
             # take gradient step
             self.optimizer.zero_grad()

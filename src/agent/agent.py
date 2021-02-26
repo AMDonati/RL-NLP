@@ -24,7 +24,7 @@ class Agent:
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
                  temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
-                 schedule_start=1, curriculum=0):
+                 schedule_start=1, curriculum=0, KL_coeff=0.):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -52,6 +52,7 @@ class Agent:
         self.epsilon_truncated_rate = epsilon_truncated_rate
         self.is_loss_correction = is_loss_correction
         self.curriculum = curriculum
+        self.KL_coeff = KL_coeff
         if self.curriculum > 0:
             self.env.update_mode(mode=env.mode, answer_sampl="random")
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
@@ -238,7 +239,7 @@ class Agent:
             if train:
                 # Saving reward and is_terminal:
                 self.memory.add_step(action, state.text[0], state.img[0], log_probs, log_probs_truncated, reward, done,
-                                     value, state.answer, ht, ct)
+                                     value, state.answer, ht, ct, log_probas_lm)
                 if self.env.reward_type == "vilbert" and done:
                     self.writer.add_scalar("vilbert_rank", pred_answer, i_episode)
             timestep += 1
