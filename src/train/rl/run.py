@@ -9,7 +9,7 @@ from data_provider.vqa_tokenizer import VQATokenizer
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 from transformers import BertTokenizer, GPT2Tokenizer
 from train.rl.model import PolicyLSTMBatch_SL
-from train.rl.algo import SLAlgo, PPO_algo
+from train.rl.algo import RLAlgo, PPO_algo
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 import json
@@ -93,10 +93,14 @@ if __name__ == '__main__':
     parser.add_argument("-alpha_lm", type=float, default=0.)
     parser.add_argument("-is_correction", type=int, default=0, help="importance sampling correction")
     parser.add_argument("-baseline", type=int, default=1, help="baseline with vf")
-    parser.add_argument("-truncation_params", type=json.loads, default={}, help="truncation parameters")
+    # parser.add_argument("-truncation_params", type=json.loads, default={}, help="truncation parameters")
     # e.g. -truncation_params "{\"s_min\": 30, \"s_max\":35, \"p_th\":0.005}"
     # parser.add_argument('-truncation', type=json.loads, default=None)
     parser.add_argument('-truncate_mode', type=str, default="top_k")
+    parser.add_argument('-s_min', type=int, default=1)
+    parser.add_argument('-s_max', type=int, default=-1)
+    parser.add_argument("-truncation_params", type=float, default=0.005, help="truncation parameters")
+
     parser.add_argument('-algo', type=str, default="reinforce")
 
     args = parser.parse_args()
@@ -178,12 +182,12 @@ if __name__ == '__main__':
     lm = get_pretrained_lm(args, train_dataset, device)
 
     model = get_model(args, train_dataset, device)
-    algos = {"reinforce": SLAlgo, "ppo": PPO_algo}
+    algos = {"reinforce": RLAlgo, "ppo": PPO_algo}
     algo = algos[args.algo]
     rl_algo = algo(model=model, train_dataset=train_dataset, val_dataset=val_dataset, test_dataset=test_dataset,
                    args=args, lm=lm, max_len=args.max_len, alpha_lm=args.alpha_lm,
                    truncation_params=args.truncation_params, is_correction=args.is_correction, baseline=args.baseline,
-                   truncate_mode=args.truncate_mode)
+                   truncate_mode=args.truncate_mode, s_min=args.s_min, s_max=args.s_max)
     if args.ep > 0:
         rl_algo.train()
     # sl_algo.generate_text()

@@ -4,8 +4,6 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from RL_toolbox.RL_functions import masked_softmax
-
 logger = logging.getLogger()
 
 
@@ -25,9 +23,9 @@ class Truncation:
     def min_max_truncation(self, probas):
         sorted_probs, sorted_indices = torch.sort(probas, descending=True)
         min_prob, max_prob = sorted_probs[:, self.s_min], sorted_probs[:, self.s_max]
-        min_mask = (probas <= min_prob.view(-1, 1))
+        min_mask = (probas > min_prob.view(-1, 1))
         max_mask = (probas > max_prob.view(-1, 1))
-        min_max_mask = torch.logical_and(min_mask, max_mask)
+        min_max_mask = torch.logical_or(min_mask, max_mask)
         return min_max_mask, sorted_probs, sorted_indices
 
     def get_mask(self, log_probas, logits):
@@ -51,7 +49,7 @@ class ProbaThreshold(Truncation):
 
     def __init__(self, **kwargs):
         Truncation.__init__(self, pretrained_lm=kwargs["pretrained_lm"])
-        self.p_th = kwargs["p_th"]
+        self.p_th = float(kwargs["truncation_params"])
         self.s_min = kwargs["s_min"]
         self.s_max = kwargs["s_max"]
 
@@ -59,7 +57,7 @@ class ProbaThreshold(Truncation):
         probas = torch.exp(log_probas)
         min_max_mask, sorted_probs, sorted_indices = self.min_max_truncation(probas)
         p_th_mask = torch.ge(probas, self.p_th)
-        final_mask = torch.logical_and(min_max_mask, p_th_mask)
+        final_mask = torch.logical_or(min_max_mask, p_th_mask)
         return final_mask
 
 

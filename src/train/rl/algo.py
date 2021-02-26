@@ -1,30 +1,33 @@
 # https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3
 # https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-import json
-import os
+import copy
 import datetime
-import torch
-from torch.utils.data import DataLoader
-# from train.train_functions import evaluate_policy
-from utils.utils_train import create_logger, write_to_csv
-from RL_toolbox.reward import Bleu_sf0
-import pandas as pd
+import json
+import logging
+import os
 import time
+
+import numpy as np
+import pandas as pd
+import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from train.rl.truncation import mask_inf_truncature, truncations
-from RL_toolbox.reward import Bleu_sf2
-import logging
-import numpy as np
+from torch.nn.utils import clip_grad_norm_
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import copy
+
+from RL_toolbox.reward import Bleu_sf0
+from RL_toolbox.reward import Bleu_sf2
+from train.rl.truncation import mask_inf_truncature, truncations
+# from train.train_functions import evaluate_policy
+from utils.utils_train import create_logger, write_to_csv
 
 logger = logging.getLogger()
 
 
-class SLAlgo:
+class RLAlgo:
     def __init__(self, model, train_dataset, val_dataset, test_dataset, args, lm, max_len, alpha_lm, truncate_mode,
-                 truncation_params={}, is_correction=False, baseline=True):
+                 truncation_params=None, is_correction=False, baseline=True, s_min=1, s_max=-1):
         self.lm = lm
         self.model = model
         self.dataset_name = args.dataset
@@ -50,10 +53,12 @@ class SLAlgo:
         self.train_function, self.eval_function = self.get_algo_functions(args)
         self.task = args.task
         self.check_batch()
+        self.s_min = s_min
+        self.s_max = s_max
         self.truncation_params = truncation_params
         self.truncation = truncations[truncate_mode](pretrained_lm=self.lm,
-                                                     **truncation_params)  # adding the truncation class.
-        # self.truncation = TopK(pretrained_lm=self.lm, num_truncated=self.truncation_params)
+                                                     s_min=s_min, s_max=s_max,
+                                                     truncation_params=truncation_params)  # adding the truncation class.
         self.reward_function = Bleu_sf2()
         self.gamma = 0.99
         self.max_len = max_len
@@ -147,8 +152,7 @@ class SLAlgo:
         best_val_loss = None
         for epoch in range(self.EPOCHS):
             self.logger.info('epoch {}/{}'.format(epoch + 1, self.EPOCHS))
-            train_loss, elapsed = self.train_function(model=self.model,
-                                                      train_generator=self.train_generator,
+            train_loss, elapsed = self.train_function(train_generator=self.train_generator,
                                                       optimizer=self.optimizer,
                                                       criterion=self.criterion,
                                                       device=self.device,
@@ -299,37 +303,43 @@ class SLAlgo:
         df.to_csv(self.out_lm_metrics, index_label="metrics", columns=temperatures)
         return result_metrics
 
-    def update(self, log_probs, log_probs_truncated, gts, inputs, feats, answers, model):
+    def update(self, log_probs, log_probs_truncated, gts, inputs, targets, feats, answers):
 
-        model.zero_grad()
-        logits, values = model(state_text=inputs, state_img=feats,
-                               state_answer=answers)
+        self.model.zero_grad()
+        logits, values = self.model(state_text=inputs, state_img=feats,
+                                    state_answer=answers)
         values = values.squeeze()
         log_probs_all = F.log_softmax(logits, dim=-1)
-        log_probs_actions = log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
+        log_probs_actions = log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
             log_probs_all.size(0), log_probs_all.size(1))
 
-        advs = gts
+        advs = gts.clone()
         if self.baseline:
             advs -= values.cpu().detach().view(gts.size(0), gts.size(1))
 
         log_probs_advs = log_probs_actions * advs
-        rl_loss_per_episode = -log_probs_advs.sum(dim=1)
         if self.is_correction:
             is_ratios = torch.exp(log_probs.detach() - log_probs_truncated.detach())
-            prod_ratios = torch.prod(is_ratios, dim=-1)
-            rl_loss_per_episode *= prod_ratios
+            cumprod_ratios = torch.cumprod(is_ratios, dim=-1)
+            log_probs_advs *= cumprod_ratios
+        rl_loss_per_episode = -log_probs_advs.sum(dim=1)
         rl_loss = rl_loss_per_episode.mean()
         value_loss = torch.square(gts.view(-1) - values.view(-1)).sum()
 
         loss = rl_loss
         if self.baseline:
             loss += 0.5 * value_loss
+
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+
+        clip_grad_norm_(self.model.parameters(), self.grad_clip)
+        self.optimizer.step()
         return loss, rl_loss, value_loss
 
-    def train_one_epoch_policy(self, model, train_generator, optimizer, criterion, device, grad_clip,
+    def train_one_epoch_policy(self, train_generator, optimizer, criterion, device, grad_clip,
                                print_interval=10):
-        model.train()  # Turns on train mode which enables dropout.
+        self.model.train()  # Turns on train mode which enables dropout.
         total_loss = 0.
         start_time = time.time()
         start_time_epoch = time.time()
@@ -355,8 +365,8 @@ class SLAlgo:
                     sort_lm, sort_lm_ind = torch.sort(logits_lm, descending=True)
                     ranks[:, t] = (sort_lm_ind == targets[:, t].view(-1, 1)).nonzero()[:, -1]
                     # in_valid_actions[:, t] = (targets[:, t].view(-1, 1) == valid_actions).sum(dim=1)
-                    logits_, _ = model(state_text=inputs_, state_img=feats,
-                                       state_answer=answers)  # output = logits (S, num_tokens)
+                    logits_, _ = self.model(state_text=inputs_, state_img=feats,
+                                            state_answer=answers)  # output = logits (S, num_tokens)
                     last_logits = (1 - self.alpha_lm) * logits_[:, -1, :] + self.alpha_lm * logits_lm
                     probs = F.softmax(last_logits, dim=-1)
                     dist = Categorical(probs)
@@ -366,8 +376,8 @@ class SLAlgo:
                     sort_probs, sort_ind = torch.sort(dist_truncated.probs, descending=True)
                     sort_words = [self.train_dataset.question_tokenizer.decode(sort_ind[j, :10].numpy()).split() for j
                                   in range(sort_ind.size(0))]
-                    logger.debug("sort words {}".format(sort_words))
-                    logger.debug("sort probs {}".format(sort_probs[:, :10]))
+                    logger.info("sort words {}".format(sort_words))
+                    logger.info("sort probs {}".format(sort_probs[:, :10]))
                     actions = dist_truncated.sample().to(self.device)
                     log_probs_truncated[:, t] = torch.log(dist_truncated.probs.gather(-1, actions.view(-1, 1)).view(-1))
                     prob_actions = dist.probs.to(self.device).gather(-1, actions.view(-1, 1)).view(-1)
@@ -376,10 +386,10 @@ class SLAlgo:
 
             gts, rewards, dialog, targets_dialog = self.compute_rewards(inputs_, targets)
 
-            if (self.episode_idx + 1) % self.update_iteration == 0:
-                # estimate the loss using one MonteCarlo rollout
-                loss, rl_loss, value_loss = self.update(log_probs, log_probs_truncated, gts, inputs_[:, :-1], feats,
-                                                        answers, model)
+            # estimate the loss using one MonteCarlo rollout
+            inputs_sampled, targets_sampled = inputs_[:, :-1], inputs_[:, 1:]
+            loss, rl_loss, value_loss = self.update(log_probs, log_probs_truncated, gts, inputs_sampled,
+                                                    targets_sampled, feats, answers)
 
             total_loss += loss.mean().item()
 
@@ -448,10 +458,10 @@ class SLAlgo:
         pd.DataFrame(self.in_va_all).to_csv(os.path.join(self.out_path, "in_vas.csv"), index=False, header=False)
 
 
-class PPO_algo(SLAlgo):
+class PPO_algo(RLAlgo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.K_epochs = 5
+        self.K_epochs = 1
         self.eps_clip = 0.02
         self.new_model = copy.deepcopy(self.model)
         self.new_model.load_state_dict(self.model.state_dict())
@@ -459,14 +469,14 @@ class PPO_algo(SLAlgo):
         self.entropy_coeff = 0.01
         self.update_iteration = 1
 
-    def update(self, log_probs, log_probs_truncated, gts, inputs, feats, answers, model):
+    def update(self, log_probs, log_probs_truncated, gts, inputs, targets, feats, answers):
 
-        model.zero_grad()
-        old_logits, old_values = model(state_text=inputs, state_img=feats,
-                                       state_answer=answers)
+        self.model.zero_grad()
+        old_logits, old_values = self.model(state_text=inputs, state_img=feats,
+                                            state_answer=answers)
         old_values = old_values.squeeze()
         old_log_probs_all = F.log_softmax(old_logits, dim=-1)
-        old_log_probs_actions = old_log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
+        old_log_probs_actions = old_log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
             old_log_probs_all.size(0), old_log_probs_all.size(1))
 
         advs = gts.clone()
@@ -474,14 +484,18 @@ class PPO_algo(SLAlgo):
             advs -= old_values.cpu().detach().view(gts.size(0), gts.size(1))
 
         for _ in range(self.K_epochs):
-            model.zero_grad()
+            self.model.zero_grad()
             logits, values = self.new_model(state_text=inputs, state_img=feats,
                                             state_answer=answers)
             values = values.squeeze()
             log_probs_all = F.log_softmax(logits, dim=-1)
-            log_probs_actions = log_probs_all.gather(-1, inputs.unsqueeze(dim=-1)).view(
+            log_probs_actions = log_probs_all.gather(-1, targets.unsqueeze(dim=-1)).view(
                 log_probs_all.size(0), log_probs_all.size(1))
             ratios = torch.exp(log_probs_actions - old_log_probs_actions.detach())
+            if self.is_correction:
+                # computing the Importance Sampling ratio (pi_theta_old / rho_theta_old)
+                is_ratios = torch.exp(log_probs - log_probs_truncated.to(self.device))
+                ratios = ratios * is_ratios
             surr1 = ratios * advs
             surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advs
             surr = -torch.min(surr1, surr2)
@@ -491,7 +505,7 @@ class PPO_algo(SLAlgo):
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
-            # clip grad norm:
+            clip_grad_norm_(self.new_model.parameters(), self.grad_clip)
             self.optimizer.step()
         # return loss, rl_loss, value_loss
         self.model.load_state_dict(self.new_model.state_dict())
