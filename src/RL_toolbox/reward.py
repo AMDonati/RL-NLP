@@ -451,7 +451,6 @@ class Bleu_sf1(Reward):
         closest_question = ep_questions_decoded[np.array(scores).argmax()]
         return reward, closest_question, None
 
-
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer,
            "bleu": Bleu_sf2,
            "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,

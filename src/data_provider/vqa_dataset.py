@@ -18,6 +18,8 @@ from data_provider.tokenizer import Tokenizer
 from data_provider.vqav2_utils import assert_eq, split_question, _load_dataset, clean_key
 from collections import Counter
 import torch.nn.functional as F
+from collections import OrderedDict
+import copy
 
 nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
@@ -43,7 +45,6 @@ class VQADataset(Dataset):
             max_seq_length=23,
             max_region_num=101,
             filter_entries=True,
-            min_len_questions=6,
             num_answers=1,
             filter_yes_no=True,
             num_images=None,
@@ -120,15 +121,9 @@ class VQADataset(Dataset):
 
             # filter entries if needed.
             if filter_entries:
-                self.filter_entries(min_len_questions=min_len_questions, num_answers=num_answers,
+                self.filter_entries(num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
                                     num_images=num_images)
-                if rl:
-                    if self.split == 'train' or self.split == 'mintrain':
-                        self.split_entries()
-
-                self.reduced_answers = [entry["answer"]["labels"] for entry in self.filtered_entries]
-                self.reduced_answers = torch.stack(self.reduced_answers).unique()
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
@@ -173,23 +168,23 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, min_len_questions=0, num_answers=1, filter_yes_no=True, num_images=None):
+    def filter_entries(self, num_answers=1, filter_yes_no=True, num_images=None):
         self.filtered_entries = []
         self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
         for entry in self.entries:
-            len_q = len(word_tokenize(entry["question"]))
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
-            if len_q >= min_len_questions and number_of_answers == num_answers:
+            if (num_answers is None or number_of_answers == num_answers) and number_of_answers > 0:
                 if filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
+                    else:
+                        self.remaining_entries.append(entry)
                 else:
                     self.filtered_entries.append(entry)
             else:
-                if entry["answer"]["labels"] is not None:
-                    self.remaining_entries.append(entry)
+                self.remaining_entries.append(entry)
         if num_images is not None:
             df = pd.DataFrame.from_records(self.filtered_entries)
             images_idx = df.image_id.sort_values().unique()
@@ -199,22 +194,49 @@ class VQADataset(Dataset):
         print("keeping {} entries over {} original entries".format(len(self.filtered_entries), len(self.entries)))
         del self.entries
 
-    def split_entries(self):
+    def split_entries(self, duplicate_entries=False):
         train_entries, test_entries = [], []
+        self.answer_img_map = {k:[] for k in self.images_idx}
         for img_idx in self.images_idx:
             img_entries = [entry for entry in self.filtered_entries if entry["image_id"] == img_idx]
             if len(img_entries) > 1:
                 test_entries.append(img_entries[-1])
                 img_entries.pop()
             for l in img_entries:
-                train_entries.append(l)
+                if duplicate_entries:
+                    self.duplicate_entries(train_entries, l)
+                else:
+                    train_entries.append(l)
+                self.answer_img_map[img_idx].extend([ans.item() for ans in l["answer"]["labels"].view(-1).cpu()])
+        self.answer_img_map = {k:list(set(v)) for k,v in self.answer_img_map.items()}
         self.filtered_entries = train_entries
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
+        self.reduced_answers = [torch.tensor(item, dtype=torch.int) for l in list(self.answer_img_map.values()) for item in l]
+        self.reduced_answers = torch.stack(self.reduced_answers).unique()
+
+    def duplicate_entries(self, train_entries, entry):
+        answers = entry["answer"]["labels"].cpu()
+        if answers.shape[0] > 1:
+            for label, score in zip(entry["answer"]["labels"], entry["answer"]["scores"]):
+                new_entry = entry
+                new_entry["answer"]["labels"] = label.view(1)
+                new_entry["answer"]["scores"] = score.view(1)
+                train_entries.append(copy.deepcopy(new_entry))
+        else:
+            train_entries.append(entry)
+
+
+    def get_answer_img_stats(self):
+        num_answer_dict = {k:len(v) for k,v in self.answer_img_map.items()}
+        min = np.min(list(num_answer_dict.values()))
+        mean = np.mean(list(num_answer_dict.values()))
+        max = np.max(list(num_answer_dict.values()))
+        return min, mean, max
 
     def get_answers_frequency(self):
-        answers_idx = [entry["answer"]["labels"].cpu().squeeze().item() for entry in self.filtered_entries]
+        answers_idx = [item for entry in self.filtered_entries for item in entry["answer"]["labels"].view(-1).cpu()]
         freq_answers = Counter(answers_idx)
         inv_freq_norm = F.softmax(torch.tensor([1/item for item in list(freq_answers.values())], dtype=torch.float32))
         inv_freq_answers = {k:inv_freq_norm[i].item() for i,k in enumerate(list(freq_answers.keys()))}
