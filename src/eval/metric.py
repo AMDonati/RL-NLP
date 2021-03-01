@@ -1,21 +1,21 @@
+import heapq
 import logging
+import operator
 import os
 
 import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
+from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 
 from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import heapq
 from models.language_model import ClevrLanguageModel
-import operator
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -197,7 +197,7 @@ class DialogMetric(Metric):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, :].numpy()[0],
                                                                    ignored=[])
-            if self.reward_type == 'vqa' or self.reward_type == "vilbert" or self.reward_type =="vilbert_rank2":
+            if self.reward_type == 'vqa' or self.reward_type == "vilbert" or self.reward_type == "vilbert_rank2":
                 pred_answer = [int(kwargs["pred_answer"].squeeze().numpy())]
                 pred_answer_decoded = self.dataset.answer_tokenizer.decode(text=pred_answer)
                 ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
@@ -283,19 +283,15 @@ class DialogImageMetric(Metric):
             values["closest_question"] = kwargs["closest_question"]
             self.generated_dialog.append(values)
 
-    def get_name_image(self, img_idx):
-        if self.dataset.__class__ == CLEVR_Dataset:
-            img_name = "CLEVR_{}_{:06d}".format(self.mode, img_idx)
-        else:
-            # img_name = "COCO_train2014_{:012d}.jpg".format(img_idx)
-            # img_name = "{:012d}".format(img_idx)
-            img_name = img_idx
-        return img_name
-
     def get_id_image(self, id_image):
-        id_image = self.get_name_image(id_image)
+
         try:
-            id_drive = self.list_image_ids.loc[id_image]["id_google"]
+            if self.dataset.__class__ == CLEVR_Dataset:
+                mode = 0 if self.mode == "train" else 1
+                id_drive = self.list_image_ids.loc[id_image]["id_google"].iloc[mode]
+            else:
+                id_drive = self.list_image_ids.loc[id_image]["id_google"]
+
         except KeyError:
             id_drive = None
         finally:
