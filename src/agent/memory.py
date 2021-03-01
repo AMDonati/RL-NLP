@@ -40,6 +40,8 @@ class Memory:
 
     def add_step(self, actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals, values,
                  states_answer, ht, ct,  log_probas_lm):
+        if log_probas_lm is None:
+            log_probas_lm = torch.tensor(0.)
         for arr, val in zip(self.arrs,
                             [actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals,
                              values, states_answer, ht, ct, log_probas_lm]):
