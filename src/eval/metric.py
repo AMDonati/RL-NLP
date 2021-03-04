@@ -298,8 +298,9 @@ class DialogImageMetric(Metric):
             return id_drive
 
     def post_treatment_(self):
+        num_last_episodes = min(20, len(self.generated_dialog))
         to_html = lambda x: "".join(["<li>{} : {}</li>".format(key, value) for key, value in x.items()])
-        html_str = ["<tr><ul>" + to_html(x) + "</ul></tr>" for x in self.generated_dialog]
+        html_str = ["<tr><ul>" + to_html(x) + "</ul></tr>" for x in self.generated_dialog[-num_last_episodes:]]
         html_str = "".join(html_str)
         html_str = "<table>" + html_str + "</table>"
         f = open(self.out_html_file, "x")
@@ -461,23 +462,21 @@ class SelfBleuMetric(Metric):
         self.out_questions_csv_file = os.path.join(self.out_path, "metrics", self.name + "_questions.csv")
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                      ignored=["<SOS>"],
-                                                                      stop_at_end=True)
-            self.questions.append(question_decoded)
+        pass
 
     def compute_(self, **kwargs):
-        self.metric = self.measure
-
-    def post_treatment_(self):
-        pd.Series(self.questions).to_csv(self.out_questions_csv_file, header=False, index=False)
-        scores = []
-        for i, question in enumerate(self.questions):
-            ref_questions = np.delete(self.questions, i)
-            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
-            scores.append(score)
-        self.metric_history.extend(scores)
+        question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                  ignored=["<SOS>"],
+                                                                  stop_at_end=True)
+        self.questions.append(question_decoded)
+        if (kwargs["idx_diversity"] == kwargs["num_diversity"] - 1) and kwargs["num_diversity"] > 1:
+            scores = []
+            for i, question in enumerate(self.questions):
+                ref_questions = np.delete(self.questions, i)
+                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
+                scores.append(score)
+            self.metric.append(np.mean(scores))
+            self.questions = []
 
 
 class HistogramOracle(Metric):
@@ -873,21 +872,27 @@ class LMActionProbs(Metric):
         logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
-class VilbertMetric(Metric):
-    '''Compute the vilbert score over the ref answer and the generated dialog.'''
+class OracleMetric(Metric):
+    '''Compute the oracle score over the ref answer and the generated dialog.'''
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "vilbert", "scalar", env_mode, trunc, sampling)
-        if agent.env.reward_type == "vilbert":
+        Metric.__init__(self, agent, train_test, "oracle", "scalar", env_mode, trunc, sampling)
+        if agent.env.reward_type in ["vilbert", "vqa"]:
             self.function = agent.env.reward_func
         else:
-            self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
-                                               vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
-                                               env=agent.env)
+            if self.dataset.__class__ != CLEVR_Dataset:
+                self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
+                                                   vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
+                                                   env=agent.env)
+            else:
+                self.function = rewards["vqa"](path="output/vqa_model_film/model.pt",
+                                               vocab="data/closure_vocab.json",
+                                               dataset=agent.env.dataset)
 
     def fill_(self, **kwargs):
-        if self.dataset.__class__ != CLEVR_Dataset:
-            if kwargs["done"]:
+        if kwargs["done"]:
+            if self.dataset.__class__ != CLEVR_Dataset:
+
                 question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
                                                                           ignored=["<SOS>"],
                                                                           stop_at_end=True)
@@ -895,7 +900,17 @@ class VilbertMetric(Metric):
                 score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
                                                 step_idx=None,
                                                 done=True)
-                self.measure.append(score)
+            else:
+                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
+                                                                          ignored=["<SOS>"],
+                                                                          stop_at_end=True)
+
+                ref_questions = kwargs["ref_questions_decoded"][0]
+                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
+                                                step_idx=None,
+                                                done=True, state=kwargs["new_state"],
+                                                real_answer=kwargs["state"].answer.view(-1))
+            self.measure.append(score)
 
     def compute_(self, **kwargs):
         if len(self.measure) > 0:
@@ -909,6 +924,6 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
            "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
-           "histogram_answers": HistogramOracle, "vilbert": VilbertMetric}
+           "histogram_answers": HistogramOracle, "oracle": OracleMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]

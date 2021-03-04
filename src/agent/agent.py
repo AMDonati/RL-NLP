@@ -5,13 +5,11 @@ import time
 
 import numpy as np
 import torch
-import torch.optim as optim
 import pandas as pd
 
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
-from utils.utils_train import write_to_csv
 
 logger = logging.getLogger()
 
@@ -220,7 +218,7 @@ class Agent:
         return h, c
 
     def generate_one_episode(self, timestep, i_episode, env, seed=None, train=True, truncation=True,
-                             test_mode='sampling', metrics=[]):
+                             test_mode='sampling', metrics=[], idx_diversity=0, num_diversity=10):
         if train or seed is None:
             state, ep_reward = env.reset(seed=seed), 0
         else:
@@ -280,7 +278,7 @@ class Agent:
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
                            ref_question=env.ref_questions, ref_questions_decoded=env.ref_questions_decoded,
                            question_idx=env.ref_question_idx, test_mode=test_mode, pred_answer=pred_answer,
-                           ref_answer=env.ref_answer)
+                           ref_answer=env.ref_answer, idx_diversity=idx_diversity, num_diversity=num_diversity)
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
@@ -299,7 +297,7 @@ class Agent:
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode,
-                            truncation=trunc, metrics=metrics)
+                            truncation=trunc, metrics=metrics, idx_diversity=i, num_diversity=num_diversity)
                     for _, metric in metrics.items():
                         metric.write()
                         metric.log(valid_actions=valid_actions)
