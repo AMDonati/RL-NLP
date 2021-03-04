@@ -449,8 +449,8 @@ class BleuMetric(Metric):
         self.metric.append(np.mean(self.measure))
 
 
-class SelfBleuMetric(Metric):
-    '''Compute the self bleu score on all generated sentences'''
+class SelfBleuImageMetric(Metric):
+    '''Compute the self bleu score on generated sentences for one image'''
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "selfbleu", "scalar", env_mode, trunc, sampling)
@@ -465,18 +465,19 @@ class SelfBleuMetric(Metric):
         pass
 
     def compute_(self, **kwargs):
-        question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
-                                                                  ignored=["<SOS>"],
-                                                                  stop_at_end=True)
-        self.questions.append(question_decoded)
-        if (kwargs["idx_diversity"] == kwargs["num_diversity"] - 1) and kwargs["num_diversity"] > 1:
-            scores = []
-            for i, question in enumerate(self.questions):
-                ref_questions = np.delete(self.questions, i)
-                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
-                scores.append(score)
-            self.metric.append(np.mean(scores))
-            self.questions = []
+        if self.sampling != "greedy":
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                      ignored=["<SOS>"],
+                                                                      stop_at_end=True)
+            self.questions.append(question_decoded)
+            if (kwargs["idx_diversity"] == kwargs["num_diversity"] - 1) and kwargs["num_diversity"] > 1:
+                scores = []
+                for i, question in enumerate(self.questions):
+                    ref_questions = np.delete(self.questions, i)
+                    score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
+                    scores.append(score)
+                self.metric.append(np.mean(scores))
+                self.questions = []
 
 
 class HistogramOracle(Metric):
@@ -922,7 +923,7 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
+           "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
            "histogram_answers": HistogramOracle, "oracle": OracleMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
