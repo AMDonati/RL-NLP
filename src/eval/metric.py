@@ -298,7 +298,7 @@ class DialogImageMetric(Metric):
             return id_drive
 
     def post_treatment_(self):
-        num_last_episodes = min(20, len(self.generated_dialog))
+        num_last_episodes = min(50, len(self.generated_dialog))
         to_html = lambda x: "".join(["<li>{} : {}</li>".format(key, value) for key, value in x.items()])
         html_str = ["<tr><ul>" + to_html(x) + "</ul></tr>" for x in self.generated_dialog[-num_last_episodes:]]
         html_str = "".join(html_str)

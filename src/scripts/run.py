@@ -105,6 +105,7 @@ def get_parser():
     parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
+    parser.add_argument("-params_reward", type=int, default=10, help="params reward")
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
     parser.add_argument('-answer_sampl', type=str, default="img_sampling",
                         help="method to sample the (img, answer) sample in the RL training.")
@@ -166,15 +167,15 @@ def get_parser():
     parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
-                        default=["return", "size_valid_actions", "ppl_dialog_lm", "ttr_question",
-                                 "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog",
-                                 "eps_truncation", "histogram_answers",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated",
+                        default=["return", "size_valid_actions", "ppl_dialog_lm",
+                                 "valid_actions", "dialog",
+                                 "histogram_answers",
+                                 "ttr", "sum_probs",
                                  "dialogimage"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "size_valid_actions",
-                                 "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
-                                 "selfbleu", "dialogimage", "valid_actions", "language_score"],
+                                 "sum_probs", "ttr",
+                                 "selfbleu", "dialogimage", "language_score"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
@@ -187,7 +188,6 @@ def get_parser():
     parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
-    parser.add_argument("-params_reward", type=int, default=10, help="params reward")
 
     return parser
 
