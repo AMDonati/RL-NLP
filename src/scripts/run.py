@@ -1,10 +1,13 @@
 import argparse
 import datetime
 import os
+import sys
 from collections import OrderedDict
 from configparser import ConfigParser
 
 import torch
+from torch import optim
+from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
 
@@ -14,9 +17,6 @@ from envs.clevr_env import ClevrEnv, VQAEnv
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from models.rl_basic import PolicyLSTMBatch
 from utils.utils_train import create_logger
-from torch import optim
-from torch.optim import lr_scheduler
-import sys
 
 
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimizer, args_):
@@ -108,7 +108,8 @@ def get_parser():
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
     parser.add_argument('-answer_sampl', type=str, default="img_sampling",
                         help="method to sample the (img, answer) sample in the RL training.")
-    parser.add_argument('-curriculum', type=int, default=0, help="if > 0, changing the answer sampling mode from random to uniform")
+    parser.add_argument('-curriculum', type=int, default=0,
+                        help="if > 0, changing the answer sampling mode from random to uniform")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -174,7 +175,8 @@ def get_parser():
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "size_valid_actions",
                                  "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
-                                 "selfbleu", "dialogimage", "valid_actions", "language_score"],
+                                 "selfbleu", "dialogimage", "valid_actions", "language_score", "cider", "kurtosis",
+                                 "oracle_recall"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],

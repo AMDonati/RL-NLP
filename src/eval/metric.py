@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+from nlgeval.pycocoevalcap.cider.cider import Cider
+from nltk.translate.meteor_score import meteor_score
+from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 
@@ -20,6 +23,10 @@ from models.language_model import ClevrLanguageModel
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
+
+
+def _strip(s):
+    return s.strip()
 
 
 class Metric:
@@ -918,13 +925,85 @@ class OracleMetric(Metric):
             self.metric.append(np.mean(self.measure))
 
 
+class OracleRecallMetric(OracleMetric):
+    '''Compute the oracle score over the ref answer and the generated dialog.'''
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "oracle_recall", "scalar", env_mode, trunc, sampling)
+        if agent.env.reward_type in ["vilbert_recall", "vqa_recall"]:
+            self.function = agent.env.reward_func
+        else:
+            if self.dataset.__class__ != CLEVR_Dataset:
+                self.function = rewards["vilbert_recall"](path="output/vilbert_vqav2/model.bin",
+                                                          vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
+                                                          env=agent.env)
+            else:
+                self.function = rewards["vqa_recall"](path="output/vqa_model_film/model.pt",
+                                                      vocab="data/closure_vocab.json",
+                                                      dataset=agent.env.dataset)
+
+
+class CiderMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "cider", "scalar", env_mode, trunc, sampling)
+        self.score_function = Cider()
+        self.tokenizer = PTBTokenizer()
+        self.candidates = []
+        self.refs = []
+
+    def fill_(self, **kwargs):
+        pass
+
+    def compute_(self, **kwargs):
+        question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                  ignored=["<SOS>"], stop_at_end=True)
+        ref_questions = kwargs["ref_questions_decoded"][0]
+        self.candidates.append(question_decoded)
+        self.refs.append([ref_questions])
+
+    def post_treatment_(self):
+        refs = {idx: list(map(_strip, ref)) for (idx, ref) in enumerate(self.refs)}
+        hyps = {idx: [lines.strip()] for (idx, lines) in enumerate(self.candidates)}
+        score, scores = self.score_function.compute_score(refs, hyps)
+        self.metric_history.extend(scores)
+
+
+class MeteorMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "meteor", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        pass
+
+    def compute_(self, **kwargs):
+        question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                  ignored=["<SOS>"], stop_at_end=True)
+        ref_questions = kwargs["ref_questions_decoded"]
+        score = meteor_score(references=ref_questions, hypothesis=question_decoded)
+        self.metric.append(score)
+
+
+class KurtosisMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "kurtosis", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        dist = pd.Series(kwargs["dist"].probs.squeeze().numpy())
+        self.measure.append(dist.kurtosis())
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
+
+
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
+           "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore,
+           "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
-           "histogram_answers": HistogramOracle, "oracle": OracleMetric}
+           "histogram_answers": HistogramOracle, "oracle": OracleMetric, "cider": CiderMetric,
+           "kurtosis": KurtosisMetric, "oracle_recall": OracleRecallMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]
