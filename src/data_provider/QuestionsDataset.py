@@ -63,7 +63,7 @@ class QuestionsDataset(Dataset):
                     target_questions = np.concatenate((target_questions, target_questions_ext))
 
         input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
-        range_samples = list(map(int, self.range_samples.split(","))) if self.range_samples is not None else [0,
+        range_samples = list(map(int, self.range_samples.split(" "))) if self.range_samples is not None else [0,
                                                                                                               input_questions.size(
                                                                                                                   0)]
         input_questions = input_questions[range_samples[0]:range_samples[1]]
