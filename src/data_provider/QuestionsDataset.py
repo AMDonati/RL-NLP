@@ -10,6 +10,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from preprocessing.text_functions import decode
 from data_provider.tokenizer import Tokenizer
+import torch.nn.functional as F
 
 
 # TODO: add a max samples here: select 350,000 questions.
@@ -43,14 +44,31 @@ class QuestionsDataset(Dataset):
         hf = h5py.File(self.data_path, 'r')
         input_questions = hf.get('input_questions')
         input_questions = np.array(input_questions, dtype=np.int32)
+        target_questions = hf.get('target_questions')
+        target_questions = np.array(target_questions, dtype=np.int32)
+        if os.path.isdir("data/closure"):
+            for file in os.listdir("data/closure"):
+                if file.endswith(".h5"):
+                    questions_hf = h5py.File(os.path.join("data/closure", file), 'r')
+                    input_questions_ext = questions_hf.get('input_questions')
+                    input_questions_ext = np.pad(input_questions_ext,
+                                                 (0, input_questions.shape[1] - input_questions_ext.shape[1]),
+                                                 "constant")
+                    input_questions = np.concatenate((input_questions, input_questions_ext))
+
+                    target_questions_ext = questions_hf.get('input_questions')
+                    target_questions_ext = np.pad(target_questions_ext,
+                                                 (0, target_questions.shape[1] - target_questions_ext.shape[1]),
+                                                 "constant")
+                    target_questions = np.concatenate((target_questions, target_questions_ext))
+
         input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
         range_samples = list(map(int, self.range_samples.split(","))) if self.range_samples is not None else [0,
                                                                                                               input_questions.size(
                                                                                                                   0)]
         input_questions = input_questions[range_samples[0]:range_samples[1]]
 
-        target_questions = hf.get('target_questions')
-        target_questions = np.array(target_questions, dtype=np.int32)
+
         target_questions = torch.LongTensor(target_questions)
         target_questions = target_questions[range_samples[0]:range_samples[1]]
         return input_questions, target_questions  # dim (B,S)
