@@ -46,8 +46,9 @@ class QuestionsDataset(Dataset):
         input_questions = np.array(input_questions, dtype=np.int32)
         target_questions = hf.get('target_questions')
         target_questions = np.array(target_questions, dtype=np.int32)
-        if os.path.isdir("data/closure"):
-            for file in os.listdir("data/closure"):
+        if os.path.isdir("data/clevr_ext"):
+            print("getting clevr ext")
+            for file in os.listdir("data/clevr_ext"):
                 if file.endswith(".h5"):
                     questions_hf = h5py.File(os.path.join("data/closure", file), 'r')
                     input_questions_ext = questions_hf.get('input_questions')
