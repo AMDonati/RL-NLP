@@ -50,7 +50,7 @@ class QuestionsDataset(Dataset):
             print("getting clevr ext")
             for file in os.listdir("data/clevr_ext"):
                 if file.endswith(".h5"):
-                    questions_hf = h5py.File(os.path.join("data/closure", file), 'r')
+                    questions_hf = h5py.File(os.path.join("data/clevr_ext", file), 'r')
                     input_questions_ext = questions_hf.get('input_questions')
                     input_questions_ext = np.pad(input_questions_ext,
                                                  ((0, 0),(0, input_questions.shape[1] - input_questions_ext.shape[1])),
