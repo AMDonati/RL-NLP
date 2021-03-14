@@ -52,14 +52,14 @@ class QuestionsDataset(Dataset):
                     questions_hf = h5py.File(os.path.join("data/closure", file), 'r')
                     input_questions_ext = questions_hf.get('input_questions')
                     input_questions_ext = np.pad(input_questions_ext,
-                                                 (0, input_questions.shape[1] - input_questions_ext.shape[1]),
+                                                 ((0, 0),(0, input_questions.shape[1] - input_questions_ext.shape[1])),
                                                  "constant")
                     input_questions = np.concatenate((input_questions, input_questions_ext))
 
                     target_questions_ext = questions_hf.get('input_questions')
                     target_questions_ext = np.pad(target_questions_ext,
-                                                 (0, target_questions.shape[1] - target_questions_ext.shape[1]),
-                                                 "constant")
+                                                  (0, target_questions.shape[1] - target_questions_ext.shape[1]),
+                                                  "constant")
                     target_questions = np.concatenate((target_questions, target_questions_ext))
 
         input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
@@ -67,7 +67,6 @@ class QuestionsDataset(Dataset):
                                                                                                               input_questions.size(
                                                                                                                   0)]
         input_questions = input_questions[range_samples[0]:range_samples[1]]
-
 
         target_questions = torch.LongTensor(target_questions)
         target_questions = target_questions[range_samples[0]:range_samples[1]]
