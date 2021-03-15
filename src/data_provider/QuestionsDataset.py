@@ -60,7 +60,7 @@ class QuestionsDataset(Dataset):
                     target_questions_ext = questions_hf.get('input_questions')
                     target_questions_ext = np.pad(target_questions_ext,
                                                   (
-                                                  (0, 0), (0, input_questions.shape[1] - input_questions_ext.shape[1])),
+                                                  (0, 0), (0, target_questions.shape[1] - target_questions_ext.shape[1])),
                                                   "constant")
                     target_questions = np.concatenate((target_questions, target_questions_ext))
 
