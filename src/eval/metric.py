@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from nlgeval.pycocoevalcap.cider.cider import Cider
+#from nlgeval.pycocoevalcap.cider.cider import Cider
 from nltk.translate.meteor_score import meteor_score
 from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
@@ -36,6 +36,8 @@ class Metric:
         self.metric_history = []
         self.metric_diversity = []
         self.metric_diversity_history = []
+        self.idxs_to_select = []
+        self.idx_to_select = None
         self.idx_step = 0
         self.idx_word = 0
         self.idx_compute = 0
@@ -76,7 +78,7 @@ class Metric:
     def reset(self):
         self.idx_word = 0
 
-    def write(self, **kwargs):
+    def write(self, idx_to_select=False):
         if self.to_tensorboard:
             if self.type == "scalar":
                 self.writer.add_scalar(self.name, np.mean(self.metric), self.idx_write)
@@ -87,6 +89,8 @@ class Metric:
         if self.sampling != "greedy":
             self.metric_diversity.extend(self.metric)
         self.metric = []
+        if idx_to_select and self.sampling == "sampling_ranking_lm":
+            self.idx_to_select = self.idx_compute
 
     def write_div(self, **kwargs):
         if self.type == "scalar" and self.metric_diversity:
@@ -94,6 +98,9 @@ class Metric:
                                 np.max(self.metric_diversity), np.min(self.metric_diversity)]
             self.metric_diversity_history.append(metric_diversity)
             self.metric_diversity = []
+        if self.idx_to_select is not None and self.sampling == "sampling_ranking_lm":
+            self.idxs_to_select.append(self.idx_to_select)
+            self.metric_history = self.metric_history[self.idxs_to_select]
 
     def log(self, **kwargs):
         pass

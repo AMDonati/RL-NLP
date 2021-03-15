@@ -434,7 +434,7 @@ def run(args):
     agent = get_agent(pretrained_lm=pretrained_lm, writer=writer, output_path=output_path, env=env, test_envs=test_envs,
                       policy=policy, optimizer=optimizer, args_=args)
 
-    eval_mode = ['sampling', 'greedy']
+    eval_mode = ['sampling', 'greedy', 'sampling_ranking_lm']
 
     # start training
     if args.resume_training is not None:

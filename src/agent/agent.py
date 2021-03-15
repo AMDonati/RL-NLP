@@ -283,6 +283,7 @@ class Agent:
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
     def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=10):
+        num_diversity = 10 if test_mode == "sampling_ranking_lm" else 1
         print("temperature at test: {}".format(self.temperature))
         env.reset()  # init env.
         timestep = 1
@@ -298,8 +299,16 @@ class Agent:
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode,
                             truncation=trunc, metrics=metrics, idx_diversity=i, num_diversity=num_diversity)
+                        ppl_state_lm = self.metrics["ppl_dialog_lm"].metric[-1]
+                        if i >= 1:
+                            if ppl_state_lm <= min_ppl:
+                                idx_to_select = True
+                                min_ppl = ppl_state_lm
+                        else:
+                            idx_to_select = True
+                            min_ppl = ppl_state_lm
                     for _, metric in metrics.items():
-                        metric.write()
+                        metric.write(idx_to_select)
                         metric.log(valid_actions=valid_actions)
                 for _, metric in metrics.items():
                     metric.write_div()
