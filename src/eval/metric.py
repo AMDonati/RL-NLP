@@ -14,6 +14,8 @@ from nltk.translate.meteor_score import meteor_score
 from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
+from transformers import AutoModelWithLMHead, AutoTokenizer
+
 
 from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
@@ -90,7 +92,7 @@ class Metric:
             self.metric_diversity.extend(self.metric)
         self.metric = []
         if idx_to_select and self.sampling == "sampling_ranking_lm":
-            self.idx_to_select = self.idx_compute
+            self.idx_to_select = self.idx_compute - 1
 
     def write_div(self, **kwargs):
         if self.type == "scalar" and self.metric_diversity:
@@ -100,7 +102,6 @@ class Metric:
             self.metric_diversity = []
         if self.idx_to_select is not None and self.sampling == "sampling_ranking_lm":
             self.idxs_to_select.append(self.idx_to_select)
-            self.metric_history = self.metric_history[self.idxs_to_select]
 
     def log(self, **kwargs):
         pass
@@ -114,7 +115,12 @@ class Metric:
     def post_treatment_(self):
         pass
 
-    def post_treatment(self):
+    def post_treatment(self, num_episodes):
+        if len(self.idxs_to_select)>0 and self.sampling == "sampling_ranking_lm" and len(self.metric_history) == num_episodes * 10:
+            print("idx to select", len(self.idxs_to_select))
+            print(len(self.metric_history))
+            self.metric_history = np.array(self.metric_history)
+            self.metric_history = list(self.metric_history[self.idxs_to_select])
         self.post_treatment_()
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False, header=False)
@@ -397,15 +403,15 @@ class LanguageScore(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
-        self.tokenizer = OpenAIGPTTokenizer.from_pretrained('openai-gpt')
-        self.lm_model = OpenAIGPTLMHeadModel.from_pretrained('openai-gpt')
+        self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
+        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
     def fill_(self, **kwargs):
         if kwargs["state"].text.shape[-1] > 1:
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
             inputs = self.tokenizer(state_decoded, return_tensors="pt")
             if inputs["input_ids"].shape[-1] >= 1:
-                _, logits = self.lm_model(**inputs, labels=inputs["input_ids"])
+                logits = self.lm_model(inputs["input_ids"])[0]
                 scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
                 action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
                 action_id = self.tokenizer(action_decoded)
@@ -534,7 +540,7 @@ class HistogramOracle(Metric):
             top_k_dict = self.metric_history
         return top_k_dict
 
-    def post_treatment(self):
+    def post_treatment(self, num_episodes):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             self.post_treatment_()
             metric_history_sorted = dict(sorted(self.metric_history.items(), key=operator.itemgetter(1), reverse=True))

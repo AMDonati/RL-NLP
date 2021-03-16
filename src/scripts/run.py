@@ -180,6 +180,9 @@ def get_parser():
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
                         help="test metrics")
+    parser.add_argument('-eval_modes', nargs='+', type=str,
+                        default=['sampling', 'greedy', 'sampling_ranking_lm'],
+                        help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
     parser.add_argument('-log_interval', type=int, default=10, help="log interval")
@@ -450,12 +453,11 @@ def run(args):
     # start evaluation
     logger.info(
         '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    for mode in eval_mode:
+    for mode in args.eval_modes:
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
-        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, test_seed=args.test_seed,
-                   num_diversity=args.num_diversity)
+        agent.test(num_episodes=args.num_episodes_test, test_mode=mode, test_seed=args.test_seed)
     # write to csv test scalar metrics:
     agent.compute_write_all_metrics(output_path=output_path, logger=logger)
     logger.info(

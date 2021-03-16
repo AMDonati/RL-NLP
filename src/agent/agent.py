@@ -7,6 +7,8 @@ import numpy as np
 import torch
 import pandas as pd
 
+from models.language_model import GenericLanguageModel, ClevrLanguageModel
+
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
@@ -102,11 +104,18 @@ class Agent:
             self.train_metrics_names if key in metrics}
         for mode in [env_.mode for env_ in self.test_envs]:
             for trunc in self.eval_trunc.keys():
-                for sampling_mode in ["sampling", "greedy"]:
+                for sampling_mode in ["sampling", "greedy", "sampling_ranking_lm"]:
                     id = "_".join([mode, trunc, sampling_mode])
                     self.metrics[id] = {key: metrics[key](self, train_test="test", env_mode=mode, trunc=trunc,
                                                           sampling=sampling_mode) for key in self.test_metrics_names if
                                         key in metrics}
+
+    def get_score_metric(self, metrics):
+        if self.truncation.language_model.__class__ == ClevrLanguageModel:
+            score_metric = metrics["ppl_dialog_lm"]
+        else:
+            score_metric = metrics["language_score"]
+        return score_metric
 
     def get_metrics(self, mode, trunc, sampling_mode):
         id = "{}_{}_{}".format(mode, trunc, sampling_mode)
@@ -209,9 +218,9 @@ class Agent:
 
     def test(self, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=1):
         for env in self.test_envs:
+            print("ENV", env)
             logger.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
-            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed,
-                          num_diversity=num_diversity)
+            self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed)
 
     def init_hidden(self, state):
         h, c = self.policy.init_hidden_state(state)
@@ -282,8 +291,9 @@ class Agent:
 
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
-    def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=10):
+    def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0):
         num_diversity = 10 if test_mode == "sampling_ranking_lm" else 1
+        test_mode_episode = {"greedy": "greedy", "sampling": "sampling", "sampling_ranking_lm": "sampling"}
         print("temperature at test: {}".format(self.temperature))
         env.reset()  # init env.
         timestep = 1
@@ -297,16 +307,22 @@ class Agent:
                     with torch.no_grad():
                         state, ep_reward, closest_question, valid_actions, timestep, _ = self.generate_one_episode(
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
-                            test_mode=test_mode,
+                            test_mode=test_mode_episode[test_mode],
                             truncation=trunc, metrics=metrics, idx_diversity=i, num_diversity=num_diversity)
-                        ppl_state_lm = self.metrics["ppl_dialog_lm"].metric[-1]
-                        if i >= 1:
-                            if ppl_state_lm <= min_ppl:
+                        if state.text.size(-1) <= 1:
+                            idx_to_select = False
+                        else:
+                            print("state", state.text)
+                            ppl_state_lm = self.get_score_metric(metrics).metric[-1]
+                            if i >= 1:
+                                if ppl_state_lm <= min_ppl:
+                                    idx_to_select = True
+                                    min_ppl = ppl_state_lm
+                                else:
+                                    idx_to_select = False
+                            else:
                                 idx_to_select = True
                                 min_ppl = ppl_state_lm
-                        else:
-                            idx_to_select = True
-                            min_ppl = ppl_state_lm
                     for _, metric in metrics.items():
                         metric.write(idx_to_select)
                         metric.log(valid_actions=valid_actions)
@@ -315,7 +331,7 @@ class Agent:
         for key_trunc in self.eval_trunc.keys():
             metrics = self.get_metrics(env.mode, key_trunc, test_mode)
             for _, metric in metrics.items():
-                metric.post_treatment()
+                metric.post_treatment(num_episodes=num_episodes)
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logger.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
@@ -354,7 +370,7 @@ class Agent:
                                                                                                'train_action_probs_lm']]}})
 
         for _, metric in self.metrics["train"].items():
-            metric.post_treatment()
+            metric.post_treatment(num_episodes=num_episodes)
         logger.info("total training time: {:7.2f}".format(time.time() - start_time))
         logger.info(
             "--------------------------------------------END OF TRAINING ----------------------------------------------------")
