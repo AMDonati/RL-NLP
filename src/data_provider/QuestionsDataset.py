@@ -54,7 +54,7 @@ class QuestionsDataset(Dataset):
                                                  "constant")
                     input_questions.append(input_questions_ext)
 
-                    target_questions_ext = questions_hf.get('input_questions')
+                    target_questions_ext = questions_hf.get('target_questions')
                     target_questions_ext = np.pad(target_questions_ext,
                                                   ((0, 0), (0, 46 - target_questions_ext.shape[1])),
                                                   "constant")
