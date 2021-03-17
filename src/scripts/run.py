@@ -52,7 +52,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "inv_schedule_step": args_.inv_schedule_step,
                       "schedule_start": args_.schedule_start,
                       "curriculum": args_.curriculum,
-                      "KL_coeff": args_.KL_coeff}
+                      "KL_coeff": args_.KL_coeff,
+                      "truncation_optim": args_.truncation_optim}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -109,7 +110,8 @@ def get_parser():
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
     parser.add_argument('-answer_sampl', type=str, default="img_sampling",
                         help="method to sample the (img, answer) sample in the RL training.")
-    parser.add_argument('-curriculum', type=int, default=0, help="if > 0, changing the answer sampling mode from random to uniform")
+    parser.add_argument('-curriculum', type=int, default=0,
+                        help="if > 0, changing the answer sampling mode from random to uniform")
     parser.add_argument('-debug', type=str, default="0,69000",
                         help="debug mode: train on the first debug images")
     parser.add_argument('-num_questions', type=int, default=10, help="number of questions for each image")
@@ -188,6 +190,8 @@ def get_parser():
     parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
+    parser.add_argument('-truncation_optim', type=int, default=0,
+                        help="optimize the truncated distribution instead of the full one")
 
     return parser
 
