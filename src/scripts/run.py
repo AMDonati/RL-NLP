@@ -189,7 +189,6 @@ def get_parser():
     parser.add_argument('-num_diversity', type=int, default=1,
                         help="number of sampling for the same image/answer for test")
     parser.add_argument('-reduced_answers', type=int, default=0, help="reduced answers")
-    parser.add_argument("-params_reward", type=int, default=10, help="params reward")
     parser.add_argument('-filter_numbers', type=int, default=0)
 
     return parser
