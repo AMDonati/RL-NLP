@@ -199,20 +199,25 @@ class VQAAnswer(Reward):
         self.dataset = dataset
         self.vocab_questions_vqa = get_vocab('question_token_to_idx', self.vocab)
         # self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
-        self.trad_dict = {value: self.vocab_questions_vqa[key] for key, value in self.dataset.vocab_questions.items() if
-                          key in self.vocab_questions_vqa}
+        self.trad_dict = {value: self.vocab_questions_vqa[key.lower()] for key, value in
+                          self.dataset.vocab_questions.items() if
+                          key.lower() in self.vocab_questions_vqa}
+        self.decoder_dict = {value: key for key, value in self.vocab_questions_vqa.items()}
 
-    def trad(self, state):
-        idx_vqa = [self.trad_dict[idx] for idx in state.text.squeeze().cpu().numpy() if idx in self.trad_dict]
+    def trad(self, input):
+        idx_vqa = [self.trad_dict[idx] for idx in input if idx in self.trad_dict]
         idx_vqa.insert(0, 1)  # add SOS token.
         idx_vqa.append(2)  # add EOS token.
         return torch.tensor(idx_vqa).unsqueeze(dim=0)
+
+    def decode(self, input):
+        return " ".join([self.decoder_dict[word] for word in input])
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
         if not done:
             return 0, "N/A", None
         with torch.no_grad():
-            question = self.trad(state).to(self.device)
+            question = self.trad(state.text.squeeze().cpu().numpy()).to(self.device)
             programs_pred = self.program_generator(question)
             scores = self.execution_engine(state.img.to(self.device), programs_pred)
             _, preds = scores.data.cpu().max(1)
