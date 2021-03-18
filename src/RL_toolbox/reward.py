@@ -1,14 +1,14 @@
 import json
-import time
+import logging
+
 import nltk
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import torch.nn.functional as F
-import logging
 
 try:
     from vilbert.task_utils import compute_score_with_logits
@@ -220,6 +220,23 @@ class VQAAnswer(Reward):
         return reward, "N/A", preds
 
 
+class VQARecall(VQAAnswer):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+        if not done:
+            return 0, "N/A", None
+        with torch.no_grad():
+            question = self.trad(state).to(self.device)
+            programs_pred = self.program_generator(question)
+            scores = self.execution_engine(state.img.to(self.device), programs_pred)
+            sorted = torch.argsort(scores.squeeze(), descending=True)
+            rank = (sorted == real_answer).nonzero().squeeze()
+            reward = rank < 5
+        return reward, "N/A", None
+
+
 class VILBERT(Reward):
     def __init__(self, path=None, vocab=None, dataset=None, env=None):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if env is None else env.device
@@ -359,6 +376,15 @@ class VILBERT_rank_NDCG(VILBERT_rank_DCG):
         self.normalize = True
 
 
+class VILBERT_Recall(VILBERT):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        super().__init__(path=path, vocab=vocab, dataset=dataset, env=env)
+
+    def get_reward(self, sorted_logits, vil_prediction, target, ranks, rank, ep_question_decoded):
+        reward = rank < 5
+        return float(reward)
+
+
 # ---------------------------------------------other Bleu variants------------------------------------------------------
 class Bleu_sf7(Reward):
     def __init__(self, sf_id=7, n_gram=4, path=None, vocab=None, dataset=None, env=None):
@@ -458,7 +484,7 @@ rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": Levenshtein
            "bleu_sf7": Bleu_sf7,
            "vilbert": VILBERT, "vilbert_rank": VILBERT_rank, "vilbert_rank2": VILBERT_rank2,
            "vilbert_proba": VILBERT_proba, "vilbert_dcg": VILBERT_rank_DCG, "vilbert_dcg2": VILBERT_rank_DCG2,
-           "vilbert_ndcg": VILBERT_rank_NDCG}
+           "vilbert_ndcg": VILBERT_rank_NDCG, "vqa_recall": VQARecall, "vilbert_recall": VILBERT_Recall}
 
 if __name__ == '__main__':
     print("testing of BLEU score with sf7 smoothing function")

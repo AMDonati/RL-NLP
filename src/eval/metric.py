@@ -1,25 +1,32 @@
+import heapq
 import logging
+import operator
 import os
 
 import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
+from nlgeval.pycocoevalcap.cider.cider import Cider
+from nltk.translate.meteor_score import meteor_score
+from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
+from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 
 from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
-from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import heapq
 from models.language_model import ClevrLanguageModel
-import operator
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
+
+
+def _strip(s):
+    return s.strip()
 
 
 class Metric:
@@ -197,10 +204,10 @@ class DialogMetric(Metric):
         with torch.no_grad():
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, :].numpy()[0],
                                                                    ignored=[])
-            if self.reward_type == 'vqa' or self.reward_type == "vilbert":
+            if self.reward_type == 'vqa' or self.reward_type == "vilbert" or self.reward_type == "vilbert_rank2":
                 pred_answer = [int(kwargs["pred_answer"].squeeze().numpy())]
                 pred_answer_decoded = self.dataset.answer_tokenizer.decode(text=pred_answer)
-                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 ref_question_decoded = kwargs["ref_questions_decoded"]
                 string = ' IMG {} - question index {}:'.format(kwargs["img_idx"],
                                                                kwargs[
@@ -263,7 +270,7 @@ class DialogImageMetric(Metric):
             values["in_valid_actions"] = self.measure
 
             if self.condition_answer != "none":
-                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].detach().numpy().item()])
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 values["ref_answer"] = ref_answer_decoded
 
             if kwargs["pred_answer"] != None:
@@ -283,27 +290,24 @@ class DialogImageMetric(Metric):
             values["closest_question"] = kwargs["closest_question"]
             self.generated_dialog.append(values)
 
-    def get_name_image(self, img_idx):
-        if self.dataset.__class__ == CLEVR_Dataset:
-            img_name = "CLEVR_{}_{:06d}".format(self.mode, img_idx)
-        else:
-            # img_name = "COCO_train2014_{:012d}.jpg".format(img_idx)
-            # img_name = "{:012d}".format(img_idx)
-            img_name = img_idx
-        return img_name
-
     def get_id_image(self, id_image):
-        id_image = self.get_name_image(id_image)
+
         try:
-            id_drive = self.list_image_ids.loc[id_image]["id_google"]
+            if self.dataset.__class__ == CLEVR_Dataset:
+                mode = 0 if self.mode == "train" else 1
+                id_drive = self.list_image_ids.loc[id_image]["id_google"].iloc[mode]
+            else:
+                id_drive = self.list_image_ids.loc[id_image]["id_google"]
+
         except KeyError:
             id_drive = None
         finally:
             return id_drive
 
     def post_treatment_(self):
+        num_last_episodes = min(50, len(self.generated_dialog))
         to_html = lambda x: "".join(["<li>{} : {}</li>".format(key, value) for key, value in x.items()])
-        html_str = ["<tr><ul>" + to_html(x) + "</ul></tr>" for x in self.generated_dialog]
+        html_str = ["<tr><ul>" + to_html(x) + "</ul></tr>" for x in self.generated_dialog[-num_last_episodes:]]
         html_str = "".join(html_str)
         html_str = "<table>" + html_str + "</table>"
         f = open(self.out_html_file, "x")
@@ -452,8 +456,8 @@ class BleuMetric(Metric):
         self.metric.append(np.mean(self.measure))
 
 
-class SelfBleuMetric(Metric):
-    '''Compute the self bleu score on all generated sentences'''
+class SelfBleuImageMetric(Metric):
+    '''Compute the self bleu score on generated sentences for one image'''
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "selfbleu", "scalar", env_mode, trunc, sampling)
@@ -465,23 +469,22 @@ class SelfBleuMetric(Metric):
         self.out_questions_csv_file = os.path.join(self.out_path, "metrics", self.name + "_questions.csv")
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
+        pass
+
+    def compute_(self, **kwargs):
+        if self.sampling != "greedy":
+            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
                                                                       ignored=["<SOS>"],
                                                                       stop_at_end=True)
             self.questions.append(question_decoded)
-
-    def compute_(self, **kwargs):
-        self.metric = self.measure
-
-    def post_treatment_(self):
-        pd.Series(self.questions).to_csv(self.out_questions_csv_file, header=False, index=False)
-        scores = []
-        for i, question in enumerate(self.questions):
-            ref_questions = np.delete(self.questions, i)
-            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
-            scores.append(score)
-        self.metric_history.extend(scores)
+            if (kwargs["idx_diversity"] == kwargs["num_diversity"] - 1) and kwargs["num_diversity"] > 1:
+                scores = []
+                for i, question in enumerate(self.questions):
+                    ref_questions = np.delete(self.questions, i)
+                    score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question, done=True)
+                    scores.append(score)
+                self.metric.append(np.mean(scores))
+                self.questions = []
 
 
 class HistogramOracle(Metric):
@@ -503,7 +506,7 @@ class HistogramOracle(Metric):
     def fill_(self, **kwargs):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             if kwargs["done"]:
-                ref_answer_decoded = self.dataset.answer_tokenizer.decode([kwargs["ref_answer"].numpy().item()])
+                ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 if kwargs["reward"] == 1.:
                     self.metric_history = self.fill_history(self.metric_history, ref_answer_decoded, kwargs["reward"])
                     self.answer_history = self.fill_history(self.answer_history, ref_answer_decoded, 1)
@@ -877,21 +880,27 @@ class LMActionProbs(Metric):
         logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
-class VilbertMetric(Metric):
-    '''Compute the vilbert score over the ref answer and the generated dialog.'''
+class OracleMetric(Metric):
+    '''Compute the oracle score over the ref answer and the generated dialog.'''
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "vilbert", "scalar", env_mode, trunc, sampling)
-        if agent.env.reward_type == "vilbert":
+        Metric.__init__(self, agent, train_test, "oracle", "scalar", env_mode, trunc, sampling)
+        if agent.env.reward_type in ["vilbert", "vqa"]:
             self.function = agent.env.reward_func
         else:
-            self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
-                                               vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
-                                               env=agent.env)
+            if self.dataset.__class__ != CLEVR_Dataset:
+                self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
+                                                   vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
+                                                   env=agent.env)
+            else:
+                self.function = rewards["vqa"](path="output/vqa_model_film/model.pt",
+                                               vocab="data/closure_vocab.json",
+                                               dataset=agent.env.dataset)
 
     def fill_(self, **kwargs):
-        if self.dataset.__class__ != CLEVR_Dataset:
-            if kwargs["done"]:
+        if kwargs["done"]:
+            if self.dataset.__class__ != CLEVR_Dataset:
+
                 question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
                                                                           ignored=["<SOS>"],
                                                                           stop_at_end=True)
@@ -899,11 +908,91 @@ class VilbertMetric(Metric):
                 score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
                                                 step_idx=None,
                                                 done=True)
-                self.measure.append(score)
+            else:
+                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
+                                                                          ignored=["<SOS>"],
+                                                                          stop_at_end=True)
+
+                ref_questions = kwargs["ref_questions_decoded"][0]
+                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
+                                                step_idx=None,
+                                                done=True, state=kwargs["new_state"],
+                                                real_answer=kwargs["state"].answer.view(-1))
+            self.measure.append(score)
 
     def compute_(self, **kwargs):
         if len(self.measure) > 0:
             self.metric.append(np.mean(self.measure))
+
+
+class OracleRecallMetric(OracleMetric):
+    '''Compute the oracle score over the ref answer and the generated dialog.'''
+
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "oracle_recall", "scalar", env_mode, trunc, sampling)
+        if agent.env.reward_type in ["vilbert_recall", "vqa_recall"]:
+            self.function = agent.env.reward_func
+        else:
+            if self.dataset.__class__ != CLEVR_Dataset:
+                self.function = rewards["vilbert_recall"](path="output/vilbert_vqav2/model.bin",
+                                                          vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
+                                                          env=agent.env)
+            else:
+                self.function = rewards["vqa_recall"](path="output/vqa_model_film/model.pt",
+                                                      vocab="data/closure_vocab.json",
+                                                      dataset=agent.env.dataset)
+
+
+class CiderMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "cider", "scalar", env_mode, trunc, sampling)
+        self.score_function = Cider()
+        self.tokenizer = PTBTokenizer()
+        self.candidates = []
+        self.refs = []
+
+    def fill_(self, **kwargs):
+        pass
+
+    def compute_(self, **kwargs):
+        question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                  ignored=["<SOS>"], stop_at_end=True)
+        ref_questions = kwargs["ref_questions_decoded"][0]
+        self.candidates.append(question_decoded)
+        self.refs.append([ref_questions])
+
+    def post_treatment_(self):
+        refs = {idx: list(map(_strip, ref)) for (idx, ref) in enumerate(self.refs)}
+        hyps = {idx: [lines.strip()] for (idx, lines) in enumerate(self.candidates)}
+        score, scores = self.score_function.compute_score(refs, hyps)
+        self.metric_history.extend(scores)
+
+
+class MeteorMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "meteor", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        pass
+
+    def compute_(self, **kwargs):
+        question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
+                                                                  ignored=["<SOS>"], stop_at_end=True)
+        ref_questions = kwargs["ref_questions_decoded"]
+        score = meteor_score(references=ref_questions, hypothesis=question_decoded)
+        self.metric.append(score)
+
+
+class KurtosisMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "kurtosis", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        dist = pd.Series(kwargs["dist"].probs.squeeze().numpy())
+        self.measure.append(dist.kurtosis())
+
+    def compute_(self, **kwargs):
+        self.metric.append(np.mean(self.measure))
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
@@ -911,8 +1000,10 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
            "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
            "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuMetric, "language_score": LanguageScore, "action_probs_truncated": ActionProbsTruncated,
+           "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore,
+           "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
-           "histogram_answers": HistogramOracle, "vilbert": VilbertMetric}
+           "histogram_answers": HistogramOracle, "oracle": OracleMetric, "cider": CiderMetric,
+           "kurtosis": KurtosisMetric, "oracle_recall": OracleRecallMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]

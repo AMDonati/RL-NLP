@@ -19,7 +19,7 @@ class SLAlgo:
         self.dataset_name = args.dataset
         self.train_dataset, self.val_dataset, self.test_dataset = train_dataset, val_dataset, test_dataset
         self.train_generator = DataLoader(dataset=train_dataset, batch_size=args.bs, drop_last=True,
-                                          num_workers=args.num_workers)
+                                          num_workers=args.num_workers, shuffle=True)
         self.val_generator = DataLoader(dataset=val_dataset, batch_size=args.bs, drop_last=True,
                                         num_workers=args.num_workers)
         self.batch_size = args.bs

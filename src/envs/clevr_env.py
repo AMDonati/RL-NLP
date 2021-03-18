@@ -144,7 +144,9 @@ class ClevrEnv(GenericEnv):
             self.ref_answers = self.ref_answers[self.num_questions:]
 
         # getting the ref_idx for the couple (question, answer).
-        self.ref_question_idx = random.choice(range(self.ref_questions.size(0)))
+        if i_episode is not None:
+            np.random.seed(i_episode)
+        self.ref_question_idx = np.random.randint(0,self.ref_questions.size(0))
         self.ref_question = self.ref_questions[self.ref_question_idx]
         self.ref_answer = self.ref_answers[self.ref_question_idx]
 
@@ -181,7 +183,7 @@ class VQAEnv(GenericEnv):
                  reward_type="levenshtein",
                  debug=None,
                  reward_path=None, mode="train", diff_reward=False,
-                 condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23, min_len_questions=0,
+                 condition_answer=True, reward_vocab=None, mask_answers=False, max_seq_length=23,
                  num_answers=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), min_data=0,
                  reduced_answers=False, answer_sampl="uniform", params=None, filter_numbers=False):
         super(VQAEnv, self).__init__(data_path, max_len, reward_type=reward_type,
@@ -203,13 +205,15 @@ class VQAEnv(GenericEnv):
         vocab_path = os.path.join(data_path, "cache", "vocab.json") if not min_data else os.path.join(data_path,
                                                                                                       "cache",
                                                                                                       "vocab_min.json")
-
+        num_answers_ = None if answer_sampl == "img_sampling" else num_answers
         self.dataset = VQADataset(split=modes[self.mode], dataroot=data_path,
                                   image_features_reader=images_feature_reader, question_tokenizer=question_tokenizer,
                                   reward_tokenizer=reward_tokenizer, clean_datasets=True,
-                                  max_seq_length=max_seq_length, min_len_questions=min_len_questions,
-                                  num_answers=num_answers, num_images=num_images, filter_entries=True,
-                                  vocab_path=vocab_path, filter_numbers=filter_numbers)
+                                  max_seq_length=max_seq_length,
+                                  num_answers=num_answers_, num_images=num_images, filter_entries=True,
+                                  vocab_path=vocab_path,filter_numbers=filter_numbers)
+        duplicate_entries = True if answer_sampl == "img_sampling" else False
+        self.dataset.split_entries(duplicate_entries)
         self.set_special_tokens()
         self.set_reward_function(reward_type=reward_type, reward_path=reward_path, reward_vocab=reward_vocab,
                                  diff_reward=diff_reward)
@@ -263,6 +267,11 @@ class VQAEnv(GenericEnv):
         elif self.answer_sampling == "inv_frequency":
             answer = self.sample_answer_from_inv_freq_distrib()
             entry, env_idx = self.sample_entry_from_answer(answer)
+        elif self.answer_sampling == "img_sampling":
+            img_idx = random.choice(self.dataset.images_idx)
+            answer = random.choice(self.dataset.answer_img_map[img_idx])
+            entries = [(idx, ent) for idx, ent in enumerate(self.dataset.filtered_entries) if ent["image_id"] == img_idx and answer in ent["answer"]["labels"]]
+            env_idx, entry = random.choice(entries)
         return entry, env_idx
 
     def reset(self, seed=None, i_episode=None):
@@ -306,21 +315,19 @@ if __name__ == '__main__':
     print('Ref Question', env.ref_question)  # shape (S)
     print("State - text part", state_clevr.text)  # shape (1,S)
 
-    print("Testing VQA Env...")
-    vqa_data_path = '../../data/vqa-v2'
-    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
-                     max_seq_length=16, debug="0,20", min_data=1, answer_sampl="random")
-    # env_vqa.mode = "test_text"
-    env_vqa.reset()
-    env_vqa.mode = "train"
+    # print("Testing VQA Env...")
+    # vqa_data_path = '../../data/vqa-v2'
+    # env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+    #                  max_seq_length=16, debug="0,20", min_data=1, answer_sampl="random")
+    # # env_vqa.mode = "test_text"
+    # env_vqa.reset()
+    # env_vqa.mode = "train"
 
-    print("Testing VQA Env with uniform answer sampling...")
-    vqa_data_path = '../../data/vqa-v2'
-    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
-                     max_seq_length=16, debug="0,20", min_data=1, answer_sampl="uniform")
-    # env_vqa.mode = "test_text"
-    env_vqa.reset()
-    env_vqa.mode = "train"
+    # print("Testing VQA Env with uniform answer sampling...")
+    # vqa_data_path = '../../data/vqa-v2'
+    # env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+    #                  max_seq_length=16, debug="0,20", min_data=1, answer_sampl="uniform")
+    # env_vqa.reset()
 
     print("Testing VQA Env with inv_frequency answer sampling...")
     vqa_data_path = '../../data/vqa-v2'
@@ -328,7 +335,11 @@ if __name__ == '__main__':
                      max_seq_length=16, debug="0,20", min_data=1, answer_sampl="inv_frequency")
     # env_vqa.mode = "test_text"
     env_vqa.reset()
-    env_vqa.mode = "train"
+
+    print("Testing VQA Env with img answer sampling...")
+    env_vqa = VQAEnv(data_path=vqa_data_path, features_h5path="../../data/vqa-v2/coco_trainval.lmdb", mode="train",
+                     max_seq_length=16, debug="0,20", min_data=1, answer_sampl="img_sampling")
+    env_vqa.reset()
 
     print("Testing seed for VQA env...")
     seed = 1

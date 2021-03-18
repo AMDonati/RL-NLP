@@ -15,7 +15,7 @@ class REINFORCE(Agent):
                  epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1., temperature_step=1,
                  temp_factor=1., temperature_min=1., temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
-                 schedule_start=1, curriculum=0):
+                 schedule_start=1, curriculum=0, KL_coeff=0.):
         Agent.__init__(self, policy=policy, optimizer=optimizer, env=env, writer=writer, out_path=out_path, gamma=gamma,
                        lr=lr,
                        grad_clip=grad_clip,
@@ -32,7 +32,8 @@ class REINFORCE(Agent):
                        is_loss_correction=is_loss_correction, train_metrics=train_metrics, test_metrics=test_metrics,
                        top_p=top_p, temperature=temperature, temperature_step=temperature_step, temp_factor=temp_factor,
                        temperature_min=temperature_min, temperature_max=temperature_max, s_min=s_min, s_max=s_max,
-                       inv_schedule_step=inv_schedule_step, schedule_start=schedule_start, curriculum=curriculum)
+                       inv_schedule_step=inv_schedule_step, schedule_start=schedule_start, curriculum=curriculum,
+                       KL_coeff=KL_coeff)
 
         self.MSE_loss = nn.MSELoss(reduction="none")
         self.grad_clip = grad_clip
@@ -108,7 +109,8 @@ class REINFORCE(Agent):
         # compute new log_probs for comparison with old ones:
         states_text = pad_sequence(self.memory.states_text, batch_first=True, padding_value=0).to(self.device)
         policy_dist, policy_dist_truncated, value, _, _ = self.policy(states_text, torch.stack(self.memory.states_img),
-                                                                torch.stack(self.memory.states_answer), ht=hts, ct=cts)
+                                                                      torch.stack(self.memory.states_answer), ht=hts,
+                                                                      ct=cts)
         new_probs = torch.gather(policy_dist.probs, 1, torch.stack(self.memory.actions))
         ratios = torch.exp(torch.log(new_probs) - logprobs).detach()
         self.writer.add_scalar('ratios', ratios.mean(), self.writer_iteration + 1)

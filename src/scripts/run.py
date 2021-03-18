@@ -51,7 +51,8 @@ def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimi
                       "s_max": args_.s_max,
                       "inv_schedule_step": args_.inv_schedule_step,
                       "schedule_start": args_.schedule_start,
-                      "curriculum": args_.curriculum}
+                      "curriculum": args_.curriculum,
+                      "KL_coeff": args_.KL_coeff}
 
     ppo_kwargs = {"policy": policy, "gamma": args_.gamma,
                   "K_epochs": args_.K_epochs,
@@ -104,8 +105,9 @@ def get_parser():
     parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
+    parser.add_argument("-params_reward", type=int, default=10, help="params reward")
     parser.add_argument('-mask_answers', type=int, default=1, help="mask answers")
-    parser.add_argument('-answer_sampl', type=str, default="uniform",
+    parser.add_argument('-answer_sampl', type=str, default="img_sampling",
                         help="method to sample the (img, answer) sample in the RL training.")
     parser.add_argument('-curriculum', type=int, default=0,
                         help="if > 0, changing the answer sampling mode from random to uniform")
@@ -126,9 +128,10 @@ def get_parser():
     parser.add_argument('-p_th', type=float,
                         help="probability threshold for proba threshold truncation mode")  # arg used in the proba_thr truncation function.
     parser.add_argument('-top_p', default=1., type=float, help="top p of nucleus sampling")
-    parser.add_argument('-s_min', default=10, type=int,
+    parser.add_argument('-s_min', default=1, type=int,
                         help="minimal size of the valid action space of the truncation function.")
     parser.add_argument('-s_max', default=200, type=int, help="maximal size of the valid action space")
+    parser.add_argument('-KL_coeff', default=0., type=float, help="adding KL divergence term in the loss if truncation")
     ## temperature args.
     parser.add_argument('-temperature', default=1., type=float, help="temperature for language model")
     parser.add_argument('-temp_step', type=int, default=1,
@@ -154,7 +157,6 @@ def get_parser():
     parser.add_argument('-init_text', type=str)
     parser.add_argument('-custom_init', type=int, default=0)
     parser.add_argument('-add_answers', type=int, default=0)
-
     # train / test pipeline:
     parser.add_argument("-num_episodes_train", type=int, default=10, help="number of episodes training")
     parser.add_argument("-num_episodes_test", type=int, default=10, help="number of episodes test")
@@ -166,15 +168,15 @@ def get_parser():
     parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
-                        default=["return", "size_valid_actions", "ppl_dialog_lm", "ttr_question",
-                                 "valid_actions", "valid_actions_episode", "lm_valid_actions", "dialog",
-                                 "eps_truncation", "histogram_answers",
-                                 "ttr", "sum_probs", "true_word_rank", "true_word_prob", "action_probs_truncated",
+                        default=["return", "size_valid_actions", "ppl_dialog_lm",
+                                 "valid_actions", "dialog",
+                                 "histogram_answers",
+                                 "ttr", "sum_probs",
                                  "dialogimage"], help="train metrics")
     parser.add_argument('-test_metrics', nargs='+', type=str,
                         default=["return", "dialog", "bleu", "ppl_dialog_lm", "size_valid_actions",
-                                 "action_probs_truncated", "ttr_question", "sum_probs", "ppl", "lv_norm", "ttr",
-                                 "selfbleu", "dialogimage", "valid_actions"],
+                                 "sum_probs", "ttr",
+                                 "selfbleu", "dialogimage", "language_score"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
@@ -265,6 +267,9 @@ def get_output_path(args):
         out_folder = out_folder + '_invsch{}'.format(args.inv_schedule_step)
     if args.schedule_start > 1:
         out_folder = out_folder + '_schstart{}'.format(args.schedule_start)
+
+    if args.KL_coeff > 0:
+        out_folder = out_folder + '_KLdiv{}'.format(args.KL_coeff)
 
     if args.resume_training is not None:
         output_path = os.path.join(args.resume_training,

@@ -16,9 +16,10 @@ class Memory:
         self.values = []
         self.ht = []
         self.ct = []
+        self.logprobs_lm = []
         self.arrs = [self.actions, self.states_text, self.states_img, self.logprobs, self.logprobs_truncated,
                      self.rewards,
-                     self.is_terminals, self.values, self.states_answer, self.ht, self.ct]
+                     self.is_terminals, self.values, self.states_answer, self.ht, self.ct, self.logprobs_lm]
 
         self.idx_episode = 0
 
@@ -35,10 +36,13 @@ class Memory:
         del self.values[:]
         del self.ht[:]
         del self.ct[:]
+        del self.logprobs_lm[:]
 
     def add_step(self, actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals, values,
-                 states_answer, ht, ct):
+                 states_answer, ht, ct,  log_probas_lm):
+        if log_probas_lm is None:
+            log_probas_lm = torch.tensor(0.)
         for arr, val in zip(self.arrs,
                             [actions, states_text, states_img, logprobs, log_probs_truncated, rewards, is_terminals,
-                             values, states_answer, ht, ct]):
+                             values, states_answer, ht, ct, log_probas_lm]):
             arr.append(val)

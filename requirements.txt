@@ -27,3 +27,4 @@ torch
 pytorch_transformers
 git+https://github.com/gqkc/CLOSURE.git
 torchvision
+git+https://github.com/Maluuba/nlg-eval.git
