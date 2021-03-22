@@ -72,6 +72,8 @@ if __name__ == '__main__':
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
     parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
+    parser.add_argument('-filter_numbers', type=int, default=0)
+
     args = parser.parse_args()
 
     device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
@@ -134,7 +136,7 @@ if __name__ == '__main__':
                                      image_features_reader=images_feature_reader,
                                      reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                                      num_images=None, vocab_path=vocab_path,
-                                     filter_entries=True, rl=False)
+                                     filter_entries=True, rl=False, filter_numbers=args.filter_numbers)
             test_dataset = val_dataset
 
         return train_dataset, val_dataset, test_dataset
