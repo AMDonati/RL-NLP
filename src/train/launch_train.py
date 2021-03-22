@@ -122,7 +122,7 @@ if __name__ == '__main__':
                 vocab_path = os.path.join(args.data_path, "vocab.json")
                 data_path = os.path.join(args.data_path, "clevr_ext")
                 full_dataset = QuestionsDataset(h5_questions_path=data_path, vocab_path=vocab_path,
-                                                range_samples=args.range_samples)
+                                                range_samples=args.range_samples, dataset_ext=1)
                 train_size = int(0.9 * len(full_dataset))
                 test_size = len(full_dataset) - train_size
                 train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
