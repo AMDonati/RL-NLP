@@ -55,8 +55,11 @@ class PPO(Agent):
         self.writer_iteration = 0
 
     def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
-        policy_dist, _, value, _, _ = self.policy(state_text, state_img, states_answer, valid_actions=None,
-                                                  ht=old_ht_truncated, ct=old_ct_truncated)
+        policy_dist, policy_dist_truncated, value, _, _ = self.policy(state_text, state_img, states_answer,
+                                                                      valid_actions=None,
+                                                                      ht=old_ht_truncated, ct=old_ct_truncated)
+        if self.truncation_optim == 1:
+            policy_dist = policy_dist_truncated
         dist_entropy = policy_dist.entropy()
         log_prob = policy_dist.log_prob(action.view(-1))
         return log_prob, value, dist_entropy, policy_dist.probs.log()
