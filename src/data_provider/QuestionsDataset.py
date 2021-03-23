@@ -15,12 +15,12 @@ import torch.nn.functional as F
 
 # TODO: add a max samples here: select 350,000 questions.
 class QuestionsDataset(Dataset):
-    def __init__(self, h5_questions_path, vocab_path, range_samples=None):
+    def __init__(self, h5_questions_path, vocab_path, range_samples=None, dataset_ext=0):
         super(QuestionsDataset, self).__init__()
         self.data_path = h5_questions_path
         self.vocab_path = vocab_path
         self.range_samples = range_samples
-        self.inp_questions, self.target_questions = self.get_questions()
+        self.inp_questions, self.target_questions = self.get_questions() if dataset_ext == 0 else self.get_questions_ext()
         self.vocab_questions = self.get_vocab()
         self.idx_to_token = self.get_idx_to_token()
         self.len_vocab = len(self.vocab_questions)
@@ -60,9 +60,44 @@ class QuestionsDataset(Dataset):
                     target_questions_ext = questions_hf.get('input_questions')
                     target_questions_ext = np.pad(target_questions_ext,
                                                   (
-                                                  (0, 0), (0, target_questions.shape[1] - target_questions_ext.shape[1])),
+                                                      (0, 0),
+                                                      (0, target_questions.shape[1] - target_questions_ext.shape[1])),
                                                   "constant")
                     target_questions = np.concatenate((target_questions, target_questions_ext))
+
+        input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
+        range_samples = list(map(int, self.range_samples.split(" "))) if self.range_samples is not None else [0,
+                                                                                                              input_questions.size(
+                                                                                                                  0)]
+        input_questions = input_questions[range_samples[0]:range_samples[1]]
+
+        target_questions = torch.LongTensor(target_questions)
+        target_questions = target_questions[range_samples[0]:range_samples[1]]
+        return input_questions, target_questions  # dim (B,S)
+
+    def get_questions_ext(self):
+        target_questions = []
+        input_questions = []
+        if os.path.isdir(self.data_path):
+            print("getting clevr ext")
+            for file in os.listdir(self.data_path):
+                if file.endswith(".h5"):
+                    questions_hf = h5py.File(os.path.join(self.data_path, file), 'r')
+                    input_questions_ext = questions_hf.get('input_questions')
+                    input_questions_ext = np.pad(input_questions_ext,
+                                                 ((0, 0), (0, 46 - input_questions_ext.shape[1])),
+                                                 "constant")
+                    input_questions.append(input_questions_ext)
+
+                    target_questions_ext = questions_hf.get('target_questions')
+                    target_questions_ext = np.pad(target_questions_ext,
+                                                  ((0, 0), (0, 46 - target_questions_ext.shape[1])),
+                                                  "constant")
+                    target_questions.append(target_questions_ext)
+
+        input_questions = np.concatenate(input_questions)
+
+        target_questions = np.concatenate(target_questions)
 
         input_questions = torch.LongTensor(input_questions)  # shape (num_samples, seq_len)
         range_samples = list(map(int, self.range_samples.split(" "))) if self.range_samples is not None else [0,

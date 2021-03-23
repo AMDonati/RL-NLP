@@ -13,11 +13,20 @@ from transformers import BertTokenizer, GPT2Tokenizer
 from models.LM_networks import GRUModel, LSTMModel, LayerNormLSTMModel
 from models.rl_basic import PolicyLSTMBatch_SL
 from train.train_algo import SLAlgo
+import copy
+from torch.utils.data import Subset
 
 '''
 training script for LM network. 
 Inspired from: https://github.com/pytorch/examples/blob/master/word_language_model/main.py
 '''
+
+
+def copy_attributes(source, target):
+    for attr in source.__dict__.keys():
+        setattr(target, attr, getattr(source, attr))
+    return target
+
 
 if __name__ == '__main__':
 
@@ -72,6 +81,8 @@ if __name__ == '__main__':
                         help="number of samples in the dataset - to train on a subset of the full dataset")
     parser.add_argument("-print_interval", type=int, default=10, help="interval logging.")
     parser.add_argument("-device_id", type=int, default=0, help="to choose the GPU for multi-GPU VM.")
+    parser.add_argument("-dataset_ext", type=int, default=0, help="dataset ext")
+
     parser.add_argument('-filter_numbers', type=int, default=0)
 
     args = parser.parse_args()
@@ -85,30 +96,41 @@ if __name__ == '__main__':
 
     def get_datasets(args, device):
         if args.dataset == "clevr":
-            train_questions_path = os.path.join(args.data_path, "train_questions.h5")
-            val_questions_path = os.path.join(args.data_path, "val_questions.h5")
-            test_questions_path = os.path.join(args.data_path, "test_questions.h5")
-            train_feats_path = os.path.join(args.data_path, 'train_features.h5')
-            val_feats_path = os.path.join(args.data_path, 'val_features.h5')
-            vocab_path = os.path.join(args.data_path, "vocab.json")
+            if args.dataset_ext == 0:
+                train_questions_path = os.path.join(args.data_path, "train_questions.h5")
+                val_questions_path = os.path.join(args.data_path, "val_questions.h5")
+                test_questions_path = os.path.join(args.data_path, "test_questions.h5")
+                train_feats_path = os.path.join(args.data_path, 'train_features.h5')
+                val_feats_path = os.path.join(args.data_path, 'val_features.h5')
+                vocab_path = os.path.join(args.data_path, "vocab.json")
 
-            if args.task == "lm":
-                train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path,
-                                                 range_samples=args.range_samples)
-                val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
-                test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
-            elif args.task == "policy":
-                train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
-                                              h5_feats_path=train_feats_path,
-                                              vocab_path=vocab_path,
-                                              max_samples=args.max_samples)
-                val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
-                                            h5_feats_path=val_feats_path,
-                                            vocab_path=vocab_path,
-                                            max_samples=args.max_samples)
-                test_dataset = val_dataset
+                if args.task == "lm":
+                    train_dataset = QuestionsDataset(h5_questions_path=train_questions_path, vocab_path=vocab_path,
+                                                     range_samples=args.range_samples)
+                    val_dataset = QuestionsDataset(h5_questions_path=val_questions_path, vocab_path=vocab_path)
+                    test_dataset = QuestionsDataset(h5_questions_path=test_questions_path, vocab_path=vocab_path)
+                elif args.task == "policy":
+                    train_dataset = CLEVR_Dataset(h5_questions_path=train_questions_path,
+                                                  h5_feats_path=train_feats_path,
+                                                  vocab_path=vocab_path,
+                                                  max_samples=args.max_samples)
+                    val_dataset = CLEVR_Dataset(h5_questions_path=val_questions_path,
+                                                h5_feats_path=val_feats_path,
+                                                vocab_path=vocab_path,
+                                                max_samples=args.max_samples)
+                    test_dataset = val_dataset
 
-
+            else:
+                vocab_path = os.path.join(args.data_path, "vocab.json")
+                data_path = os.path.join(args.data_path, "clevr_ext")
+                full_dataset = QuestionsDataset(h5_questions_path=data_path, vocab_path=vocab_path,
+                                                range_samples=args.range_samples, dataset_ext=1)
+                train_size = int(0.9 * len(full_dataset))
+                test_size = len(full_dataset) - train_size
+                train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
+                train_dataset = copy_attributes(train_dataset, train_dataset.dataset)
+                test_dataset = copy_attributes(test_dataset, test_dataset.dataset)
+                val_dataset = copy.deepcopy(test_dataset)
         elif args.dataset == "vqa":
 
             lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
