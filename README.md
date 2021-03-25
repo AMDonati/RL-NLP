@@ -37,6 +37,10 @@ To download the dataset directly via the shell, you can run the following comman
     ```
     gdown --id 1BSqXY6KV4wOxo6tdjP7xej54gMvqk7k1 --output data/clevr_ext/clevr_dialog_train_raw.json
 
+* To get the necessary models: 
+    ```
+  get_models.sh
+
 ## Requirements 
 * You can create a conda environment called rl-nlp: `conda create -n rl-nlp`
 * And activate it: `conda activate rl-nlp`
