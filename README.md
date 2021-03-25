@@ -39,7 +39,8 @@ To download the dataset directly via the shell, you can run the following comman
 
 * To get the necessary models: 
     ```
-  get_models.sh
+  chmod +x sh/files/get_models.sh
+  sh/files/get_models.sh
 
 ## Requirements 
 * You can create a conda environment called rl-nlp: `conda create -n rl-nlp`
