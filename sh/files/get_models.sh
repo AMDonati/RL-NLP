@@ -11,6 +11,7 @@ mkdir output/vqa_lm_model
 mkdir output/vqa_lm_model_smallvocab
 mkdir output/vqa_policy_512_1024_answer
 mkdir output/vqa_policy_512_1024_answer_smallvocab
+mkdir output/vilbert_vqav2
 
 mv output/vqa_lm_model/model.pt output/old/vqa_lm_model_$(date +"%Y_%m_%d_%I_%M_%p")
 gdown --id $VQA_LM_MODEL --output output/vqa_lm_model/model.pt
