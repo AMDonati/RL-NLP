@@ -20,6 +20,7 @@ To download the dataset directly via the shell, you can run the following comman
   gdown --id 1AVZXRzmKBxVH6Ul9ZviSWPVdj_kwU3yX --output data/data.zip
     unzip data/data.zip -d data/
     rm data/data.zip
+    rm data/vqa-v2/cache/vocab.json
 
 * If you want the whole clevr dataset: 
   ```
