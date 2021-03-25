@@ -1005,7 +1005,7 @@ class PeakinessMetric(Metric):
         self.measure.append(sum_10)
 
     def compute_(self, **kwargs):
-        self.metric.append(self.measure)
+        self.metric.extend(self.measure)
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
