@@ -14,6 +14,29 @@ To download the dataset directly via the shell, you can run the following comman
 `wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip -O data/CLEVR_v1.0.zip`  
 `unzip data/CLEVR_v1.0.zip -d data`
 
+## Get data
+* Get data
+    ```
+  gdown --id 1AVZXRzmKBxVH6Ul9ZviSWPVdj_kwU3yX --output data/data.zip
+    unzip data/data.zip -d data/
+    rm data/data.zip
+
+* If you want the whole clevr dataset: 
+  ```
+  rm -r data/CLEVR_v1.0
+  wget https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip -O data/CLEVR_v1.0.zip
+  unzip data/CLEVR_v1.0.zip -d data
+  rm data/CLEVR_v1.0.zip
+
+* If you want the whole vqa-v2 dataset
+    ```
+  wget https://dl.fbaipublicfiles.com/vilbert-multi-task/datasets/coco/features_100/COCO_trainval_resnext152_faster_rcnn_genome.lmdb/data.mdb
+  mv data.mdb data/vqa-v2/coco_trainval.lmdb/
+ 
+* To download the clevr dialog on 20000 images to train the external language model 
+    ```
+    gdown --id 1BSqXY6KV4wOxo6tdjP7xej54gMvqk7k1 --output data/clevr_ext/clevr_dialog_train_raw.json
+
 ## Requirements 
 * You can create a conda environment called rl-nlp: `conda create -n rl-nlp`
 * And activate it: `conda activate rl-nlp`
