@@ -24,7 +24,7 @@ class Agent:
                  alpha_logits=0., alpha_decay_rate=0., epsilon_truncated=0., train_seed=0, epsilon_truncated_rate=1.,
                  is_loss_correction=1, train_metrics=[], test_metrics=[], top_p=1., temperature=1, temp_factor=1,
                  temperature_step=1, temperature_min=1, temperature_max=10, s_min=10, s_max=200, inv_schedule_step=0,
-                 schedule_start=1, curriculum=0, KL_coeff=0.):
+                 schedule_start=1, curriculum=0, KL_coeff=0., truncation_optim=0):
         self.device = policy.device
         self.policy = policy.to(self.device)
         self.optimizer = optimizer
@@ -53,10 +53,10 @@ class Agent:
         self.is_loss_correction = is_loss_correction
         self.curriculum = curriculum
         self.KL_coeff = KL_coeff
+        self.truncation_optim = truncation_optim
         if self.curriculum > 0:
             self.env.update_mode(mode=env.mode, answer_sampl="random")
         p_th_ = p_th if p_th is not None else 1 / self.env.dataset.len_vocab
-
 
         if self.truncate_mode is not None:
             self.eval_trunc = {"no_trunc": False, "with_trunc": True} if eval_no_trunc else {"with_trunc": True}
@@ -94,7 +94,6 @@ class Agent:
             logger.info("number MEAN of answers per img:{}".format(mean))
             logger.info("number MAX of answers per img:{}".format(max))
             logger.info("-" * 100)
-
 
     def init_metrics(self):
         self.metrics = {}
@@ -166,6 +165,8 @@ class Agent:
         policy_dist, policy_dist_truncated, value, ht, ct = self.get_policy_distributions(state, valid_actions,
                                                                                           logits_lm,
                                                                                           alpha=alpha, ht=ht, ct=ct)
+        if self.truncation_optim == 1:
+            policy_dist = policy_dist_truncated
         action = self.sample_action(policy_dist=policy_dist, policy_dist_truncated=policy_dist_truncated,
                                     valid_actions=valid_actions, mode=mode, forced=forced)
         log_prob = policy_dist.log_prob(action.to(self.device)).view(-1)

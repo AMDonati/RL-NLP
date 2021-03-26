@@ -28,6 +28,14 @@ logger = logging.getLogger()  # pylint: disable=invalid-name
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
+def isfloat(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+
+
 def assert_match_split_vocab_path_args(split, vocab_path, vocab_path_min):
     if vocab_path == vocab_path_min:
         assert split == "minval" or split == "mintrain", "You can't used a reduced vocab on train and val split. used minval and mintrain split instead."
@@ -50,7 +58,7 @@ class VQADataset(Dataset):
             num_images=None,
             vocab_path=os.path.join("data/vqa-v2", "cache", "vocab.json"),
             max_samples=None,
-            rl=True):
+            rl=True, filter_numbers=False):
         super().__init__()
         self.split = split
         self.get_answers_vocab(dataroot)
@@ -123,7 +131,7 @@ class VQADataset(Dataset):
             if filter_entries:
                 self.filter_entries(num_answers=num_answers,
                                     filter_yes_no=filter_yes_no,
-                                    num_images=num_images)
+                                    num_images=num_images, filter_floats=filter_numbers)
 
     def build_true_vocab(self, vocab_out_path, tokens_to_remove=["-", ".", "/", "(", ")", "`", "#", "^", ":", "?"],
                          save_first_words=False):
@@ -168,15 +176,20 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, num_answers=1, filter_yes_no=True, num_images=None):
+    def filter_entries(self, num_answers=1, filter_yes_no=True, num_images=None,filter_floats=False):
         self.filtered_entries = []
         self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
         no_idx = self.ans2label["no"]
+        # floats = [v for k, v in self.ans2label.items() if isfloat(k)]
+        numbers_idx = [self.ans2label[str(i)] for i in range(20) if str(i) in self.ans2label]
         for entry in self.entries:
             number_of_answers = len(entry["answer"]["labels"]) if entry["answer"]["labels"] is not None else 0
             if (num_answers is None or number_of_answers == num_answers) and number_of_answers > 0:
-                if filter_yes_no:
+                if filter_floats:
+                    if entry["answer"]["labels"][0] in numbers_idx:
+                        self.filtered_entries.append(entry)
+                elif filter_yes_no:
                     if entry["answer"]["labels"][0] != yes_idx and entry["answer"]["labels"][0] != no_idx:
                         self.filtered_entries.append(entry)
                     else:

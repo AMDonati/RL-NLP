@@ -216,7 +216,7 @@ class DialogMetric(Metric):
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, :].numpy()[0],
                                                                    ignored=[])
             if self.reward_type == 'vqa' or self.reward_type == "vilbert" or self.reward_type == "vilbert_rank2":
-                pred_answer = [int(kwargs["pred_answer"].squeeze().numpy())]
+                pred_answer = [int(kwargs["pred_answer"].squeeze().detach().numpy())]
                 pred_answer_decoded = self.dataset.answer_tokenizer.decode(text=pred_answer)
                 ref_answer_decoded = self.dataset.answer_tokenizer.decode(kwargs["ref_answer"].view(1).numpy())
                 ref_question_decoded = kwargs["ref_questions_decoded"]
@@ -1007,6 +1007,19 @@ class KurtosisMetric(Metric):
         self.metric.append(np.mean(self.measure))
 
 
+class PeakinessMetric(Metric):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "peakiness", "scalar", env_mode, trunc, sampling)
+
+    def fill_(self, **kwargs):
+        sorted, indices = torch.sort(kwargs["dist"].probs, descending=True)
+        sum_10 = sorted[:, :10].sum().item()
+        self.measure.append(sum_10)
+
+    def compute_(self, **kwargs):
+        self.metric.extend(self.measure)
+
+
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
            "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
@@ -1016,6 +1029,6 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
            "histogram_answers": HistogramOracle, "oracle": OracleMetric, "cider": CiderMetric,
-           "kurtosis": KurtosisMetric, "oracle_recall": OracleRecallMetric}
+           "kurtosis": KurtosisMetric, "oracle_recall": OracleRecallMetric, "peakiness": PeakinessMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]
