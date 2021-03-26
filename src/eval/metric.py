@@ -1028,7 +1028,7 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore,
            "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
-           "histogram_answers": HistogramOracle, "oracle": OracleMetric, "cider": CiderMetric,
+           "histogram_answers": HistogramOracle, "oracle": OracleMetric, "cider": CiderMetric, "meteor": MeteorMetric,
            "kurtosis": KurtosisMetric, "oracle_recall": OracleRecallMetric, "peakiness": PeakinessMetric}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]
