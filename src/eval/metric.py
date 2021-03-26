@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-# from nlgeval.pycocoevalcap.cider.cider import Cider
+from nlgeval.pycocoevalcap.cider.cider import Cider
 from nltk.translate.meteor_score import meteor_score
+import nltk
 from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
@@ -20,6 +21,8 @@ from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.language_model import ClevrLanguageModel
+
+nltk.download('wordnet')
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
