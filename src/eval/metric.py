@@ -9,13 +9,12 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-#from nlgeval.pycocoevalcap.cider.cider import Cider
+# from nlgeval.pycocoevalcap.cider.cider import Cider
 from nltk.translate.meteor_score import meteor_score
 from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 from transformers import AutoModelWithLMHead, AutoTokenizer
-
 
 from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
@@ -116,9 +115,8 @@ class Metric:
         pass
 
     def post_treatment(self, num_episodes):
-        if len(self.idxs_to_select)>0 and self.sampling == "sampling_ranking_lm" and len(self.metric_history) == num_episodes * 10:
-            print("idx to select", len(self.idxs_to_select))
-            print(len(self.metric_history))
+        if len(self.idxs_to_select) > 0 and self.sampling == "sampling_ranking_lm" and len(
+                self.metric_history) == num_episodes * 10:
             self.metric_history = np.array(self.metric_history)
             self.metric_history = list(self.metric_history[self.idxs_to_select])
         self.post_treatment_()
@@ -415,6 +413,7 @@ class LanguageScore(Metric):
                 scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
                 action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
                 action_id = self.tokenizer(action_decoded)
+                # TODO: add the case if len(action_id["input_ids"]) == 0 (pad TOKEN).
                 if len(action_id["input_ids"]) == 1:
                     log_prob = scores[:, -1, action_id["input_ids"][0]]
                     self.measure.append(log_prob.squeeze())

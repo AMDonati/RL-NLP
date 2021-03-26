@@ -218,7 +218,6 @@ class Agent:
 
     def test(self, num_episodes=10, test_mode='sampling', test_seed=0, num_diversity=1):
         for env in self.test_envs:
-            print("ENV", env)
             logger.info('-----------------------Starting Evaluation for {} dialog ------------------'.format(env.mode))
             self.test_env(env, num_episodes=num_episodes, test_mode=test_mode, test_seed=test_seed)
 
@@ -312,7 +311,6 @@ class Agent:
                         if state.text.size(-1) <= 1:
                             idx_to_select = False
                         else:
-                            print("state", state.text)
                             ppl_state_lm = self.get_score_metric(metrics).metric[-1]
                             if i >= 1:
                                 if ppl_state_lm <= min_ppl:
