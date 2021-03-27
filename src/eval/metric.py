@@ -1003,7 +1003,7 @@ class KurtosisMetric(Metric):
         Metric.__init__(self, agent, train_test, "kurtosis", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
-        dist = pd.Series(kwargs["dist"].probs.squeeze().numpy())
+        dist = pd.Series(kwargs["dist"].probs.squeeze().cpu().numpy())
         self.measure.append(dist.kurtosis())
 
     def compute_(self, **kwargs):
@@ -1015,7 +1015,7 @@ class PeakinessMetric(Metric):
         Metric.__init__(self, agent, train_test, "peakiness", "scalar", env_mode, trunc, sampling)
 
     def fill_(self, **kwargs):
-        sorted, indices = torch.sort(kwargs["dist"].probs, descending=True)
+        sorted, indices = torch.sort(kwargs["dist"].probs.cpu(), descending=True)
         sum_10 = sorted[:, :10].sum().item()
         self.measure.append(sum_10)
 
