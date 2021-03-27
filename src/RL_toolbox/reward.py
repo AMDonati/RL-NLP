@@ -237,9 +237,9 @@ class VQARecall(VQAAnswer):
             programs_pred = self.program_generator(question)
             scores = self.execution_engine(state.img.to(self.device), programs_pred)
             sorted = torch.argsort(scores.squeeze(), descending=True)
-            rank = (sorted == real_answer).nonzero().squeeze()
+            rank = (sorted.cpu() == real_answer.cpu()).nonzero().squeeze()
             reward = rank < 5
-        return reward, "N/A", None
+        return reward.item(), "N/A", None
 
 
 class VILBERT(Reward):
