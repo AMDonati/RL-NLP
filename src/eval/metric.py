@@ -313,7 +313,7 @@ class DialogImageMetric(Metric):
             else:
                 id_drive = self.list_image_ids.loc[id_image]["id_google"]
 
-        except KeyError:
+        except :
             id_drive = None
         finally:
             return id_drive
