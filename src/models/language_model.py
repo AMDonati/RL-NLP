@@ -2,16 +2,18 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 
+
 class LanguageModel:
-    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), tokenizer=None, prefix_tokenizer=""):
+    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 tokenizer=None, prefix_tokenizer=""):
         self.device = device
         self.tokenizer = tokenizer
         self.language_model = pretrained_lm.to(self.device)
         self.dataset = dataset
         self.prefix_tokenizer = prefix_tokenizer
-        #self.dataset_to_lm_trad = {value: self.tokenizer.encode(text=prefix_tokenizer + key)[0] for
-                                   #key, value in self.dataset.vocab_questions.items() if
-                                   #len(self.tokenizer.encode(text=prefix_tokenizer + key)) == 1}
+        # self.dataset_to_lm_trad = {value: self.tokenizer.encode(text=prefix_tokenizer + key)[0] for
+        # key, value in self.dataset.vocab_questions.items() if
+        # len(self.tokenizer.encode(text=prefix_tokenizer + key)) == 1}
         self.init_text = None
         self.init_text_short = None
 
@@ -26,27 +28,33 @@ class LanguageModel:
 
 
 class ClevrLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), tokenizer=None):
+    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 tokenizer=None):
         LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer)
         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
+        self.pad_idx = self.dataset.vocab_questions["<PAD>"]
 
     def forward(self, state_text, temperature=1):
         seq_len = state_text.size(1)
         log_probas, logits = self.language_model(state_text.to(self.device))
         logits = logits.view(len(state_text), seq_len, -1)
         logits = logits[:, -1, :] / temperature
+        # hotfix
+        logits[:, self.pad_idx] = torch.tensor(-float("Inf"))
         last_log_probas = F.log_softmax(logits, dim=-1)
         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
 
 
 class GenericLanguageModel(LanguageModel):
-    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0):
-        LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer, prefix_tokenizer=prefix_tokenizer)
+    def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                 tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0):
+        LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer,
+                               prefix_tokenizer=prefix_tokenizer)
         self.tokenizer = tokenizer
         self.name = "generic"
         self.dataset_to_lm_trad = {value: self.tokenizer.encoder[key] for
-                                 key, value in self.dataset.vocab_questions.items() if
-                                 key in self.tokenizer.encoder.keys()}
+                                   key, value in self.dataset.vocab_questions.items() if
+                                   key in self.tokenizer.encoder.keys()}
 
         self.bos_token = self.tokenizer.bos_token
         self.get_init_text(init_text, custom_init, add_answers)
@@ -54,22 +62,23 @@ class GenericLanguageModel(LanguageModel):
     def get_init_text(self, init_text, custom_init, add_answers, seed=1234):
         if custom_init > 0:
             np.random.seed(seed)
-            idxs = np.random.randint(0,len(self.dataset.remaining_entries),size=custom_init)
+            idxs = np.random.randint(0, len(self.dataset.remaining_entries), size=custom_init)
             samples = np.array(self.dataset.remaining_entries)[list(set(idxs))]
             example_questions = [s["question"] for s in samples]
             if bool(add_answers):
-                example_answers = [s["answer"]["labels"][np.argmax(s["answer"]["scores"].numpy())].item() for s in samples]
+                example_answers = [s["answer"]["labels"][np.argmax(s["answer"]["scores"].numpy())].item() for s in
+                                   samples]
                 example_answers = [self.dataset.label2ans[a] for a in example_answers]
-                example_questions = [q+ " " + a.capitalize() + "." for (q,a) in zip(example_questions, example_answers)]
+                example_questions = [q + " " + a.capitalize() + "." for (q, a) in
+                                     zip(example_questions, example_answers)]
             example_questions_text = " ".join(example_questions)
             self.init_text = init_text + example_questions_text
-            self.init_text_short = init_text + " ".join(example_questions[:min(len(example_questions),2)]) + "..."
+            self.init_text_short = init_text + " ".join(example_questions[:min(len(example_questions), 2)]) + "..."
         else:
             self.init_text = init_text
             self.init_text_short = init_text
         if self.init_text is not None:
             print("init text for GPT-2 pre-conditioning...", self.init_text)
-
 
     def forward(self, state_text, temperature=1):
         text = self.dataset.question_tokenizer.decode(state_text.cpu().numpy().ravel(), stop_at_end=True)
@@ -95,6 +104,7 @@ if __name__ == '__main__':
     from transformers import AutoModelWithLMHead, GPT2Tokenizer, BertTokenizer
     from data_provider.vqa_dataset import *
     from data_provider.vqa_tokenizer import VQATokenizer
+
     print("test of generic language model...")
     vqa_data_path = '../../data/vqa-v2'
 
@@ -119,9 +129,9 @@ if __name__ == '__main__':
                                          tokenizer=lm_tokenizer, init_text=init_string, custom_init=2)
 
     print("Test of Language Model forward pass...")
-    state_text = torch.tensor([[4,5,6]])
+    state_text = torch.tensor([[4, 5, 6]])
     log_probs, logits, _ = pretrained_lm.forward(state_text)
     print("log_probs", log_probs.shape)
 
-    #print("length intersection vocab", len(pretrained_lm.clevr_to_lm_trad))
-    #print("total length vocab", train_dataset.len_vocab)  # should be intersection vocab - 4 (special tokens).
+    # print("length intersection vocab", len(pretrained_lm.clevr_to_lm_trad))
+    # print("total length vocab", train_dataset.len_vocab)  # should be intersection vocab - 4 (special tokens).
