@@ -26,18 +26,24 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
     else:
         print('Building vocab...')
         # question_token_to_idx
-        list_questions = [q['question'] for q in questions]
+        list_questions = []
+        for orig_idx, q in enumerate(questions):
+            for dialog in q["dialogs"]:
+                for question in dialog["dialog"]:
+                    # questions
+                    list_questions.append(question['question'])
+
         question_token_to_idx, start_words = build_vocab(sequences=list_questions,
-                                            min_token_count=min_token_count,
-                                            punct_to_keep=punct_to_keep,
-                                            punct_to_remove=punct_to_remove)
+                                                         min_token_count=min_token_count,
+                                                         punct_to_keep=punct_to_keep,
+                                                         punct_to_remove=punct_to_remove)
         print('number of words in vocab: {}'.format(len(question_token_to_idx)))
         print('set of starting words...: {}'.format(start_words))
         # answer_token_to_idx
         if 'answer' in questions[0]:
             list_answers = [q['answer'] for q in questions]
             answer_token_to_idx, _ = build_vocab(list_answers, min_token_count=1,
-                                              punct_to_keep=None, punct_to_remove=None)
+                                                 punct_to_keep=None, punct_to_remove=None)
         vocab = {'question_token_to_idx': question_token_to_idx,
                  'answer_token_to_idx': answer_token_to_idx}
 
@@ -54,10 +60,10 @@ def preprocess_questions(min_token_count, punct_to_keep, punct_to_remove, add_st
                 # questions
                 question = question['question']
                 question_tokens, _ = tokenize(s=question,
-                                           punct_to_keep=punct_to_keep,
-                                           punct_to_remove=punct_to_remove,
-                                           add_start_token=add_start_token,
-                                           add_end_token=add_end_token)
+                                              punct_to_keep=punct_to_keep,
+                                              punct_to_remove=punct_to_remove,
+                                              add_start_token=add_start_token,
+                                              add_end_token=add_end_token)
                 question_encoded = encode(seq_tokens=question_tokens,
                                           token_to_idx=vocab['question_token_to_idx'],
                                           allow_unk=True)
