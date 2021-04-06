@@ -40,7 +40,7 @@ class ClevrLanguageModel(LanguageModel):
         logits = logits.view(len(state_text), seq_len, -1)
         logits = logits[:, -1, :] / temperature
         # hotfix
-        logits[:, self.pad_idx] = torch.tensor(-float("Inf")).to(self.device)
+        #logits[:, self.pad_idx] = torch.tensor(-float("Inf")).to(self.device)
         last_log_probas = F.log_softmax(logits, dim=-1)
         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
 
