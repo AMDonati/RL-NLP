@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=clevrfeatures
 #SBATCH --qos=qos_gpu-t3
+#SBATCH -C v100-32g
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --gres=gpu:1
