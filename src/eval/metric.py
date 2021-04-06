@@ -12,7 +12,7 @@ import torch.nn.functional as F
 from nlgeval.pycocoevalcap.cider.cider import Cider
 from nltk.translate.meteor_score import meteor_score
 #import nltk
-#from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
+from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
 from transformers import AutoModelWithLMHead, AutoTokenizer
