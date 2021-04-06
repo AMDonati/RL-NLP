@@ -309,8 +309,7 @@ class Agent:
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode_episode[test_mode],
                             truncation=trunc, metrics=metrics, idx_diversity=i, num_diversity=num_diversity)
-                        if state.text.size(-1) <= 1:
-                            idx_to_select = False
+                        idx_to_select = False
 
                     for _, metric in metrics.items():
                         metric.write(idx_to_select)
