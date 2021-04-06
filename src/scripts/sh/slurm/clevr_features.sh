@@ -12,6 +12,8 @@ module purge
 module load  pytorch-gpu/py3/1.7.1
 conda activate rl-nlp
 
+export PYTHONPATH=src:${PYTHONPATH}
+
 set -x
 srun python -u src/preprocessing/extract_features.py --input_image_dir data/CLEVR_v1.0/images/train --output_h5_file data/train_features.h5 --batch_size 64
 srun python -u src/preprocessing/extract_features.py --input_image_dir data/CLEVR_v1.0/images/val --output_h5_file data/val_features.h5 --batch_size 64
