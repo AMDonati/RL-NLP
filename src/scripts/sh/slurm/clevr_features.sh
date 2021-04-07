@@ -4,7 +4,8 @@
 #SBATCH -C v100-32g
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=4
 #SBATCH --output=clevrfeatures%j.out
 #SBATCH --error=clevrfeatures%j.err
 #SBATCH --time=03:00:00
