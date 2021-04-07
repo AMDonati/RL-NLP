@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=clevrfeatures
+#SBATCH --job-name=vqav2data
 #SBATCH --qos=qos_gpu-t3
 #SBATCH -C v100-32g
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=4
-#SBATCH --output=clevrfeatures%j.out
-#SBATCH --error=clevrfeatures%j.err
+#SBATCH --output=vqav2data%j.out
+#SBATCH --error=vqav2data%j.err
 #SBATCH --time=03:00:00
 
 module purge
