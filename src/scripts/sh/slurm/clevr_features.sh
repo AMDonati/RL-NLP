@@ -4,7 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
 #SBATCH --output=clevrfeatures%j.out
 #SBATCH --error=clevrfeatures%j.err
 #SBATCH --time=03:00:00
