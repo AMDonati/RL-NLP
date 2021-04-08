@@ -1,5 +1,4 @@
 #!/bin/bash
-export TMPDIR=$JOBSCRATCH
 #SBATCH --job-name=clevrfeatures
 #SBATCH --qos=qos_gpu-t3
 #SBATCH -C v100-32g
@@ -10,6 +9,7 @@ export TMPDIR=$JOBSCRATCH
 #SBATCH --error=clevrfeatures%j.err
 #SBATCH --time=03:00:00
 
+export TMPDIR=$JOBSCRATCH
 module purge
 module load  pytorch-gpu/py3/1.7.1
 conda activate rl-nlp
