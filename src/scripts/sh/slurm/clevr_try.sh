@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=clevrfeatures
+#SBATCH --job-name=clevrtry
 #SBATCH --qos=qos_gpu-t3
 #SBATCH -C v100-32g
 #SBATCH --nodes=1
@@ -7,8 +7,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=clevrfeatures%j.out
-#SBATCH --error=clevrfeatures%j.err
+#SBATCH --output=clevrtry%j.out
+#SBATCH --error=clevrtry%j.err
 #SBATCH --time=03:00:00
 
 export TMPDIR=$JOBSCRATCH
