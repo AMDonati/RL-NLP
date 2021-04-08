@@ -3,9 +3,9 @@
 #SBATCH --qos=qos_gpu-t3
 #SBATCH -C v100-32g
 #SBATCH --nodes=1
-#SBATCH --ntasks=16
-#SBATCH --gres=gpu:4
-#SBATCH --cpus-per-task=4
+#SBATCH --ntasks=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
 #SBATCH --output=vqav2data%j.out
 #SBATCH --error=vqav2data%j.err
 #SBATCH --time=03:00:00
