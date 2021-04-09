@@ -3,10 +3,8 @@
 #SBATCH --partition=prepost
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:1
 #SBATCH --output=vqav2data-pp%j.out
 #SBATCH --error=vqav2data-pp%j.err
-#SBATCH --time=03:00:00
 
 module purge
 module load  pytorch-gpu/py3/1.7.1
