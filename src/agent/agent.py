@@ -12,6 +12,7 @@ from models.language_model import GenericLanguageModel, ClevrLanguageModel
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
+from envs.clevr_env import ClevrEnv
 
 logger = logging.getLogger()
 
@@ -96,6 +97,14 @@ class Agent:
             logger.info("-" * 100)
 
     def init_metrics(self):
+        if self.env.__class__ != ClevrEnv:
+            del metrics["clevr_oracle"]
+        else:
+            del metrics["vilbert_oracle"]
+
+        self.train_metrics_names = [metr for metr in self.train_metrics_names if metr in metrics]
+        self.test_metrics_names = [metr for metr in self.test_metrics_names if metr in metrics]
+
         self.metrics = {}
         self.metrics["train"] = {
             key: metrics[key](self, train_test="train", env_mode="train", trunc="trunc",
@@ -251,7 +260,7 @@ class Agent:
                     self.writer.add_scalar("vilbert_rank", pred_answer, i_episode)
             timestep += 1
             for key, metric in metrics.items():
-                #start = time.time()
+                # start = time.time()
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
                             actions_probs=actions_probs, ref_question=env.ref_questions,
                             ref_questions_decoded=env.ref_questions_decoded, reward=reward,
@@ -260,9 +269,9 @@ class Agent:
                             i_episode=i_episode, ref_question_idx=env.ref_question_idx, logits_lm=logits_lm,
                             log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm,
                             alpha=self.alpha_logits_lm, ref_answer=env.ref_answer)
-                #end = time.time()
-                #if done:
-                    #logger.info("fill {} exec {}".format(key, end - start))
+                # end = time.time()
+                # if done:
+                # logger.info("fill {} exec {}".format(key, end - start))
             state = new_state
             ht = new_ht
             ct = new_ct
@@ -288,15 +297,15 @@ class Agent:
                     loss = None
                 break
         for key, metric in metrics.items():
-            #start = time.time()
+            # start = time.time()
 
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
                            ref_question=env.ref_questions, ref_questions_decoded=env.ref_questions_decoded,
                            question_idx=env.ref_question_idx, test_mode=test_mode, pred_answer=pred_answer,
                            ref_answer=env.ref_answer, idx_diversity=idx_diversity, num_diversity=num_diversity)
-            #end = time.time()
-            #if done:
-                #logger.info(" compute {} exec {}".format(key, end - start))
+            # end = time.time()
+            # if done:
+            # logger.info(" compute {} exec {}".format(key, end - start))
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
     def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0):
@@ -384,23 +393,27 @@ class Agent:
                                    key_mode != "train"]
             # for stats
             for metric in instances_of_metric:
-                if metric.stats is not None:
-                    stats_dict[metric.trunc]["_".join([metric.env_mode, metric.sampling])] = metric.stats[0]
-                if metric.stats_div is not None:
-                    stats_dict_div[metric.trunc]["_".join([metric.env_mode, metric.sampling])] = metric.stats_div
+                if metric.stats:
+                    for key_stat, stat in metric.stats.items():
+                        stats_dict[metric.trunc]["_".join([metric.env_mode, metric.sampling, key_stat])] = stat[0]
+                        if str(stat[0]) != 'nan':
+                            all_metrics[metric.trunc].setdefault(key_stat, []).append(stat[0])
 
+                if metric.stats_div:
+                    for key_stat, stat in metric.stats.items():
+                        stats_dict[metric.trunc]["_".join([metric.env_mode, metric.sampling, key_stat])] = stat[0]
+                        # all_metrics[metric.trunc].setdefault(key_stat, []).append(stat[0])
             stats_path = os.path.join(self.out_path, "stats", "{}.csv".format(key))
             div_path = os.path.join(self.out_path, "stats", "{}_div.csv".format(key))
 
             pd.DataFrame(data=stats_dict).to_csv(stats_path)
             pd.DataFrame(data=stats_dict_div).to_csv(div_path)
 
-            # for all metrics
-            for trunc in stats_dict.keys():
-                means = [value for value in stats_dict[trunc].values()]
-                means = [x for x in means if str(x) != 'nan']
-                if len(means) > 0:
-                    all_metrics[trunc][key] = np.round(np.mean(means), decimals=3)
+        # for all metrics
+        for trunc in all_metrics.keys():
+            for key_s in all_metrics[trunc].keys():
+                if len(all_metrics[trunc][key_s]) > 0:
+                    all_metrics[trunc][key_s] = np.round(np.mean(all_metrics[trunc][key_s]), decimals=3)
 
         stats_path = os.path.join(self.out_path, "all_metrics.csv")
         pd.DataFrame(data=all_metrics).to_csv(stats_path)
