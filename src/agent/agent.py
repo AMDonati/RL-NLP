@@ -260,7 +260,7 @@ class Agent:
                     self.writer.add_scalar("vilbert_rank", pred_answer, i_episode)
             timestep += 1
             for key, metric in metrics.items():
-                start = time.time()
+                # start = time.time()
                 metric.fill(state=state, action=action, done=done, dist=dist, valid_actions=valid_actions,
                             actions_probs=actions_probs, ref_question=env.ref_questions,
                             ref_questions_decoded=env.ref_questions_decoded, reward=reward,
@@ -270,8 +270,8 @@ class Agent:
                             log_probas_lm=log_probas_lm, timestep=t, origin_log_probs_lm=origin_log_probs_lm,
                             alpha=self.alpha_logits_lm, ref_answer=env.ref_answer)
                 end = time.time()
-                if done:
-                    logger.info("fill {} exec {}".format(key, end - start))
+                # if done:
+                # logger.info("fill {} exec {}".format(key, end - start))
             state = new_state
             ht = new_ht
             ct = new_ct
@@ -297,15 +297,15 @@ class Agent:
                     loss = None
                 break
         for key, metric in metrics.items():
-            start = time.time()
+            # start = time.time()
 
             metric.compute(state=state, closest_question=closest_question, img_idx=env.img_idx, reward=reward,
                            ref_question=env.ref_questions, ref_questions_decoded=env.ref_questions_decoded,
                            question_idx=env.ref_question_idx, test_mode=test_mode, pred_answer=pred_answer,
                            ref_answer=env.ref_answer, idx_diversity=idx_diversity, num_diversity=num_diversity)
             end = time.time()
-            if done:
-                logger.info(" compute {} exec {}".format(key, end - start))
+            # if done:
+            # logger.info(" compute {} exec {}".format(key, end - start))
         return state, ep_reward, closest_question, valid_actions, timestep, loss
 
     def test_env(self, env, num_episodes=10, test_mode='sampling', test_seed=0):

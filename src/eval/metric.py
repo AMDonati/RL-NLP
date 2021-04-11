@@ -128,12 +128,13 @@ class Metric:
     def post_treatment_(self):
         pass
 
-    def post_treatment(self, num_episodes):
+    def filter_reranking(self, num_episodes):
         if len(self.idxs_to_select) > 0 and self.sampling == "sampling_ranking_lm" and len(
                 self.metric_history) == num_episodes * 10:
             self.metric_history = np.array(self.metric_history)
             self.metric_history = list(self.metric_history[self.idxs_to_select])
-        self.post_treatment_()
+
+    def save_series_and_stats(self):
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False, header=False)
 
@@ -144,7 +145,12 @@ class Metric:
                 df.to_csv(self.out_div_csv_file)
                 self.stats_div = {self.key: self.get_stats_div(df)}
 
-                # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
+    def post_treatment(self, num_episodes):
+        self.filter_reranking(num_episodes)
+        self.post_treatment_()
+        self.save_series_and_stats()
+
+        # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
 
 
 class VAMetric(Metric):
@@ -417,34 +423,40 @@ class LanguageScore(Metric):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
         self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.questions = []
+        self.batch_size = 200
 
     def fill_(self, **kwargs):
-        if kwargs["state"].text.shape[-1] > 1:
-            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
-            inputs = self.tokenizer(state_decoded, return_tensors="pt")
-            if inputs["input_ids"].shape[-1] >= 1:
-                logits = self.lm_model(inputs["input_ids"])[0]
-                scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
-                action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
-                action_id = self.tokenizer(action_decoded)
-                # TODO: add the case if len(action_id["input_ids"]) == 0 (pad TOKEN).
-                if len(action_id["input_ids"]) == 1:
-                    log_prob = scores[:, -1, action_id["input_ids"][0]]
-                    self.measure.append(log_prob.squeeze())
-                elif len(action_id["input_ids"]) == 2:
-                    log_prob_1 = scores[:, -1, action_id["input_ids"][0]]
-                    self.measure.append(log_prob_1.squeeze())
-                    inputs_2 = torch.cat([inputs["input_ids"], torch.tensor(action_id["input_ids"][0]).view(1, 1)],
-                                         dim=-1)
-                    outputs = self.lm_model(input_ids=inputs_2)
-                    scores_2 = F.log_softmax(outputs[0], dim=-1)  # (B, S, vocab size)
-                    log_prob_2 = scores_2[:, -1, action_id["input_ids"][1]]
-                    self.measure.append(log_prob_2.squeeze())
+        pass
+
+    def process_batch(self):
+        inputs = self.tokenizer(self.questions, return_tensors="pt")
+        logits = self.lm_model(inputs["input_ids"])[0]
+        scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
+        log_probs = torch.gather(scores, -1, inputs["input_ids"].unsqueeze(dim=-1))
+        log_probs = log_probs.squeeze() * inputs["attention_mask"]
+        lengths = inputs["attention_mask"].sum(dim=1)
+        ppl = torch.exp(-log_probs.sum(dim=1).view(-1) / lengths.view(-1))
+        self.metric.extend(ppl.tolist())
+
+    def reset(self):
+        self.questions = []
 
     def compute_(self, **kwargs):
-        if len(self.measure) > 0:
-            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-            self.metric.append(ppl)
+        if kwargs["state"].text.shape[-1] > 1:
+            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
+            self.questions.append(state_decoded)
+        if len(self.questions) == self.batch_size:
+            self.process_batch()
+            self.reset()
+
+    def post_treatment(self, num_episodes):
+        if len(self.questions) == self.batch_size:
+            self.process_batch()
+            self.reset()
+        self.filter_reranking(num_episodes)
+        self.post_treatment_()
+        self.save_series_and_stats()
 
 
 class Return(Metric):
