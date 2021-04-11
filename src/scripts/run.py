@@ -178,7 +178,7 @@ def get_parser():
                         default=["return", "clevr_oracle", "vilbert_oracle", "dialog", "bleu", "meteor", "cider",
                                  "ppl_dialog_lm", "size_valid_actions",
                                  "sum_probs",
-                                 "selfbleu", "dialogimage", "language_score", "kurtosis", "peakiness"],
+                                 "selfbleu", "dialogimage", "kurtosis", "peakiness"],
                         help="test metrics")
     parser.add_argument('-test_modes', nargs='+', type=str,
                         default=["test_images"],
