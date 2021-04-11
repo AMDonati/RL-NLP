@@ -326,8 +326,19 @@ class Agent:
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode_episode[test_mode],
                             truncation=trunc, metrics=metrics, idx_diversity=i, num_diversity=num_diversity)
-                        idx_to_select = False
-
+                        if state.text.size(-1) <= 1:
+                            idx_to_select = False
+                        else:
+                            ppl_state_lm = self.get_score_metric(metrics).metric[-1]
+                            if i >= 1:
+                                if ppl_state_lm <= min_ppl:
+                                    idx_to_select = True
+                                    min_ppl = ppl_state_lm
+                                else:
+                                    idx_to_select = False
+                            else:
+                                idx_to_select = True
+                                min_ppl = ppl_state_lm
                     for _, metric in metrics.items():
                         metric.write(idx_to_select)
                         metric.log(valid_actions=valid_actions)
