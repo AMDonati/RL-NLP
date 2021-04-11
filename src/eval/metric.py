@@ -425,7 +425,7 @@ class LanguageScore(Metric):
         self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.questions = []
-        self.batch_size = 200
+        self.batch_size = 1000
 
     def fill_(self, **kwargs):
         pass
@@ -438,7 +438,7 @@ class LanguageScore(Metric):
         log_probs = log_probs.squeeze() * inputs["attention_mask"]
         lengths = inputs["attention_mask"].sum(dim=1)
         ppl = torch.exp(-log_probs.sum(dim=1).view(-1) / lengths.view(-1))
-        self.metric.extend(ppl.tolist())
+        return ppl.tolist()
 
     def reset(self):
         self.questions = []
@@ -448,12 +448,14 @@ class LanguageScore(Metric):
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
             self.questions.append(state_decoded)
         if len(self.questions) == self.batch_size:
-            self.process_batch()
+            ppl = self.process_batch()
+            self.metric.extend(ppl)
             self.reset()
 
     def post_treatment(self, num_episodes):
         if len(self.questions) > 0:
-            self.process_batch()
+            ppl = self.process_batch()
+            self.metric_history.extend(ppl)
             self.reset()
         self.filter_reranking(num_episodes)
         self.post_treatment_()
