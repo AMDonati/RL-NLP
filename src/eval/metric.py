@@ -431,7 +431,7 @@ class LanguageScore(Metric):
 
     def process_batch(self):
         inputs = self.tokenizer(self.questions, return_tensors="pt")
-        logits = self.lm_model(inputs["input_ids"])[0]
+        logits = self.lm_model(inputs["input_ids"], padding=True)[0]
         scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
         log_probs = torch.gather(scores, -1, inputs["input_ids"].unsqueeze(dim=-1))
         log_probs = log_probs.squeeze() * inputs["attention_mask"]
