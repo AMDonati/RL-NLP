@@ -423,6 +423,7 @@ class LanguageScore(Metric):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
         self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
         self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
         self.questions = []
         self.batch_size = 200
 
@@ -430,7 +431,7 @@ class LanguageScore(Metric):
         pass
 
     def process_batch(self):
-        inputs = self.tokenizer(self.questions, return_tensors="pt")
+        inputs = self.tokenizer(self.questions, padding=True, truncation=True, return_tensors="pt")
         logits = self.lm_model(inputs["input_ids"], padding=True)[0]
         scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
         log_probs = torch.gather(scores, -1, inputs["input_ids"].unsqueeze(dim=-1))
@@ -451,7 +452,7 @@ class LanguageScore(Metric):
             self.reset()
 
     def post_treatment(self, num_episodes):
-        if len(self.questions) == self.batch_size:
+        if len(self.questions) > 0:
             self.process_batch()
             self.reset()
         self.filter_reranking(num_episodes)
