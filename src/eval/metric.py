@@ -1025,7 +1025,7 @@ class VilbertRecallMetric(Metric):
             self.reset()
 
     def post_treatment(self, num_episodes):
-        if len(self.questions) != 0:
+        if len(self.metric_history) != 0:
             self.process_batch()
             self.reset()
         serie_ranks = pd.Series(self.metric_history)
