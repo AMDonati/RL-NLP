@@ -22,7 +22,6 @@ from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.language_model import ClevrLanguageModel
 from RL_toolbox.reward import get_vocab
-from torch.nn.utils.rnn import pack_padded_sequence
 
 try:
     from vilbert.task_utils import compute_score_with_logits
