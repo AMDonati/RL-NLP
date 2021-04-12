@@ -217,8 +217,16 @@ def create_config_file(conf_file, args):
     with open(conf_file, 'w') as fp:
         config.write(fp)
 
+def get_hf_path():
+    if not os.path.isdir("cache/gpt-2"):
+        os.makedirs("cache/gpt-2")
+        model = AutoModelWithLMHead.from_pretrained("gpt2")
+        model.save_pretrained("cache/gpt-2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        tokenizer.save_pretrained("cache/gpt-2")
 
 def get_pretrained_lm(args, env, device):
+    get_hf_path()
     if "gpt" == args.lm_path:
         lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
         tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
