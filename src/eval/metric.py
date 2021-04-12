@@ -405,8 +405,8 @@ class LanguageScore(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
-        self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
+        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
 
     def fill_(self, **kwargs):
         if kwargs["state"].text.shape[-1] > 1:

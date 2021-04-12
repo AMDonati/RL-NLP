@@ -220,8 +220,8 @@ def create_config_file(conf_file, args):
 
 def get_pretrained_lm(args, env, device):
     if "gpt" == args.lm_path:
-        lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
+        tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                              tokenizer=tokenizer, init_text=args.init_text,
                                              custom_init=args.custom_init, add_answers=args.add_answers, device=device)
