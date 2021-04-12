@@ -8,6 +8,9 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
 
+import os
+os.environ['TRANSFORMERS_CACHE'] = "/cache"
+
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv, VQAEnv

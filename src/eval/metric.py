@@ -2,6 +2,7 @@ import heapq
 import logging
 import operator
 import os
+os.environ['TRANSFORMERS_CACHE'] = "/cache"
 
 import h5py
 import matplotlib.pyplot as plt
