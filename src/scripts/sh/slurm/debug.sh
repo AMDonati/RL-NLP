@@ -1,3 +1,4 @@
+#!/bin/bash
 #SBATCH --job-name=debug
 #SBATCH --qos=qos_gpu-t3
 #SBATCH -C v100-32g
