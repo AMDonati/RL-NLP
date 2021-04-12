@@ -1025,10 +1025,11 @@ class VilbertRecallMetric(Metric):
             self.reset()
 
     def post_treatment(self, num_episodes):
-        if len(self.metric_history) != 0:
+        if len(self.metric_history) > 0:
             self.process_batch()
             self.reset()
-        serie_ranks = pd.Series(self.metric_history)
+        serie_ranks = pd.Series(self.ranks)
+        serie_rewards = pd.Series(self.rewards)
         serie_recall_5 = (serie_ranks < 5).astype(int)
 
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
@@ -1036,8 +1037,6 @@ class VilbertRecallMetric(Metric):
         if self.type == "scalar":
             self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5)}
 
-        serie_ranks = pd.Series(self.ranks)
-        serie_rewards = pd.Series(self.rewards)
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         rewards_out_file = os.path.join(self.out_path, "metrics", self.name + "_rewards.csv")
 
