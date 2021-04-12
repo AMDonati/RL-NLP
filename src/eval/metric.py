@@ -76,6 +76,7 @@ class Metric:
         self.stats = {}
         self.stats_div = {}
         self.to_tensorboard = True if key in metrics_to_tensorboard else False
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def fill(self, **kwargs):
         self.fill_(**kwargs)
@@ -920,52 +921,7 @@ class LMActionProbs(Metric):
         logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
-class OracleMetric(Metric):
-    '''Compute the oracle score over the ref answer and the generated dialog.'''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "oracle", "scalar", env_mode, trunc, sampling)
-        if agent.env.reward_type in ["vilbert", "vqa"]:
-            self.function = agent.env.reward_func
-        else:
-            if self.dataset.__class__ != CLEVR_Dataset:
-                self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
-                                                   vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
-                                                   env=agent.env)
-            else:
-                self.function = rewards["vqa"](path="output/vqa_model_film/model.pt",
-                                               vocab="data/closure_vocab.json",
-                                               dataset=agent.env.dataset)
-
-    def fill_(self, **kwargs):
-        if kwargs["done"]:
-            if self.dataset.__class__ != CLEVR_Dataset:
-
-                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                          ignored=["<SOS>"],
-                                                                          stop_at_end=True)
-                ref_questions = kwargs["ref_questions_decoded"][0]
-                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                                step_idx=None,
-                                                done=True)
-            else:
-                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                          ignored=["<SOS>"],
-                                                                          stop_at_end=True)
-
-                ref_questions = kwargs["ref_questions_decoded"][0]
-                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                                step_idx=None,
-                                                done=True, state=kwargs["new_state"],
-                                                real_answer=kwargs["state"].answer.view(-1))
-            self.measure.append(score)
-
-    def compute_(self, **kwargs):
-        if len(self.measure) > 0:
-            self.metric.append(np.mean(self.measure))
-
-
-class VilbertRecallMetric(OracleMetric):
+class VilbertRecallMetric(Metric):
     '''Compute the oracle score over the ref answer and the generated dialog.'''
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
@@ -1026,7 +982,7 @@ class VilbertRecallMetric(OracleMetric):
         masked_preds[masked_preds == 0] = -float("Inf")
         maxs_of_targets, argmaxs_of_targets = masked_preds.max(dim=1)
         ranks = (argmaxs_of_targets.unsqueeze(dim=1) == sorted_indices).nonzero()[:, 1]
-        reward = compute_score_with_logits(vil_prediction, targets.unsqueeze(dim=0), device=self.device)
+        reward = compute_score_with_logits(vil_prediction, targets, device=self.device)
         self.ranks.extend(ranks.tolist())
         self.rewards.extend(reward.sum(dim=1).tolist())
 
@@ -1094,7 +1050,6 @@ class OracleClevr(Metric):
         Metric.__init__(self, agent, train_test, "oracle_recall", "scalar", env_mode, trunc, sampling)
         vocab = "data/closure_vocab.json"
         path = "output/vqa_model_film/model.pt"
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.execution_engine, ee_kwargs = load_execution_engine(path)
         self.execution_engine.to(self.device)
         self.execution_engine.eval()
@@ -1232,7 +1187,7 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
            "histogram_answers": HistogramOracle, "cider": CiderMetric, "meteor": MeteorMetric,
-           "kurtosis": KurtosisMetric, "vilbert_oracle": VilbertRecallMetric, "peakiness": PeakinessMetric,
-           "clevr_oracle": OracleClevr}
+           "kurtosis": KurtosisMetric, "peakiness": PeakinessMetric,
+           "oracle": None}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]

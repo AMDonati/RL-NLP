@@ -97,13 +97,6 @@ class Agent:
             logger.info("-" * 100)
 
     def init_metrics(self):
-        if self.env.__class__ != ClevrEnv:
-            del metrics["clevr_oracle"]
-        else:
-            del metrics["vilbert_oracle"]
-
-        self.train_metrics_names = [metr for metr in self.train_metrics_names if metr in metrics]
-        self.test_metrics_names = [metr for metr in self.test_metrics_names if metr in metrics]
 
         self.metrics = {}
         self.metrics["train"] = {
