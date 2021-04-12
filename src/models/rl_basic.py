@@ -172,7 +172,7 @@ class PolicyLSTMBatch(nn.Module):
         return embedding
 
     def _get_embed_text(self, text, answer, img, h, c):
-        lens = (text != 0).sum(dim=1).to(self.device)
+        lens = (text != 0).sum(dim=1).type(torch.int64)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.fusion == "sat":
             last_word_embedding = pad_embed[torch.arange(pad_embed.size(0)), lens - 1]
