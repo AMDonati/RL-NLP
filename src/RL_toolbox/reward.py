@@ -300,7 +300,7 @@ class VILBERT(Reward):
         if self.reduced_answers:
             mask = torch.ones_like(vil_prediction) * float("-Inf")
             mask[:, self.dataset.reduced_answers.squeeze().long()] = vil_prediction[:,
-                                                              self.dataset.reduced_answers.squeeze().long()]
+                                                                     self.dataset.reduced_answers.squeeze().long()]
             vil_prediction = mask
         sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
         ranks = (sorted_indices.squeeze()[..., None] == (target != 0).nonzero().squeeze()).any(-1).nonzero()
@@ -483,13 +483,23 @@ class Bleu_sf1(Reward):
         return reward, closest_question, None
 
 
+class ZeroReward(Reward):
+    def __init__(self, path=None, vocab=None, dataset=None, env=None):
+        Reward.__init__(self, path)
+        self.type = "episode"
+
+    def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
+        return 0., "N/A"
+
+
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer,
            "bleu": Bleu_sf2,
            "bleu_sf0": Bleu_sf0, "bleu_sf1": Bleu_sf1, "bleu_sf2": Bleu_sf2, "bleu_sf3": Bleu_sf3, "bleu_sf4": Bleu_sf4,
            "bleu_sf7": Bleu_sf7,
            "vilbert": VILBERT, "vilbert_rank": VILBERT_rank, "vilbert_rank2": VILBERT_rank2,
            "vilbert_proba": VILBERT_proba, "vilbert_dcg": VILBERT_rank_DCG, "vilbert_dcg2": VILBERT_rank_DCG2,
-           "vilbert_ndcg": VILBERT_rank_NDCG, "vqa_recall": VQARecall, "vilbert_recall": VILBERT_Recall}
+           "vilbert_ndcg": VILBERT_rank_NDCG, "vqa_recall": VQARecall, "vilbert_recall": VILBERT_Recall,
+           "zero": ZeroReward}
 
 if __name__ == '__main__':
     print("testing of BLEU score with sf7 smoothing function")
