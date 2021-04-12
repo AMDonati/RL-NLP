@@ -120,7 +120,6 @@ class PolicyLSTMBatch(nn.Module):
             mean_encoder_out = encoder_out.mean(dim=1)
             h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
             c = self.init_c(mean_encoder_out.to(self.device))
-            h, c
         return h, c
 
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0., ht=None,
@@ -173,7 +172,7 @@ class PolicyLSTMBatch(nn.Module):
         return embedding
 
     def _get_embed_text(self, text, answer, img, h, c):
-        lens = (text != 0).sum(dim=1)
+        lens = (text != 0).sum(dim=1).to(self.device)
         pad_embed = self.word_embedding(text.to(self.device))
         if self.fusion == "sat":
             last_word_embedding = pad_embed[torch.arange(pad_embed.size(0)), lens - 1]
