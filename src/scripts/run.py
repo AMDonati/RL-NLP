@@ -186,7 +186,7 @@ def get_parser():
                         default=["test_images"],
                         help="test metrics")
     parser.add_argument('-eval_modes', nargs='+', type=str,
-                        default=['sampling', 'greedy', 'sampling_ranking_lm'],
+                        default=['sampling', 'greedy'],
                         help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
@@ -457,8 +457,6 @@ def run(args):
     optimizer, scheduler = get_optimizer(policy, args)
     agent = get_agent(pretrained_lm=pretrained_lm, writer=writer, output_path=output_path, env=env, test_envs=test_envs,
                       policy=policy, optimizer=optimizer, args_=args)
-
-    eval_mode = ['sampling', 'greedy', 'sampling_ranking_lm']
 
     # start training
     if args.resume_training is not None:
