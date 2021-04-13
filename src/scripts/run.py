@@ -1,12 +1,12 @@
 import argparse
 import datetime
-import os
 from collections import OrderedDict
 from configparser import ConfigParser
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
+from pytorch_transformers import BertTokenizer
 
 import os
 os.environ['TRANSFORMERS_CACHE'] = "/cache"
@@ -224,6 +224,10 @@ def get_hf_path():
         model.save_pretrained("cache/gpt-2")
         tokenizer = AutoTokenizer.from_pretrained("gpt2")
         tokenizer.save_pretrained("cache/gpt-2")
+    if not os.path.isdir("cache/bert"):
+        os.makedirs("cache/bert")
+        reward_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        reward_tokenizer.save_pretrained("cache/bert")
 
 def get_pretrained_lm(args, env, device):
     get_hf_path()
