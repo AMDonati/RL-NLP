@@ -1105,11 +1105,13 @@ class OracleClevr(Metric):
             self.reset()
         serie_ranks = pd.Series(self.metric_history)
         serie_recall_5 = (serie_ranks < 5).astype(int)
+        serie_score = (serie_ranks ==0).astype(int)
+
 
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         serie_ranks.to_csv(ranks_out_file, index=False, header=False)
         if self.type == "scalar":
-            self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5)}
+            self.stats = {"oracle_score": self.get_stats(serie_score), "recall_5": self.get_stats(serie_recall_5)}
 
 
 class CiderMetric(Metric):
