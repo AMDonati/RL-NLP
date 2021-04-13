@@ -1,3 +1,4 @@
+#!/bin/bash
 #SBATCH --job-name=clevr-lmext-debug
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=2
