@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --output=slurm_out/clevr/lmext-try-%j.out
 #SBATCH --error=slurm_out/clevr/lmext-try-%j.err
-#SBATCH --time=20:00:00
+#SBATCH --time=18:00:00
 
 export TMPDIR=$JOBSCRATCH
 module purge
