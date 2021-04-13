@@ -18,6 +18,7 @@ from torch import optim
 from torch.optim import lr_scheduler
 import sys
 from eval.metric import metrics, OracleClevr, VilbertRecallMetric
+from RL_toolbox.reward import rewards
 
 
 def get_agent(pretrained_lm, writer, output_path, env, test_envs, policy, optimizer, args_):
@@ -105,6 +106,8 @@ def get_parser():
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
+    parser.add_argument('-test_reward_zero', type=int, default=1, help="type of reward function for test")
+
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument("-params_reward", type=int, default=10, help="params reward")
@@ -356,17 +359,19 @@ def log_hparams(logger, args):
 
 def get_rl_env(args, device):
     # upload env.
+    test_reward = "zero" if args.test_reward_zero else args.params_reward
+
     if args.env == "clevr":
         metrics["oracle"] = OracleClevr
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                       reduced_answers=args.reduced_answers, params=args.params_reward)
+                       reduced_answers=args.reduced_answers, params=test_reward)
         test_modes = args.test_modes
         test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                              reduced_answers=args.reduced_answers, params=args.params_reward)
+                              reduced_answers=args.reduced_answers, params=test_reward)
                      for mode in test_modes]
     elif args.env == "vqa":
         metrics["oracle"] = VilbertRecallMetric
@@ -378,6 +383,8 @@ def get_rl_env(args, device):
                      min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl=args.answer_sampl,
                      params=args.params_reward, filter_numbers=args.filter_numbers)
         if device.type == "cpu":
+            env.set_reward_function(test_reward, reward_path=args.reward_path, reward_vocab=args.reward_vocab,
+                                    diff_reward=args.diff_reward)
             test_envs = [env]
         else:
             test_envs = []
@@ -388,7 +395,7 @@ def get_rl_env(args, device):
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
                                         min_data=args.min_data, reduced_answers=args.reduced_answers,
-                                        answer_sampl="random", params=args.params_reward,
+                                        answer_sampl="random", params=test_reward,
                                         filter_numbers=args.filter_numbers))
             if "test_text" in args.test_modes:
                 test_text_env = env
