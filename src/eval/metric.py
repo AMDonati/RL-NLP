@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 from nlgeval.pycocoevalcap.cider.cider import Cider
 from nltk.translate.meteor_score import meteor_score
-#import nltk
+# import nltk
 from tools.refer.evaluation.tokenizer.ptbtokenizer import PTBTokenizer
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
@@ -22,8 +22,18 @@ from RL_toolbox.reward import rewards
 # If modifying these scopes, delete the file token.pickle.
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.language_model import ClevrLanguageModel
+from RL_toolbox.reward import get_vocab
 
-#nltk.download('wordnet')
+try:
+    from vilbert.task_utils import compute_score_with_logits
+    from vilbert.vilbert import VILBertForVLTasks, BertConfig
+except ImportError:
+    print("VILBERT NOT IMPORTED!!")
+# nltk.download('wordnet')
+try:
+    from vr.utils import load_execution_engine, load_program_generator
+except ImportError:
+    print("VR NOT IMPORTED!!")
 
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
@@ -64,9 +74,10 @@ class Metric:
         self.name = train_test + "_" + self.id + '_' + self.key
         self.out_csv_file = os.path.join(self.out_path, "metrics", self.name + ".csv")
         self.out_div_csv_file = os.path.join(self.out_path, "diversity", self.name + ".csv")
-        self.stats = None
-        self.stats_div = None
+        self.stats = {}
+        self.stats_div = {}
         self.to_tensorboard = True if key in metrics_to_tensorboard else False
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def fill(self, **kwargs):
         self.fill_(**kwargs)
@@ -118,24 +129,30 @@ class Metric:
     def post_treatment_(self):
         pass
 
-    def post_treatment(self, num_episodes):
+    def filter_reranking(self, num_episodes):
         if len(self.idxs_to_select) > 0 and self.sampling == "sampling_ranking_lm" and len(
                 self.metric_history) == num_episodes * 10:
             self.metric_history = np.array(self.metric_history)
             self.metric_history = list(self.metric_history[self.idxs_to_select])
-        self.post_treatment_()
+
+    def save_series_and_stats(self):
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False, header=False)
 
         if self.type == "scalar":
-            self.stats = self.get_stats(serie)
+            self.stats = {self.key: self.get_stats(serie)}
             if self.metric_diversity_history:
                 df = pd.DataFrame(data=self.metric_diversity_history, columns=["mean", "std", "max", "min"])
                 df.to_csv(self.out_div_csv_file)
-                self.stats_div = self.get_stats_div(df)
+                self.stats_div = {self.key: self.get_stats_div(df)}
 
+    def post_treatment(self, num_episodes):
+        self.filter_reranking(num_episodes)
+        self.post_treatment_()
+        self.save_series_and_stats()
 
-# ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
+        # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
+
 
 class VAMetric(Metric):
     '''Display the valid action space in the training log.'''
@@ -314,7 +331,7 @@ class DialogImageMetric(Metric):
             else:
                 id_drive = self.list_image_ids.loc[id_image]["id_google"]
 
-        except :
+        except:
             id_drive = None
         finally:
             return id_drive
@@ -407,34 +424,43 @@ class LanguageScore(Metric):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
         self.lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
         self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.questions = []
+        self.batch_size = 1000
 
     def fill_(self, **kwargs):
-        if kwargs["state"].text.shape[-1] > 1:
-            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
-            inputs = self.tokenizer(state_decoded, return_tensors="pt")
-            if inputs["input_ids"].shape[-1] >= 1:
-                logits = self.lm_model(inputs["input_ids"])[0]
-                scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
-                action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
-                action_id = self.tokenizer(action_decoded)
-                # TODO: add the case if len(action_id["input_ids"]) == 0 (pad TOKEN).
-                if len(action_id["input_ids"]) == 1:
-                    log_prob = scores[:, -1, action_id["input_ids"][0]]
-                    self.measure.append(log_prob.squeeze())
-                elif len(action_id["input_ids"]) == 2:
-                    log_prob_1 = scores[:, -1, action_id["input_ids"][0]]
-                    self.measure.append(log_prob_1.squeeze())
-                    inputs_2 = torch.cat([inputs["input_ids"], torch.tensor(action_id["input_ids"][0]).view(1, 1)],
-                                         dim=-1)
-                    outputs = self.lm_model(input_ids=inputs_2)
-                    scores_2 = F.log_softmax(outputs[0], dim=-1)  # (B, S, vocab size)
-                    log_prob_2 = scores_2[:, -1, action_id["input_ids"][1]]
-                    self.measure.append(log_prob_2.squeeze())
+        pass
+
+    def process_batch(self):
+        inputs = self.tokenizer(self.questions, padding=True, truncation=True, return_tensors="pt")
+        logits = self.lm_model(inputs["input_ids"])[0]
+        scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
+        log_probs = torch.gather(scores, -1, inputs["input_ids"].unsqueeze(dim=-1))
+        log_probs = log_probs.squeeze() * inputs["attention_mask"]
+        lengths = inputs["attention_mask"].sum(dim=1)
+        ppl = torch.exp(-log_probs.sum(dim=1).view(-1) / lengths.view(-1))
+        return ppl.tolist()
+
+    def reset(self):
+        self.questions = []
 
     def compute_(self, **kwargs):
-        if len(self.measure) > 0:
-            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-            self.metric.append(ppl)
+        if kwargs["state"].text.shape[-1] > 1:
+            state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
+            self.questions.append(state_decoded)
+        if len(self.questions) == self.batch_size:
+            ppl = self.process_batch()
+            self.metric.extend(ppl)
+            self.reset()
+
+    def post_treatment(self, num_episodes):
+        if len(self.questions) > 0:
+            ppl = self.process_batch()
+            self.metric_history.extend(ppl)
+            self.reset()
+        self.filter_reranking(num_episodes)
+        self.post_treatment_()
+        self.save_series_and_stats()
 
 
 class Return(Metric):
@@ -896,67 +922,195 @@ class LMActionProbs(Metric):
         logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
-class OracleMetric(Metric):
+class VilbertRecallMetric(Metric):
     '''Compute the oracle score over the ref answer and the generated dialog.'''
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "oracle", "scalar", env_mode, trunc, sampling)
-        if agent.env.reward_type in ["vilbert", "vqa"]:
+        Metric.__init__(self, agent, train_test, "vilbert_recall", "scalar", env_mode, trunc, sampling)
+        vocab = "output/vilbert_vqav2/bert_base_6layer_6conect.json"
+        path = "output/vilbert_vqav2/model.bin"
+        self.ranks = []
+        self.rewards = []
+        config = BertConfig.from_json_file(vocab)
+        self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
+        self.batch_size = 30
+        self.reset()
+        self.env = agent.env
+        if agent.env.reward_type in ["vilbert_recall"]:
             self.function = agent.env.reward_func
         else:
-            if self.dataset.__class__ != CLEVR_Dataset:
-                self.function = rewards["vilbert"](path="output/vilbert_vqav2/model.bin",
-                                                   vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
-                                                   env=agent.env)
-            else:
-                self.function = rewards["vqa"](path="output/vqa_model_film/model.pt",
-                                               vocab="data/closure_vocab.json",
-                                               dataset=agent.env.dataset)
+            self.function = rewards["vilbert_recall"](path="output/vilbert_vqav2/model.bin",
+                                                      vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
+                                                      env=agent.env)
 
     def fill_(self, **kwargs):
-        if kwargs["done"]:
-            if self.dataset.__class__ != CLEVR_Dataset:
+        pass
 
-                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                          ignored=["<SOS>"],
-                                                                          stop_at_end=True)
-                ref_questions = kwargs["ref_questions_decoded"][0]
-                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                                step_idx=None,
-                                                done=True)
-            else:
-                question_decoded = self.dataset.question_tokenizer.decode(kwargs["new_state"].text.numpy()[0],
-                                                                          ignored=["<SOS>"],
-                                                                          stop_at_end=True)
+    def reset(self):
+        self.features = []
+        self.spatials = []
+        self.encoded_question = []
+        self.segment_ids = []
+        self.input_mask = []
+        self.image_mask = []
+        self.co_attention_mask = []
+        self.targets = []
+        self.question_id = []
+        self.task_tokens = []
+        self.ep_questions_decoded = []
 
-                ref_questions = kwargs["ref_questions_decoded"][0]
-                score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                                step_idx=None,
-                                                done=True, state=kwargs["new_state"],
-                                                real_answer=kwargs["state"].answer.view(-1))
-            self.measure.append(score)
+    def process_batch(self):
+
+        vil_prediction, vil_prediction_gqa, vil_logit, vil_binary_prediction, vil_tri_prediction, vision_prediction, vision_logit, linguisic_prediction, linguisic_logit, _ = self.model(
+            torch.cat(self.encoded_question, dim=0),
+            torch.cat(self.features, dim=0),
+            torch.cat(self.spatials, dim=0),
+            torch.cat(self.segment_ids, dim=0),
+            torch.cat(self.input_mask, dim=0),
+            torch.cat(self.image_mask, dim=0),
+            torch.cat(self.co_attention_mask, dim=0),
+            torch.cat(self.task_tokens, dim=0),
+        )
+
+        if self.env.reduced_answers:
+            mask = torch.ones_like(vil_prediction) * float("-Inf")
+            mask[:, self.dataset.reduced_answers.squeeze().long()] = vil_prediction[:,
+                                                                     self.dataset.reduced_answers.squeeze().long()]
+            vil_prediction = mask
+        sorted_logits, sorted_indices = torch.sort(vil_prediction, descending=True)
+        targets = torch.cat(self.targets, dim=0)
+        masked_preds = (-vil_prediction * (targets != 0).int().float())
+        masked_preds[masked_preds == 0] = -float("Inf")
+        maxs_of_targets, argmaxs_of_targets = masked_preds.max(dim=1)
+        ranks = (argmaxs_of_targets.unsqueeze(dim=1) == sorted_indices).nonzero()[:, 1]
+        reward = compute_score_with_logits(vil_prediction, targets, device=self.device)
+        self.ranks.extend(ranks.tolist())
+        self.rewards.extend(reward.sum(dim=1).tolist())
 
     def compute_(self, **kwargs):
-        if len(self.measure) > 0:
-            self.metric.append(np.mean(self.measure))
+
+        (features,
+         spatials,
+         image_mask,
+         real_question,
+         target,
+         real_input_mask,
+         real_segment_ids,
+         co_attention_mask,
+         question_id) = self.dataset.get_data_for_ViLBERT(self.env.env_idx)
+
+        question_tokens = kwargs["state"].text.numpy().ravel()
+        question = self.dataset.question_tokenizer.decode(question_tokens)  #
+        encoded_question = self.dataset.reward_tokenizer.encode(question)
+        encoded_question = self.dataset.reward_tokenizer.add_special_tokens_single_sentence(encoded_question)
+
+        segment_ids, input_mask, encoded_question = self.dataset.get_masks_for_tokens(encoded_question)
+        segment_ids, input_mask, encoded_question = torch.tensor(segment_ids), torch.tensor(input_mask), torch.tensor(
+            encoded_question).view(-1)
+        task_tokens = encoded_question.new().resize_(encoded_question.size(0), 1).fill_(1)
+
+        self.features.append(features.unsqueeze(dim=0))
+        self.spatials.append(spatials.unsqueeze(dim=0))
+        self.encoded_question.append(encoded_question.unsqueeze(dim=0))
+        self.segment_ids.append(segment_ids.unsqueeze(dim=0))
+        self.input_mask.append(input_mask.unsqueeze(dim=0))
+        self.image_mask.append(image_mask.unsqueeze(dim=0))
+        self.co_attention_mask.append(co_attention_mask.unsqueeze(dim=0))
+        self.targets.append(target.unsqueeze(dim=0))
+        self.question_id.append(question_id)
+        self.task_tokens.append(task_tokens.unsqueeze(dim=0))
+        self.ep_questions_decoded.append(kwargs["ref_questions_decoded"])
+
+        if len(self.features) == self.batch_size:
+            self.process_batch()
+            self.reset()
+
+    def post_treatment(self, num_episodes):
+        if len(self.metric_history) > 0:
+            self.process_batch()
+            self.reset()
+        serie_ranks = pd.Series(self.ranks)
+        serie_rewards = pd.Series(self.rewards)
+        serie_recall_5 = (serie_ranks < 5).astype(int)
+
+        ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
+        serie_ranks.to_csv(ranks_out_file, index=False, header=False)
+        if self.type == "scalar":
+            self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5)}
+
+        ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
+        rewards_out_file = os.path.join(self.out_path, "metrics", self.name + "_rewards.csv")
+
+        serie_ranks.to_csv(ranks_out_file, index=False, header=False)
+        serie_rewards.to_csv(rewards_out_file, index=False, header=False)
 
 
-class OracleRecallMetric(OracleMetric):
-    '''Compute the oracle score over the ref answer and the generated dialog.'''
-
+class OracleClevr(Metric):
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "oracle_recall", "scalar", env_mode, trunc, sampling)
-        if agent.env.reward_type in ["vilbert_recall", "vqa_recall"]:
-            self.function = agent.env.reward_func
-        else:
-            if self.dataset.__class__ != CLEVR_Dataset:
-                self.function = rewards["vilbert_recall"](path="output/vilbert_vqav2/model.bin",
-                                                          vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
-                                                          env=agent.env)
-            else:
-                self.function = rewards["vqa_recall"](path="output/vqa_model_film/model.pt",
-                                                      vocab="data/closure_vocab.json",
-                                                      dataset=agent.env.dataset)
+        vocab = "data/closure_vocab.json"
+        path = "output/vqa_model_film/model.pt"
+        self.execution_engine, ee_kwargs = load_execution_engine(path)
+        self.execution_engine.to(self.device)
+        self.execution_engine.eval()
+        self.program_generator, pg_kwargs = load_program_generator(path)
+        self.program_generator.to(self.device)
+        self.program_generator.eval()
+        self.vocab = vocab
+        self.vocab_questions_vqa = get_vocab('question_token_to_idx', self.vocab)
+        # self.vocab_questions_vqa.update({"<pad>": 0, "<sos>": 1, "<eos>": 2})
+        self.trad_dict = {value: self.vocab_questions_vqa[key.lower()] for key, value in
+                          self.dataset.vocab_questions.items() if
+                          key.lower() in self.vocab_questions_vqa}
+        self.decoder_dict = {value: key for key, value in self.vocab_questions_vqa.items()}
+
+        self.reset()
+        self.batch_size = 30
+
+    def trad(self, input):
+        idx_vqa = [self.trad_dict[idx] for idx in input if idx in self.trad_dict]
+        idx_vqa.insert(0, 1)  # add SOS token.
+        idx_vqa.append(2)  # add EOS token.
+        return torch.tensor(idx_vqa).unsqueeze(dim=0).squeeze().to(self.device)
+
+    def decode(self, input):
+        return " ".join([self.decoder_dict[word] for word in input])
+
+    def fill_(self, **kwargs):
+        pass
+
+    def process_batch(self):
+        programs_pred = self.program_generator(pad_sequence(self.questions, batch_first=True))
+        scores = self.execution_engine(torch.cat(self.imgs), programs_pred)
+        sorted = torch.argsort(scores, descending=True)
+        ranks = torch.nonzero(sorted.cpu() == torch.cat(self.answers).view((sorted.size(0), -1)))
+        self.metric_history.extend(ranks[:, 1].tolist())
+
+    def reset(self):
+        self.questions = []
+        self.imgs = []
+        self.answers = []
+
+    def compute_(self, **kwargs):
+        self.questions.append(self.trad(kwargs["state"].text.squeeze().cpu().numpy()))
+        self.imgs.append(kwargs["state"].img.to(self.device))
+        self.answers.append(kwargs["ref_answer"].view(-1))
+
+        if len(self.questions) == self.batch_size:
+            self.process_batch()
+            self.reset()
+
+    def post_treatment(self, num_episodes):
+        if len(self.questions) != 0:
+            self.process_batch()
+            self.reset()
+        serie_ranks = pd.Series(self.metric_history)
+        serie_recall_5 = (serie_ranks < 5).astype(int)
+
+        ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
+        serie_ranks.to_csv(ranks_out_file, index=False, header=False)
+        if self.type == "scalar":
+            self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5)}
 
 
 class CiderMetric(Metric):
@@ -1032,7 +1186,8 @@ metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": Si
            "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore,
            "action_probs_truncated": ActionProbsTruncated,
            "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
-           "histogram_answers": HistogramOracle, "oracle": OracleMetric, "cider": CiderMetric, "meteor": MeteorMetric,
-           "kurtosis": KurtosisMetric, "oracle_recall": OracleRecallMetric, "peakiness": PeakinessMetric}
+           "histogram_answers": HistogramOracle, "cider": CiderMetric, "meteor": MeteorMetric,
+           "kurtosis": KurtosisMetric, "peakiness": PeakinessMetric,
+           "oracle": None}
 metrics_to_tensorboard = ["return", "size_valid_actions", "sum_probs_truncated", "lm_valid_actions", "ttr",
                           "action_probs_truncated", "valid_actions_episode", "ppl_dialog_lm", "ttr_question"]
