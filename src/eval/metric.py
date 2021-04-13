@@ -1105,8 +1105,7 @@ class OracleClevr(Metric):
             self.reset()
         serie_ranks = pd.Series(self.metric_history)
         serie_recall_5 = (serie_ranks < 5).astype(int)
-        serie_score = (serie_ranks ==0).astype(int)
-
+        serie_score = (serie_ranks == 0).astype(int)
 
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         serie_ranks.to_csv(ranks_out_file, index=False, header=False)
