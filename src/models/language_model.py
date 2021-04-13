@@ -32,7 +32,7 @@ class ClevrLanguageModel(LanguageModel):
                  tokenizer=None):
         LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer)
         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
-        self.pad_idx = self.dataset.vocab_questions["<PAD>"]
+        self.pad_idx = self.dataset.vocab_questions["<UNK>"]
 
     def forward(self, state_text, temperature=1):
         seq_len = state_text.size(1)
