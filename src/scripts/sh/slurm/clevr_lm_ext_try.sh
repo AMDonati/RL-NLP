@@ -3,11 +3,10 @@
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=2
 #SBATCH --gres=gpu:2
-#SBATCH --cpus-per-task=8
-#SBATCH --mem-per-cpu=8g
+#SBATCH --cpus-per-task=4
 #SBATCH --output=slurm_out/clevr/lmext-try-%j.out
 #SBATCH --error=slurm_out/clevr/lmext-try-%j.err
-#SBATCH --time=100:00:00
+#SBATCH --time=70:00:00
 
 export TMPDIR=$JOBSCRATCH
 module purge
