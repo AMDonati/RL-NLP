@@ -2,6 +2,7 @@ import heapq
 import logging
 import operator
 import os
+os.environ['TRANSFORMERS_CACHE'] = "/cache"
 
 import h5py
 import matplotlib.pyplot as plt
@@ -421,8 +422,8 @@ class LanguageScore(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
-        self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
+        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.questions = []
         self.batch_size = 1000

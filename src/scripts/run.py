@@ -1,12 +1,15 @@
 import argparse
 import datetime
-import os
 from collections import OrderedDict
 from configparser import ConfigParser
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
+from pytorch_transformers import BertTokenizer
+
+import os
+os.environ['TRANSFORMERS_CACHE'] = "/cache"
 
 from agent.ppo import PPO
 from agent.reinforce import REINFORCE
@@ -188,7 +191,7 @@ def get_parser():
                         default=["test_images"],
                         help="test metrics")
     parser.add_argument('-eval_modes', nargs='+', type=str,
-                        default=['sampling', 'greedy', 'sampling_ranking_lm'],
+                        default=['sampling', 'greedy'],
                         help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
@@ -219,11 +222,23 @@ def create_config_file(conf_file, args):
     with open(conf_file, 'w') as fp:
         config.write(fp)
 
+def get_hf_path():
+    if not os.path.isdir("cache/gpt-2"):
+        os.makedirs("cache/gpt-2")
+        model = AutoModelWithLMHead.from_pretrained("gpt2")
+        model.save_pretrained("cache/gpt-2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        tokenizer.save_pretrained("cache/gpt-2")
+    if not os.path.isdir("cache/bert"):
+        os.makedirs("cache/bert")
+        reward_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+        reward_tokenizer.save_pretrained("cache/bert")
 
 def get_pretrained_lm(args, env, device):
+    get_hf_path()
     if "gpt" == args.lm_path:
-        lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
+        tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
         pretrained_lm = GenericLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                              tokenizer=tokenizer, init_text=args.init_text,
                                              custom_init=args.custom_init, add_answers=args.add_answers, device=device)
@@ -454,8 +469,6 @@ def run(args):
     optimizer, scheduler = get_optimizer(policy, args)
     agent = get_agent(pretrained_lm=pretrained_lm, writer=writer, output_path=output_path, env=env, test_envs=test_envs,
                       policy=policy, optimizer=optimizer, args_=args)
-
-    eval_mode = ['sampling', 'greedy', 'sampling_ranking_lm']
 
     # start training
     if args.resume_training is not None:

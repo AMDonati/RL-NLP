@@ -1,5 +1,6 @@
 import logging
 import os
+os.environ['TRANSFORMERS_CACHE'] = "/cache"
 import random
 import time
 
