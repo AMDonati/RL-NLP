@@ -489,7 +489,7 @@ class ZeroReward(Reward):
         self.type = "episode"
 
     def get(self, question, ep_questions_decoded, step_idx, done=False, real_answer="", state=None):
-        return 0., "N/A"
+        return 0., "N/A", None
 
 
 rewards = {"cosine": Cosine, "levenshtein": Levenshtein_, "lv_norm": LevenshteinNorm, "vqa": VQAAnswer,
