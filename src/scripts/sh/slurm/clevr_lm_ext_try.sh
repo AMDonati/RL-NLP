@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=clevr-lmext-debug
-#SBATCH --qos=qos_gpu-t4
+#SBATCH --qos=qos_gpu-t3
 #SBATCH --ntasks=2
 #SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=4
 #SBATCH --output=slurm_out/clevr/lmext-try-%j.out
 #SBATCH --error=slurm_out/clevr/lmext-try-%j.err
-#SBATCH --time=70:00:00
+#SBATCH --time=20:00:00
 
 export TMPDIR=$JOBSCRATCH
 module purge
