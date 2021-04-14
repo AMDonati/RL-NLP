@@ -1,15 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=clevrsampleva20
+#SBATCH --job-name=clevr-sampleva20
 #SBATCH --qos=qos_gpu-t3
-#SBATCH -C v100-32g
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=8g
+#SBATCH --cpus-per-task=4
 #SBATCH --output=slurm_out/clevr/sampleva20-%j.out
 #SBATCH --error=slurm_out/clevr/sampleva20-%j.err
-#SBATCH --time=25:00:00
+#SBATCH --time=20:00:00
 
 export TMPDIR=$JOBSCRATCH
 module purge
