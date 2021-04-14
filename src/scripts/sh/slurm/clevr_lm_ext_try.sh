@@ -7,6 +7,7 @@
 #SBATCH --output=slurm_out/clevr/lmext-try-%j.out
 #SBATCH --error=slurm_out/clevr/lmext-try-%j.err
 #SBATCH --time=18:00:00
+#SBATCH --exclusive
 
 export TMPDIR=$JOBSCRATCH
 module purge
@@ -42,3 +43,4 @@ REWARD_VOCAB="data/closure_vocab.json"
 set -x
 srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 20 -debug $DEBUG -eval_modes "sampling" "greedy" "sampling_ranking_lm" &
 srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 30 -debug $DEBUG &
+wait
