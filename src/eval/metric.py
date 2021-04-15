@@ -2,6 +2,7 @@ import heapq
 import logging
 import operator
 import os
+
 os.environ['TRANSFORMERS_CACHE'] = "/cache"
 
 import h5py
@@ -391,9 +392,9 @@ class PPLDialogfromLM(Metric):
         Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
         self.min_data = agent.env.min_data
         self.device = agent.device
-        self.get_lm_model(agent)
+        self.get_lm_model()
 
-    def get_lm_model(self, agent):
+    def get_lm_model(self):
         if self.dataset.__class__ == CLEVR_Dataset:
             lm_model = torch.load("output/lm_model/model.pt", map_location=torch.device('cpu'))
         else:
@@ -403,7 +404,7 @@ class PPLDialogfromLM(Metric):
                 lm_model = torch.load("output/vqa_lm_model/model.pt", map_location=torch.device('cpu'))
         lm_model.eval()
         self.pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=self.dataset,
-                                                tokenizer=self.dataset.question_tokenizer, device=agent.device)
+                                                tokenizer=self.dataset.question_tokenizer, device=self.device)
 
     def fill_(self, **kwargs):
         with torch.no_grad():
@@ -415,6 +416,17 @@ class PPLDialogfromLM(Metric):
         if len(self.measure) > 0:
             ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
             self.metric.append(ppl)
+
+
+class PPLDialogfromLMExt(PPLDialogfromLM):
+    def __init__(self, agent, train_test, env_mode, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
+        self.min_data = agent.env.min_data
+        self.device = agent.device
+        self.lm_path = "output/lm_ext/model.pt"
+        self.lm_model = torch.load(self.lm_path, map_location=self.device)
+        self.pretrained_lm = ClevrLanguageModel(pretrained_lm=self.lm_model, dataset=self.dataset,
+                                                tokenizer=self.dataset.question_tokenizer, device=self.device)
 
 
 class LanguageScore(Metric):

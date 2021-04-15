@@ -9,6 +9,7 @@ from transformers import AutoModelWithLMHead, AutoTokenizer
 from pytorch_transformers import BertTokenizer
 
 import os
+
 os.environ['TRANSFORMERS_CACHE'] = "/cache"
 
 from agent.ppo import PPO
@@ -20,7 +21,7 @@ from utils.utils_train import create_logger
 from torch import optim
 from torch.optim import lr_scheduler
 import sys
-from eval.metric import metrics, OracleClevr, VilbertRecallMetric
+from eval.metric import metrics, OracleClevr, PPLDialogfromLMExt, VilbertRecallMetric
 from RL_toolbox.reward import rewards
 
 
@@ -222,6 +223,7 @@ def create_config_file(conf_file, args):
     with open(conf_file, 'w') as fp:
         config.write(fp)
 
+
 def get_hf_path():
     if not os.path.isdir("cache/gpt-2"):
         os.makedirs("cache/gpt-2")
@@ -233,6 +235,7 @@ def get_hf_path():
         os.makedirs("cache/bert")
         reward_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
         reward_tokenizer.save_pretrained("cache/bert")
+
 
 def get_pretrained_lm(args, env, device):
     get_hf_path()
@@ -378,6 +381,7 @@ def get_rl_env(args, device):
 
     if args.env == "clevr":
         metrics["oracle"] = OracleClevr
+        metrics["language_score"] = PPLDialogfromLMExt
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
