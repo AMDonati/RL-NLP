@@ -443,15 +443,12 @@ class LanguageScore(Metric):
     def fill_(self, **kwargs):
         pass
 
-    def process_batch(self):
-        inputs = self.tokenizer(self.questions, padding=True, truncation=True, return_tensors="pt")
-        logits = self.lm_model(inputs["input_ids"])[0]
-        scores = F.log_softmax(logits, dim=-1)  # (B, S, vocab size)
-        log_probs = torch.gather(scores, -1, inputs["input_ids"].unsqueeze(dim=-1))
-        log_probs = log_probs.squeeze() * inputs["attention_mask"]
-        lengths = inputs["attention_mask"].sum(dim=1)
-        ppl = torch.exp(-log_probs.sum(dim=1).view(-1) / lengths.view(-1))
-        return ppl.tolist()
+    def process_batch(self, questions):
+        inputs = self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt")
+        labels = inputs["input_ids"].clone()
+        labels[inputs["attention_mask"] == 0] = -100
+        outputs = self.lm_model(**inputs, labels=inputs["input_ids"])
+        return torch.exp(outputs["loss"]).view(-1).tolist()
 
     def reset(self):
         self.questions = []
@@ -461,13 +458,13 @@ class LanguageScore(Metric):
             state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text[:, 1:].cpu().numpy()[0])
             self.questions.append(state_decoded)
         if len(self.questions) == self.batch_size:
-            ppl = self.process_batch()
+            ppl = self.process_batch(self.questions)
             self.metric.extend(ppl)
             self.reset()
 
     def post_treatment(self, num_episodes):
         if len(self.questions) > 0:
-            ppl = self.process_batch()
+            ppl = self.process_batch(self.questions)
             self.metric_history.extend(ppl)
             self.reset()
         self.filter_reranking(num_episodes)
