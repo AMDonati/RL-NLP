@@ -393,23 +393,10 @@ class PPLDialogfromLM(Metric):
         Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
         self.min_data = agent.env.min_data
         self.device = agent.device
-        self.get_lm_model()
-
-    def get_lm_model(self):
-        if self.dataset.__class__ == CLEVR_Dataset:
-            lm_model = torch.load("output/lm_model/model.pt", map_location=torch.device('cpu'))
-        else:
-            if self.min_data:
-                lm_model = torch.load("output/vqa_lm_model_smallvocab/model.pt", map_location=torch.device('cpu'))
-            else:
-                lm_model = torch.load("output/vqa_lm_model/model.pt", map_location=torch.device('cpu'))
-        lm_model.eval()
-        self.pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=self.dataset,
-                                                tokenizer=self.dataset.question_tokenizer, device=self.device)
 
     def fill_(self, **kwargs):
         with torch.no_grad():
-            log_probas_lm, _, _ = self.pretrained_lm.forward(kwargs["state"].text.to(self.device), temperature=1)
+            log_probas_lm, _, _ = self.language_model.forward(kwargs["state"].text.to(self.device), temperature=1)
             log_probas_lm = log_probas_lm.cpu()
             self.measure.append(log_probas_lm[:, kwargs["action"]])
 
@@ -421,7 +408,7 @@ class PPLDialogfromLM(Metric):
 
 class PPLDialogfromLMExt(PPLDialogfromLM):
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
+        Metric.__init__(self, agent, train_test, "ppl_dialog_lm_ext", "scalar", env_mode, trunc, sampling)
         self.min_data = agent.env.min_data
         self.device = agent.device
         self.lm_path = "output/lm_ext/model.pt"
