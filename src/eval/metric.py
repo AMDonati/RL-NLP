@@ -24,13 +24,14 @@ from RL_toolbox.reward import rewards
 from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.language_model import ClevrLanguageModel
 from RL_toolbox.reward import get_vocab
+import nltk
 
 try:
     from vilbert.task_utils import compute_score_with_logits
     from vilbert.vilbert import VILBertForVLTasks, BertConfig
 except ImportError:
     print("VILBERT NOT IMPORTED!!")
-# nltk.download('wordnet')
+nltk.download('wordnet')
 try:
     from vr.utils import load_execution_engine, load_program_generator
 except ImportError:

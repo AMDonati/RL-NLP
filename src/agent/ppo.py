@@ -116,7 +116,7 @@ class PPO(Agent):
             entropy_loss = self.entropy_coeff * dist_entropy
 
             # adding KL_divergence term
-            if self.truncate_mode is not None and self.KL_coeff > 0:
+            if self.KL_coeff > 0:
                 # KL(LM(p) || pi (q)] = sum p * log (p/q)
                 KL_term = logprobs_lm.exp() * (logprobs_lm - policy_logprobs)
                 KL_div = KL_term.sum(-1)

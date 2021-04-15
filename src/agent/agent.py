@@ -98,7 +98,6 @@ class Agent:
             logger.info("-" * 100)
 
     def init_metrics(self):
-
         self.metrics = {}
         self.metrics["train"] = {
             key: metrics[key](self, train_test="train", env_mode="train", trunc="trunc",

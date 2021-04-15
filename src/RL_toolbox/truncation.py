@@ -39,6 +39,7 @@ class Truncation:
     def __init__(self, agent, pretrained_lm=None):
         self.language_model = pretrained_lm
         self.alpha_logits_lm = agent.alpha_logits_lm
+        self.KL_coeff = agent.KL_coeff
         self.dataset = agent.env.dataset
         self.device = agent.device
 
@@ -59,7 +60,7 @@ class NoTruncation(Truncation):
         Truncation.__init__(self, agent, pretrained_lm=kwargs["pretrained_lm"])
 
     def get_valid_actions(self, state, truncation, temperature):
-        if self.alpha_logits_lm > 0:
+        if self.alpha_logits_lm > 0 or self.KL_coeff > 0:
             with torch.no_grad():
                 log_probas_lm, logits_lm, origin_log_probs_lm = self.language_model.forward(state.text.to(self.device), temperature)
         else:
