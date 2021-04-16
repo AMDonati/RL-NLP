@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=clevr-pth0.1
 #SBATCH --qos=qos_gpu-t3
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --ntasks=4
-#SBATCH --gres=gpu:4
-#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/clevr/pth0.1-%j.out
 #SBATCH --error=slurm_out/clevr/pth0.1-%j.err

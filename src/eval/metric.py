@@ -41,7 +41,6 @@ SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
 
-
 def _strip(s):
     return s.strip()
 
