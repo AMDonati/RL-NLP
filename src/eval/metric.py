@@ -31,7 +31,7 @@ try:
     from vilbert.vilbert import VILBertForVLTasks, BertConfig
 except ImportError:
     print("VILBERT NOT IMPORTED!!")
-nltk.download('wordnet')
+#nltk.download('wordnet')
 try:
     from vr.utils import load_execution_engine, load_program_generator
 except ImportError:
