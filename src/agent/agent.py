@@ -9,6 +9,7 @@ import torch
 import pandas as pd
 
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
+from data_provider.CLEVR_Dataset import CLEVR_Dataset
 
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
@@ -112,10 +113,16 @@ class Agent:
                                         key in metrics}
 
     def get_score_metric(self, metrics):
-        if self.truncation.language_model.__class__ == ClevrLanguageModel:
-            score_metric = metrics["ppl_dialog_lm"]
-        else:
-            score_metric = metrics["language_score"]
+        # if self.truncation.language_model.__class__ == ClevrLanguageModel:
+        #     if self.env.dataset.__class__ == CLEVR_Dataset:
+        #         if self.truncation.language_model.lm_path == "output/lm_model/model.pt":
+        #             score_metric = metrics["ppl_dialog_lm"]
+        #         elif self.truncation.language_model.lm_path == "output/lm_ext/model.pt":
+        #             score_metric = metrics["ppl_dialog_lm_ext"]
+        #     else:
+        #         score_metric = metrics["ppl_dialog_lm"]
+        # else:
+        score_metric = metrics["language_score"]
         return score_metric
 
     def get_metrics(self, mode, trunc, sampling_mode):

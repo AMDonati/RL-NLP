@@ -5,7 +5,7 @@ import numpy as np
 
 class LanguageModel:
     def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-                 tokenizer=None, prefix_tokenizer=""):
+                 tokenizer=None, prefix_tokenizer="", lm_path=None):
         self.device = device
         self.tokenizer = tokenizer
         self.language_model = pretrained_lm.to(self.device)
@@ -16,6 +16,7 @@ class LanguageModel:
         # len(self.tokenizer.encode(text=prefix_tokenizer + key)) == 1}
         self.init_text = None
         self.init_text_short = None
+        self.lm_path = lm_path
 
     def forward(self, state):
         pass
@@ -29,8 +30,8 @@ class LanguageModel:
 
 class ClevrLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-                 tokenizer=None):
-        LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer)
+                 tokenizer=None, lm_path=None):
+        LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer, lm_path=lm_path)
         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
         self.pad_idx = self.dataset.vocab_questions["<UNK>"]
 
@@ -47,9 +48,9 @@ class ClevrLanguageModel(LanguageModel):
 
 class GenericLanguageModel(LanguageModel):
     def __init__(self, pretrained_lm, dataset, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-                 tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0):
+                 tokenizer=None, prefix_tokenizer=" ", init_text=None, custom_init=0, add_answers=0, lm_path=None):
         LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer,
-                               prefix_tokenizer=prefix_tokenizer)
+                               prefix_tokenizer=prefix_tokenizer, lm_path=lm_path)
         self.tokenizer = tokenizer
         self.name = "generic"
         self.dataset_to_lm_trad = {value: self.tokenizer.encoder[key] for

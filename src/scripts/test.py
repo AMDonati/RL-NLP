@@ -14,7 +14,9 @@ def get_parser():
     parser.add_argument("-test_metrics", nargs='+', type=str,
                         default=None, help="test metrics")
     parser.add_argument("-test_modes", nargs='+', type=str,
-                        default=None, help="test metrics")
+                        default=None, help="test modes")
+    parser.add_argument("-eval_modes", nargs='+', type=str,
+                        default=None, help="test generation modes")
     return parser
 
 
@@ -55,8 +57,11 @@ def eval(args):
             if args.test_metrics is not None:
                 defaults["test_metrics"] = args.test_metrics
 
-            if "test_modes" in defaults.keys()and args.test_modes is not None:
+            if "test_modes" in defaults.keys() and args.test_modes is not None:
                 defaults["test_modes"] = args.test_modes
+
+            if "eval_modes" in defaults.keys() and args.eval_modes is not None:
+                defaults["eval_modes"] = args.eval_modes
 
             if "temp_factor" in defaults.keys():
                 if "inv_schedule_step" in defaults.keys():

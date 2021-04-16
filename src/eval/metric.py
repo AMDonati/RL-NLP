@@ -349,43 +349,6 @@ class DialogImageMetric(Metric):
         f.close()
 
 
-class PPLMetric(Metric):
-    """
-    Compute the ppl of the learning policy on the ref questions.
-    https://towardsdatascience.com/perplexity-in-language-models-87a196019a94
-    """
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "ppl", "scalar", env_mode, trunc, sampling)
-        self.agent = agent
-
-    def get_stats(self, serie):
-        return [serie.median(), serie.std(), serie.size]
-
-    def fill_(self, **kwargs):
-        if kwargs["done"]:
-            with torch.no_grad():
-                state = kwargs["state"]
-                sos = torch.tensor([self.dataset.question_tokenizer.vocab["<SOS>"]])
-                ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0]
-                # getting the probs for the complete policy
-                ref_question = torch.cat((sos, ref_question), dim=-1).unsqueeze(dim=0)
-                ht, ct = self.agent.init_hidden(state)
-                for i, action in enumerate(ref_question[:, 1:].view(-1)):
-                    forced_state = state.__class__(ref_question[:, :i + 1], state.img, state.answer)
-
-                    real_action, log_probs, _, _, dist, _, _, _, ht, ct = self.agent.act(
-                        state=forced_state,
-                        mode="forced",
-                        truncation=True,
-                        forced=action, ht=ht, ct=ct)
-                    self.measure.append(log_probs)
-
-    def compute_(self, **kwargs):
-        ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-        self.metric.append(ppl)
-
-
 class PPLDialogfromLM(Metric):
     '''Computes the PPL of the Language Model over the generated dialog'''
 
@@ -393,10 +356,23 @@ class PPLDialogfromLM(Metric):
         Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
         self.min_data = agent.env.min_data
         self.device = agent.device
+        self.get_lm_model(agent)
+
+    def get_lm_model(self, agent):
+        if self.dataset.__class__ == CLEVR_Dataset:
+            lm_model = torch.load("output/lm_model/model.pt", map_location=torch.device('cpu'))
+        else:
+            if self.min_data:
+                lm_model = torch.load("output/vqa_lm_model_smallvocab/model.pt", map_location=torch.device('cpu'))
+            else:
+                lm_model = torch.load("output/vqa_lm_model/model.pt", map_location=torch.device('cpu'))
+        lm_model.eval()
+        self.pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=self.dataset,
+                                                tokenizer=self.dataset.question_tokenizer, device=agent.device)
 
     def fill_(self, **kwargs):
         with torch.no_grad():
-            log_probas_lm, _, _ = self.language_model.forward(kwargs["state"].text.to(self.device), temperature=1)
+            log_probas_lm, _, _ = self.pretrained_lm.forward(kwargs["state"].text.to(self.device), temperature=1)
             log_probas_lm = log_probas_lm.cpu()
             self.measure.append(log_probas_lm[:, kwargs["action"]])
 
@@ -586,151 +562,6 @@ class HistogramOracle(Metric):
         plt.savefig(self.out_png_file)
 
 
-class LvNormMetric(Metric):
-    '''Compute the levenshtein over the ref questions and the generated dialog.'''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "lv_norm", "scalar", env_mode, trunc, sampling)
-        self.function = rewards["lv_norm"]()
-
-    def fill_(self, **kwargs):
-        if kwargs["done"]:
-            question_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
-                                                                      ignored=["<SOS>"],
-                                                                      stop_at_end=True)
-            ref_questions = kwargs["ref_questions_decoded"]
-            score, _, _ = self.function.get(ep_questions_decoded=ref_questions, question=question_decoded,
-                                            step_idx=kwargs["timestep"], done=True)
-            self.measure.append(score)
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-
-
-# ------------------------ DIVERSITY METRICS -------------------------------------------------------------------------------------------------------------------
-
-class RefQuestionsMetric(Metric):
-    '''
-    Compute the ratio of Unique closest questions on all the set of questions generated for the same image.
-    '''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "ratio_closest_questions", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        if kwargs["done"]:
-            self.measure.append(kwargs["closest_question"])
-
-    def compute_(self, **kwargs):
-        unique_ratio = len(list(set(self.measure))) / len(self.measure)
-        self.measure.append(unique_ratio)
-
-    def compute(self, **kwargs):
-        self.compute_(**kwargs)
-        self.idx_word = 0
-        self.idx_step = 0
-
-    def write(self):
-        pass
-
-
-class TTRQuestionMetric(Metric):
-    '''
-    Compute the token-to-token ratio for each question (useful to measure language drift).
-    '''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "ttr_question", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        if kwargs["done"]:
-            self.measure = kwargs["new_state"].text.numpy()[0]
-
-    def compute_(self, **kwargs):
-        diversity_metric = len(set(list(self.measure))) / len(self.measure)
-        self.metric.append(diversity_metric)
-
-
-class TrueWordRankOriginLM(Metric):
-    """
-    Compute the rank of the true word in the original lm logits
-    """
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
-        if kwargs["origin_log_probs_lm"] is not None and true_action != 0:
-            true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
-            sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
-            rank = int(torch.nonzero(indices.squeeze().cpu() == true_lm_action).squeeze().numpy())
-            self.measure.append(rank)
-
-    def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
-
-
-class TrueWordRankLM(Metric):
-    """
-    Compute the rank of the target word in the lm logits
-    """
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
-        if kwargs["log_probas_lm"] is not None and true_action != 0:
-            sorted, indices = torch.sort(kwargs["log_probas_lm"].squeeze(), descending=True)
-            rank = int(torch.nonzero(indices.squeeze().cpu() == true_action).squeeze().numpy())
-            self.measure.append(rank)
-
-    def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
-
-
-class ActionRankLM(Metric):
-    """
-    Compute the rank of the action taken in the original lm logits
-    """
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "true_word_rank", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
-        if kwargs["origin_log_probs_lm"] is not None and true_action != 0:
-            true_action = kwargs["action"].cpu().numpy().item()
-            true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
-            sorted, indices = torch.sort(kwargs["origin_log_probs_lm"][:, -1, :], descending=True)
-            rank = int(torch.nonzero(indices.squeeze().cpu() == true_lm_action).squeeze().numpy())
-            self.measure.append(rank)
-
-    def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
-
-
-class TrueWordProbLM(Metric):
-    """
-    Compute the probability of the true word in the original lm logits
-    """
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "true_word_prob", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
-        if kwargs["origin_log_probs_lm"] is not None and true_action != 0:
-            true_action = kwargs["ref_question"].view(-1)[kwargs["timestep"]].cpu().numpy().item()
-            true_lm_action = self.language_model.dataset_to_lm_trad[true_action]
-            prob = kwargs["origin_log_probs_lm"][:, -1, true_lm_action].exp().cpu().numpy()[0]
-            self.measure.append(prob)
-
-    def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
-
-
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
 
@@ -749,174 +580,6 @@ class UniqueWordsMetric(Metric):
             unique_tokens = np.unique(arr)
             diversity_metric = len(unique_tokens) / len(arr) if len(arr) > 0 else 0
             self.metric.append(diversity_metric)
-
-
-# --------------------------------------- OLD METRICS ----------------------------------------------------------------------------------------------------
-
-class PolicyMetric(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "policy", "text", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        # compute top_k_words from the Policy:
-        with torch.no_grad():
-            state_decoded = self.dataset.question_tokenizer.decode(tex=kwargs["state"].text.numpy()[0],
-                                                                   ignored=[])
-            top_k_weights, top_k_indices = torch.topk(kwargs["dist"].probs, 5, sorted=True)
-            top_words_decoded = self.question_tokenizer.decode(tex=top_k_indices.cpu().numpy()[0])
-            # get top_words from the language model:
-            seq_len = kwargs["state"].text.size(1)
-            log_probas, _ = self.language_model.forward(kwargs["state"].text.to(self.agent.device))
-            log_probas = log_probas.view(len(kwargs["state"].text), seq_len, -1)
-            _, top_k_indices_lm = torch.topk(log_probas[:, -1, :], 10, sorted=True)
-            top_k_indices, top_k_weights, top_k_indices_lm = top_k_indices.squeeze(), top_k_weights.squeeze(), top_k_indices_lm.squeeze()
-            in_top_k_words_lm = []
-            for i in top_k_indices:
-                if i in top_k_indices_lm:
-                    in_top_k_words_lm.append("Y")
-                else:
-                    in_top_k_words_lm.append("N")
-            weights_words = ["{}/{:.3f}/{}".format(word, weight, top_k_lm, number=3) for word, weight, top_k_lm in
-                             zip(top_words_decoded.split(), top_k_weights.cpu().detach().numpy(), in_top_k_words_lm)]
-            self.measure.append("next possible words for {} : {}".format(state_decoded, ", ".join(weights_words)))
-
-    def compute_(self, **kwargs):
-        self.metric = self.measure
-
-    def write(self):
-        pass
-
-    def log(self, **kwargs):
-        logger.info('---------------------Policy Top Words------------------------------')
-        logger.info('\n'.join(self.metric))
-        logger.info('--------------------------------------------------------------------')
-
-
-class ValidActionsMetric(Metric):
-    """Look at the mismatch ref question / valid action space per episode."""
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "valid_actions_episode", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        if kwargs["valid_actions"] is not None:
-            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0].cpu()
-            if len(ref_question) > self.idx_word:
-                if ref_question[self.idx_word] not in kwargs["valid_actions"].cpu():
-                    self.measure.append(0)
-                else:
-                    self.measure.append(1)
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.sum(self.measure) / len(self.measure))
-
-
-class LMVAMetric(Metric):
-    '''Monitor the mismatch between the valid actions space and the ref questions.'''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "lm_valid_actions", "scalar", env_mode, trunc, sampling)
-        self.counter = 0
-
-    def fill_(self, **kwargs):
-        if kwargs["valid_actions"] is not None:
-            ref_question = kwargs["ref_question"][kwargs["ref_question"] != 0].cpu()
-            if len(ref_question) > self.idx_word:
-                if ref_question[self.idx_word] not in kwargs["valid_actions"].cpu():
-                    self.counter += 1
-
-    def compute_(self, **kwargs):
-        self.metric = [self.counter]
-
-
-class PoliciesRatioMetric(Metric):
-    '''to monitor the discrepancy between the truncated policy (used for action selection) and the learned policy'''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "policies_discrepancy", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        ratios = np.exp(
-            kwargs["log_probs"].detach().cpu().numpy() - kwargs["log_probs_truncated"].detach().cpu().numpy())
-        self.measure.append(ratios)
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-
-
-class LMPolicyProbsRatio(Metric):
-    '''to monitor the difference between the proba given by the lm for the words choosen and the probas given by the policy.'''
-
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "lm_policy_probs_ratio", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        if kwargs["valid_actions"] is not None:
-            lm_log_probs = kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]].detach().cpu().numpy()
-            ratios = np.exp(lm_log_probs - kwargs["log_probs"].detach().cpu().numpy())
-        else:
-            ratios = 0
-        self.measure.append(ratios)
-
-    def compute_(self, **kwargs):
-        self.metric.append(np.mean(self.measure))
-
-
-class ActionProbs(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "action_probs", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        self.measure.append(kwargs["log_probs"])
-
-    def compute_(self, **kwargs):
-        ep_log_probs = torch.stack(self.measure).clone().detach()
-        self.ep_probs = np.round(np.exp(ep_log_probs.cpu().squeeze().numpy()), decimals=5)
-        self.metric.append(np.mean(self.ep_probs))
-
-    def log(self, **kwargs):
-        logger.info('episode action probs: {}'.format(self.ep_probs))
-
-
-class ActionProbsTruncated(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "action_probs_truncated", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        action_decoded = self.dataset.question_tokenizer.decode(kwargs["action"].cpu().numpy())
-        self.measure.append([kwargs["log_probs_truncated"], action_decoded])
-
-    def compute_(self, **kwargs):
-        self.ep_probs_truncated = {}
-        logprobs = [i[0] for i in self.measure]
-        ep_log_probs_truncated = torch.stack(logprobs).clone().detach()
-        self.ep_probs_truncated["actions"] = [i[1] for i in self.measure]
-        self.ep_probs_truncated["probs"] = np.round(np.exp(ep_log_probs_truncated.cpu().view(-1).numpy()), decimals=5)
-        self.metric.append(np.mean(self.ep_probs_truncated["probs"]))
-
-    def log(self, **kwargs):
-        log_info = ["{}/{:.3f}".format(word, weight, number=3) for word, weight in
-                    zip(self.ep_probs_truncated["actions"], self.ep_probs_truncated["probs"])]
-        logger.info('episode action probs truncated: {}'.format(log_info))
-
-
-class LMActionProbs(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "action_probs_lm", "scalar", env_mode, trunc, sampling)
-
-    def fill_(self, **kwargs):
-        if kwargs["action"] in kwargs["valid_actions"]:
-            self.measure.append(kwargs["actions_probs"][kwargs["valid_actions"] == kwargs["action"]])
-        else:
-            self.measure.append(torch.tensor([0.]).to(self.agent.device))
-
-    def compute_(self, **kwargs):
-        lm_probs = torch.stack(self.measure).cpu().clone().detach()
-        self.ep_lm_probs = np.round(lm_probs.cpu().squeeze().numpy(), decimals=5)
-        self.metric.append(np.mean(self.ep_lm_probs))
-
-    def log(self, **kwargs):
-        logger.info('episode action probs from the LANGUAGE MODEL: {}'.format(self.ep_lm_probs))
 
 
 class VilbertRecallMetric(Metric):
@@ -1178,12 +841,10 @@ class PeakinessMetric(Metric):
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,
            "dialog": DialogMetric, "dialogimage": DialogImageMetric,
-           "ppl": PPLMetric, "ppl_dialog_lm": PPLDialogfromLM, "bleu": BleuMetric,
-           "ttr_question": TTRQuestionMetric, "sum_probs": SumProbsOverTruncated, "true_word_rank": TrueWordRankLM,
-           "true_word_prob": TrueWordProbLM, "lv_norm": LvNormMetric, "ttr": UniqueWordsMetric,
-           "selfbleu": SelfBleuImageMetric, "language_score": LanguageScore,
-           "action_probs_truncated": ActionProbsTruncated,
-           "lm_valid_actions": LMVAMetric, "valid_actions_episode": ValidActionsMetric,
+           "ppl_dialog_lm": PPLDialogfromLM, "ppl_dialog_lmext": PPLDialogfromLMExt, "bleu": BleuMetric,
+           "sum_probs": SumProbsOverTruncated,
+           "ttr": UniqueWordsMetric,
+           "selfbleu": SelfBleuImageMetric, "language_score": None,
            "histogram_answers": HistogramOracle, "cider": CiderMetric, "meteor": MeteorMetric,
            "kurtosis": KurtosisMetric, "peakiness": PeakinessMetric,
            "oracle": None}

@@ -21,7 +21,7 @@ from utils.utils_train import create_logger
 from torch import optim
 from torch.optim import lr_scheduler
 import sys
-from eval.metric import metrics, OracleClevr, PPLDialogfromLMExt, VilbertRecallMetric
+from eval.metric import metrics, OracleClevr, PPLDialogfromLMExt, VilbertRecallMetric, LanguageScore
 from RL_toolbox.reward import rewards
 
 
@@ -111,7 +111,6 @@ def get_parser():
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
     parser.add_argument('-test_reward_zero', type=int, default=1, help="type of reward function for test")
-
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument("-params_reward", type=int, default=10, help="params reward")
@@ -249,7 +248,7 @@ def get_pretrained_lm(args, env, device):
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
         pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
-                                           tokenizer=env.dataset.question_tokenizer, device=device)
+                                           tokenizer=env.dataset.question_tokenizer, device=device, lm_path=args.lm_path)
     return pretrained_lm
 
 
@@ -377,7 +376,7 @@ def log_hparams(logger, args):
 
 def get_rl_env(args, device):
     # upload env.
-    test_reward = "zero" if args.test_reward_zero else args.params_reward
+    test_reward = "zero" if args.test_reward_zero else args.reward
 
     if args.env == "clevr":
         metrics["oracle"] = OracleClevr
@@ -394,7 +393,7 @@ def get_rl_env(args, device):
                      for mode in test_modes]
     elif args.env == "vqa":
         metrics["oracle"] = VilbertRecallMetric
-
+        metrics["language_score"] = LanguageScore
         env = VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
                      reward_type=args.reward, mode="train", max_seq_length=23, debug=args.debug,
                      diff_reward=args.diff_reward, reward_path=args.reward_path,
