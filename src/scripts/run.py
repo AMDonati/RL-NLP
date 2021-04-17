@@ -191,7 +191,7 @@ def get_parser():
                         default=["test_images"],
                         help="test metrics")
     parser.add_argument('-eval_modes', nargs='+', type=str,
-                        default=['sampling', 'greedy'],
+                        default=['sampling', 'greedy', 'sampling_ranking_lm'],
                         help="test metrics")
     # misc.
     parser.add_argument('-logger_level', type=str, default="INFO", help="level of logger")
