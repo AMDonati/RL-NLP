@@ -35,7 +35,6 @@ def merge_one_experiment(args):
             all = pd.concat([merged_with_trunc, merged_no_trunc], axis=1, keys=["with_trunc", "no_trunc"])
             all = all.transpose()
             all.to_csv(os.path.join(dir_conf, "merged_metrics.csv"))
-            print("ok")
 
 
 def merge_all_experiments(args):
@@ -58,6 +57,7 @@ def merge_all_experiments(args):
     df_no_trunc.to_csv(os.path.join(args.path, "merged_no_trunc.csv"))
     df_with_trunc.to_latex(os.path.join(args.path, "merged_with_trunc.txt"))
     df_no_trunc.to_latex(os.path.join(args.path, "merged_with_trunc.txt"))
+    print(f"Saved in {args.path}")
 
 
 if __name__ == '__main__':
