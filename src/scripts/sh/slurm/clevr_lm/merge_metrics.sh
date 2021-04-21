@@ -20,5 +20,5 @@ export PYTHONPATH=src:${PYTHONPATH}
 PATH="output/RL/CLEVR_lm/FINAL_EXP"
 
 set -x
-srun python -u merge_metrics.py -path $PATH
+srun python -u src/merge_metrics.py -path $PATH
 #wait
