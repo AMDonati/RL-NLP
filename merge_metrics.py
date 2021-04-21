@@ -11,6 +11,9 @@ def get_parser():
                         default=['action_probs_truncated', 'bleu', 'lv_norm', 'ppl', 'ppl_dialog_lm',
                                  'return', 'selfbleu', 'size_valid_actions', 'sum_probs', 'ttr_question',
                                  'vilbert', 'ttr'], help="")
+    parser.add_argument('-bottom_folder', type=int, default=1)
+    parser.add_argument('-top_folder', type=int, default=1)
+
     return parser
 
 
@@ -25,14 +28,24 @@ def merge_one_experiment(args):
             all_metrics_path = os.path.join(dir_experiment, "all_metrics.csv")
             if os.path.exists(all_metrics_path):
                 df_exp = pd.read_csv(all_metrics_path, index_col=0)
-                df_with_trunc = df_with_trunc.append(df_exp["with_trunc"].to_dict(), ignore_index=True)
-                df_no_trunc = df_no_trunc.append(df_exp["no_trunc"].to_dict(), ignore_index=True)
+                if "with_trunc" in df_exp.columns:
+                    df_with_trunc = df_with_trunc.append(df_exp["with_trunc"].to_dict(), ignore_index=True)
+                if "no_trunc" in df_exp.columns:
+                    df_no_trunc = df_no_trunc.append(df_exp["no_trunc"].to_dict(), ignore_index=True)
 
-        if not df_with_trunc.empty and not df_with_trunc.empty:
-            str_mean_std = lambda x: str(round(x.mean(), 2)) + "+-" + str(round(x.std(), 2))
+        str_mean_std = lambda x: str(round(x.mean(), 2)) + "+-" + str(round(x.std(), 2))
+        keys = []
+        concat_truncs = []
+        if not df_with_trunc.empty:
             merged_with_trunc = df_with_trunc.apply(str_mean_std)
+            concat_truncs.append(merged_with_trunc)
+            keys.append("with_trunc")
+        if not df_no_trunc.empty:
             merged_no_trunc = df_no_trunc.apply(str_mean_std)
-            all = pd.concat([merged_with_trunc, merged_no_trunc], axis=1, keys=["with_trunc", "no_trunc"])
+            keys.append("no_trunc")
+            concat_truncs.append(merged_no_trunc)
+        if concat_truncs:
+            all = pd.concat(concat_truncs, axis=1, keys=keys)
             all = all.transpose()
             all.to_csv(os.path.join(dir_conf, "merged_metrics.csv"))
 
@@ -56,12 +69,14 @@ def merge_all_experiments(args):
     df_with_trunc.to_csv(os.path.join(args.path, "merged_with_trunc.csv"))
     df_no_trunc.to_csv(os.path.join(args.path, "merged_no_trunc.csv"))
     df_with_trunc.to_latex(os.path.join(args.path, "merged_with_trunc.txt"))
-    df_no_trunc.to_latex(os.path.join(args.path, "merged_with_trunc.txt"))
+    df_no_trunc.to_latex(os.path.join(args.path, "merged_no_trunc.txt"))
     print(f"Saved in {args.path}")
 
 
 if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
-    merge_one_experiment(args)
-    merge_all_experiments(args)
+    if args.bottom_folder == 1:
+        merge_one_experiment(args)
+    if args.top_folder == 1:
+        merge_all_experiments(args)
