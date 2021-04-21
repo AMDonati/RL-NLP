@@ -130,7 +130,7 @@ class Metric:
         pass
 
     def filter_reranking(self, num_episodes, idxs_to_select):
-        if len(self.idxs_to_select) > 0 and self.sampling == "sampling_ranking_lm" and len(
+        if idxs_to_select is not None and self.sampling == "sampling_ranking_lm" and len(
                 self.metric_history) == num_episodes * 10:
             self.metric_history = np.array(self.metric_history)
             self.metric_history = list(self.metric_history[idxs_to_select])
@@ -385,6 +385,11 @@ class PPLDialogfromLM(Metric):
         ppls = self.get_ppl(inputs=kwargs["state"].text.clone())
         self.metric.extend(ppls)
 
+    def get_min_ppl_idxs(self, num_diversity):
+        ppls = torch.tensor(self.metric_history).view(-1, num_diversity)
+        idx_to_keep = torch.argmin(ppls, dim=1).tolist()
+        return idx_to_keep
+
 
 class PPLDialogfromLMExt(PPLDialogfromLM):
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
@@ -437,6 +442,15 @@ class LanguageScore(Metric):
             ppl = self.process_batch(self.questions)
             self.metric.extend(ppl)
             self.reset()
+
+    def get_min_ppl_idxs(self, num_diversity):
+        if len(self.questions) > 0:
+            ppl = self.process_batch(self.questions)
+            self.metric_history.extend(ppl)
+            self.reset()
+        ppls = torch.tensor(self.metric_history).view(-1, num_diversity)
+        idx_to_keep = torch.argmin(ppls, dim=1).tolist()
+        return idx_to_keep
 
     def post_treatment(self, num_episodes, idx_to_keep=None):
         if len(self.questions) > 0:

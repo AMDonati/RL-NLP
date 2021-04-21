@@ -329,13 +329,9 @@ class Agent:
             idx_to_keep = None
             if test_mode == "sampling_ranking_lm":
                 language_score = metrics["language_score"]
-                language_score.post_treatment(num_episodes=num_episodes)
-                ppls = torch.tensor(language_score.metric_history).view(-1, num_diversity)
-                idx_to_keep = torch.argmin(ppls, dim=1).tolist()
-
+                idx_to_keep = language_score.get_min_ppl_idxs(num_diversity)
             for key_metric, metric in metrics.items():
-                if key_metric != "language_score":
-                    metric.post_treatment(num_episodes=num_episodes, idx_to_keep=idx_to_keep)
+                metric.post_treatment(num_episodes=num_episodes, idx_to_keep=idx_to_keep)
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logger.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)
