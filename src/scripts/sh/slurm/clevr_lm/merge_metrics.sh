@@ -17,8 +17,8 @@ conda activate rl-nlp-2
 
 export PYTHONPATH=src:${PYTHONPATH}
 
-PATH="output/RL/CLEVR_lm/FINAL_EXP"
+OUT_PATH="output/RL/CLEVR_lm/FINAL_EXP"
 
 set -x
-srun python -u src/merge_metrics.py -path $PATH
+srun python -u src/merge_metrics.py -path $OUT_PATH
 #wait
