@@ -13,6 +13,7 @@ def get_parser():
                                  'vilbert', 'ttr'], help="")
     parser.add_argument('-bottom_folder', type=int, default=1)
     parser.add_argument('-top_folder', type=int, default=1)
+    parser.add_argument('-precision', type=int, default=4)
 
     return parser
 
@@ -33,7 +34,7 @@ def merge_one_experiment(args):
                 if "no_trunc" in df_exp.columns:
                     df_no_trunc = df_no_trunc.append(df_exp["no_trunc"].to_dict(), ignore_index=True)
 
-        str_mean_std = lambda x: str(round(x.mean(), 4)) + "+-" + str(round(x.std(), 2))
+        str_mean_std = lambda x: str(round(x.mean(), args.precision)) + "+-" + str(round(x.std(), 2))
         keys = []
         concat_truncs = []
         if not df_with_trunc.empty:
