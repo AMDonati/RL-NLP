@@ -1,5 +1,6 @@
 import logging
 import os
+
 os.environ['TRANSFORMERS_CACHE'] = "/cache"
 import random
 import time
@@ -318,28 +319,19 @@ class Agent:
                             timestep=timestep, i_episode=i_episode, env=env, seed=seed, train=False,
                             test_mode=test_mode_episode[test_mode],
                             truncation=trunc, metrics=metrics, idx_diversity=i, num_diversity=num_diversity)
-                        if state.text.size(-1) <= 1:
-                            idx_to_select = False
-                        else:
-                            ppl_state_lm = self.get_score_metric(metrics).metric[-1]
-                            if i >= 1:
-                                if ppl_state_lm <= min_ppl:
-                                    idx_to_select = True
-                                    min_ppl = ppl_state_lm
-                                else:
-                                    idx_to_select = False
-                            else:
-                                idx_to_select = True
-                                min_ppl = ppl_state_lm
                     for _, metric in metrics.items():
-                        metric.write(idx_to_select)
+                        metric.write()
                         metric.log(valid_actions=valid_actions)
                 for _, metric in metrics.items():
                     metric.write_div()
         for key_trunc in self.eval_trunc.keys():
             metrics = self.get_metrics(env.mode, key_trunc, test_mode)
-            for _, metric in metrics.items():
-                metric.post_treatment(num_episodes=num_episodes)
+            idx_to_keep = None
+            if test_mode == "sampling_ranking_lm":
+                language_score = metrics["language_score"]
+                idx_to_keep = language_score.get_min_ppl_idxs(num_diversity)
+            for key_metric, metric in metrics.items():
+                metric.post_treatment(num_episodes=num_episodes, idx_to_keep=idx_to_keep)
 
     def log_at_train(self, i_episode, ep_reward, state, closest_question, valid_actions):
         logger.info('-' * 20 + 'Episode {} - Img  {}'.format(i_episode, self.env.img_idx) + '-' * 20)

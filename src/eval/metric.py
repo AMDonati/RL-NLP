@@ -31,7 +31,7 @@ try:
     from vilbert.vilbert import VILBertForVLTasks, BertConfig
 except ImportError:
     print("VILBERT NOT IMPORTED!!")
-#nltk.download('wordnet')
+# nltk.download('wordnet')
 try:
     from vr.utils import load_execution_engine, load_program_generator
 except ImportError:
@@ -40,6 +40,7 @@ except ImportError:
 SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
 
 logger = logging.getLogger()
+
 
 def _strip(s):
     return s.strip()
@@ -115,8 +116,6 @@ class Metric:
                                 np.max(self.metric_diversity), np.min(self.metric_diversity)]
             self.metric_diversity_history.append(metric_diversity)
             self.metric_diversity = []
-        if self.idx_to_select is not None and self.sampling == "sampling_ranking_lm":
-            self.idxs_to_select.append(self.idx_to_select)
 
     def log(self, **kwargs):
         pass
@@ -130,11 +129,11 @@ class Metric:
     def post_treatment_(self):
         pass
 
-    def filter_reranking(self, num_episodes):
-        if len(self.idxs_to_select) > 0 and self.sampling == "sampling_ranking_lm" and len(
+    def filter_reranking(self, num_episodes, idxs_to_select):
+        if idxs_to_select is not None and self.sampling == "sampling_ranking_lm" and len(
                 self.metric_history) == num_episodes * 10:
             self.metric_history = np.array(self.metric_history)
-            self.metric_history = list(self.metric_history[self.idxs_to_select])
+            self.metric_history = list(self.metric_history[idxs_to_select])
 
     def save_series_and_stats(self):
         serie = pd.Series(self.metric_history)
@@ -147,8 +146,8 @@ class Metric:
                 df.to_csv(self.out_div_csv_file)
                 self.stats_div = {self.key: self.get_stats_div(df)}
 
-    def post_treatment(self, num_episodes):
-        self.filter_reranking(num_episodes)
+    def post_treatment(self, num_episodes, idx_to_keep=None):
+        self.filter_reranking(num_episodes, idx_to_keep)
         self.post_treatment_()
         self.save_series_and_stats()
 
@@ -370,15 +369,27 @@ class PPLDialogfromLM(Metric):
                                                 tokenizer=self.dataset.question_tokenizer, device=agent.device)
 
     def fill_(self, **kwargs):
+        pass
+
+    def get_ppl(self, inputs):
         with torch.no_grad():
-            log_probas_lm, _, _ = self.pretrained_lm.forward(kwargs["state"].text.to(self.device), temperature=1)
-            log_probas_lm = log_probas_lm.cpu()
-            self.measure.append(log_probas_lm[:, kwargs["action"]])
+            loss = torch.nn.CrossEntropyLoss(ignore_index=0)
+            log_probas, logits = self.pretrained_lm.language_model(inputs.to(self.device))
+            shift_logits = logits[..., :-1, :].contiguous().to(self.device)
+            shift_logits[:, self.pretrained_lm.unk_idx] = shift_logits.min().to(self.device)
+            shift_labels = inputs[..., 1:].contiguous().to(self.device)
+            loss_ = loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            ppls = torch.exp(loss_)
+            return ppls.view(-1).tolist()
 
     def compute_(self, **kwargs):
-        if len(self.measure) > 0:
-            ppl = torch.exp(-torch.stack(self.measure).sum() / len(self.measure)).cpu().numpy().item()
-            self.metric.append(ppl)
+        ppls = self.get_ppl(inputs=kwargs["state"].text.clone())
+        self.metric.extend(ppls)
+
+    def get_min_ppl_idxs(self, num_diversity):
+        ppls = torch.tensor(self.metric_history).view(-1, num_diversity)
+        idx_to_keep = torch.argmin(ppls, dim=1).tolist()
+        return idx_to_keep
 
 
 class PPLDialogfromLMExt(PPLDialogfromLM):
@@ -407,11 +418,19 @@ class LanguageScore(Metric):
         pass
 
     def process_batch(self, questions):
+        loss = torch.nn.CrossEntropyLoss(reduction="none")
         inputs = self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt")
         labels = inputs["input_ids"].clone()
         labels[inputs["attention_mask"] == 0] = -100
-        outputs = self.lm_model(**inputs, labels=inputs["input_ids"])
-        return torch.exp(outputs["loss"]).view(-1).tolist()
+        outputs = self.lm_model(**inputs, labels=labels)
+        shift_logits = outputs["logits"][..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        loss_ = loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)).view(labels.size(0),
+                                                                                               labels.size(1) - 1)
+        masked_loss = loss_.sum(dim=-1)
+        masked_loss /= inputs["attention_mask"].sum(dim=-1)
+        ppls_per_sentence = torch.exp(masked_loss)
+        return ppls_per_sentence.view(-1).tolist()
 
     def reset(self):
         self.questions = []
@@ -425,12 +444,21 @@ class LanguageScore(Metric):
             self.metric.extend(ppl)
             self.reset()
 
-    def post_treatment(self, num_episodes):
+    def get_min_ppl_idxs(self, num_diversity):
         if len(self.questions) > 0:
             ppl = self.process_batch(self.questions)
             self.metric_history.extend(ppl)
             self.reset()
-        self.filter_reranking(num_episodes)
+        ppls = torch.tensor(self.metric_history).view(-1, num_diversity)
+        idx_to_keep = torch.argmin(ppls, dim=1).tolist()
+        return idx_to_keep
+
+    def post_treatment(self, num_episodes, idx_to_keep=None):
+        if len(self.questions) > 0:
+            ppl = self.process_batch(self.questions)
+            self.metric_history.extend(ppl)
+            self.reset()
+        self.filter_reranking(num_episodes, idx_to_keep)
         self.post_treatment_()
         self.save_series_and_stats()
 
@@ -541,7 +569,7 @@ class HistogramOracle(Metric):
             top_k_dict = self.metric_history
         return top_k_dict
 
-    def post_treatment(self, num_episodes):
+    def post_treatment(self, num_episodes, idx_to_keep=None):
         if self.reward_type == "vilbert" or self.reward_type == "vqa":
             self.post_treatment_()
             metric_history_sorted = dict(sorted(self.metric_history.items(), key=operator.itemgetter(1), reverse=True))
@@ -684,7 +712,7 @@ class VilbertRecallMetric(Metric):
             self.process_batch()
             self.reset()
 
-    def post_treatment(self, num_episodes):
+    def post_treatment(self, num_episodes, idx_to_keep=None):
         if len(self.metric_history) > 0:
             self.process_batch()
             self.reset()
@@ -759,7 +787,7 @@ class OracleClevr(Metric):
             self.process_batch()
             self.reset()
 
-    def post_treatment(self, num_episodes):
+    def post_treatment(self, num_episodes, idx_to_keep=None):
         if len(self.questions) != 0:
             self.process_batch()
             self.reset()
