@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=debug-vqa
+#SBATCH --job-name=scratch-try
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
