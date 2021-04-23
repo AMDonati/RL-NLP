@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import copy
 
-nltk.download('punkt')
+#nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
 logger = logging.getLogger()  # pylint: disable=invalid-name
