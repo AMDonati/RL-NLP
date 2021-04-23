@@ -401,6 +401,17 @@ class PPLDialogfromLMExt(PPLDialogfromLM):
         self.pretrained_lm = ClevrLanguageModel(pretrained_lm=self.lm_model, dataset=self.dataset,
                                                 tokenizer=self.dataset.question_tokenizer, device=self.device)
 
+    def get_ppl(self, inputs):
+        with torch.no_grad():
+            loss = torch.nn.CrossEntropyLoss(ignore_index=0)
+            log_probas, logits = self.pretrained_lm.language_model(inputs.to(self.device))
+            shift_logits = logits[..., :-1, :].contiguous().to(self.device)
+            shift_logits[:, self.pretrained_lm.unk_idx] = shift_logits.min().to(self.device)
+            shift_labels = inputs[..., 1:].contiguous().to(self.device)
+            loss_ = loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            ppls = torch.exp(loss_)
+            return ppls.view(-1).tolist()
+
 
 class LanguageScore(Metric):
     '''Compute the perplexity of a pretrained language model (GPT) on the generated dialog.'''

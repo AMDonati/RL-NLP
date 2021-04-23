@@ -33,7 +33,7 @@ class ClevrLanguageModel(LanguageModel):
                  tokenizer=None, lm_path=None):
         LanguageModel.__init__(self, pretrained_lm, dataset, device=device, tokenizer=tokenizer, lm_path=lm_path)
         self.dataset_to_lm_trad = {value: value for _, value in self.dataset.vocab_questions.items()}
-        self.pad_idx = self.dataset.vocab_questions["<UNK>"]
+        self.unk_idx = self.dataset.vocab_questions["<UNK>"]
 
     def forward(self, state_text, temperature=1):
         seq_len = state_text.size(1)
@@ -41,7 +41,7 @@ class ClevrLanguageModel(LanguageModel):
         logits = logits.view(len(state_text), seq_len, -1)
         logits = logits[:, -1, :] / temperature
         # hotfix
-        logits[:, self.pad_idx] = torch.tensor(-1e32).to(self.device)
+        logits[:, self.unk_idx] = torch.tensor(-1e32).to(self.device)
         last_log_probas = F.log_softmax(logits, dim=-1)
         return last_log_probas, logits, log_probas.view(len(state_text), seq_len, -1)
 
