@@ -375,8 +375,8 @@ class PPLDialogfromLM(Metric):
         with torch.no_grad():
             loss = torch.nn.CrossEntropyLoss(ignore_index=0)
             log_probas, logits = self.pretrained_lm.language_model(inputs.to(self.device))
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = inputs[..., 1:].contiguous()
+            shift_logits = logits[..., :-1, :].contiguous().to(self.device)
+            shift_labels = inputs[..., 1:].contiguous().to(self.device)
             loss_ = loss(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             ppls = torch.exp(loss_)
             return ppls.view(-1).tolist()
