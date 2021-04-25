@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=2-scratch-try
-#SBATCH --qos=qos_gpu-t3
+#SBATCH --qos=qos_gpu-t4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1

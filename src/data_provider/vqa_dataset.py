@@ -514,3 +514,20 @@ if __name__ == '__main__':
             vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
         print("question decoded - lm_tokenizer: {}".format(
             vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
+
+# VQA
+# Input
+# Images
+# COCO
+# Training
+# images
+# 82,783
+# images
+# Validation
+# images
+# 40,504
+# images
+# Testing
+# images
+# 81,434
+# images
