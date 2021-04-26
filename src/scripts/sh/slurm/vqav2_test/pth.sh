@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa/T-pth-%j.out
-#SBATCH --error=slurm_out/clevr/T-pth-%j.err
+#SBATCH --error=slurm_out/vqa/T-pth-%j.err
 #SBATCH --time=20:00:00
 
 
