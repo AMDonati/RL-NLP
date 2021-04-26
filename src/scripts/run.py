@@ -487,7 +487,8 @@ def run(args):
     # start evaluation
     logger.info(
         '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    for mode in args.eval_modes:
+    eval_modes = ["greedy", "sampling", "sampling_ranking_lm"]
+    for mode in eval_modes:
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
