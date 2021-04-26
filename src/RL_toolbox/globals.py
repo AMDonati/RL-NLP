@@ -4,11 +4,17 @@ try:
 except ImportError:
     print("VILBERT NOT IMPORTED!!")
 from transformers import AutoModelWithLMHead, AutoTokenizer
+import sys
+import time
+
+start_time = time.time()
 
 vilbert_path = "output/vilbert_vqav2/model.bin"
 bert_config = BertConfig.from_json_file("output/vilbert_vqav2/bert_base_6layer_6conect.json")
-vilbert_model = VILBertForVLTasks.from_pretrained(vilbert_path, config=bert_config, num_labels=1)
 
+vilbert_model = VILBertForVLTasks.from_pretrained(vilbert_path, config=bert_config, num_labels=1)
+print("--- %s seconds ---" % (time.time() - start_time))
+
+print(sys.getsizeof(vilbert_model))
 gpt2_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
 gpt2_tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
-
