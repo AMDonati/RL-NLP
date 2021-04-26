@@ -614,12 +614,16 @@ class VilbertRecallMetric(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "vilbert_recall", "scalar", env_mode, trunc, sampling)
-        vocab = "output/vilbert_vqav2/bert_base_6layer_6conect.json"
-        path = "output/vilbert_vqav2/model.bin"
+
         self.ranks = []
         self.rewards = []
-        config = BertConfig.from_json_file(vocab)
-        self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
+        if "vilbert" in agent.env.reward_type:
+            self.model = agent.env.reward_func.model
+        else:
+            vocab = "output/vilbert_vqav2/bert_base_6layer_6conect.json"
+            path = "output/vilbert_vqav2/model.bin"
+            config = BertConfig.from_json_file(vocab)
+            self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
         self.batch_size = 30
         self.reset()
         self.env = agent.env
