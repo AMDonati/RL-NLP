@@ -9,13 +9,9 @@ import numpy as np
 import torch
 import pandas as pd
 
-from models.language_model import GenericLanguageModel, ClevrLanguageModel
-from data_provider.CLEVR_Dataset import CLEVR_Dataset
-
 from RL_toolbox.truncation import truncations
 from agent.memory import Memory
 from eval.metric import metrics
-from envs.clevr_env import ClevrEnv
 
 logger = logging.getLogger()
 

@@ -25,10 +25,10 @@ from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.language_model import ClevrLanguageModel
 from RL_toolbox.reward import get_vocab
 import nltk
+from RL_toolbox.globals import vilbert_model, gpt2_model, gpt2_tokenizer
 
 try:
     from vilbert.task_utils import compute_score_with_logits
-    from vilbert.vilbert import VILBertForVLTasks, BertConfig
 except ImportError:
     print("VILBERT NOT IMPORTED!!")
 # nltk.download('wordnet')
@@ -408,8 +408,8 @@ class LanguageScore(Metric):
 
     def __init__(self, agent, train_test, env_mode, trunc, sampling):
         Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
-        self.lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
-        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
+        self.lm_model = gpt2_model
+        self.tokenizer = gpt2_tokenizer
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.questions = []
         self.batch_size = 1000
@@ -620,10 +620,7 @@ class VilbertRecallMetric(Metric):
         if "vilbert" in agent.env.reward_type:
             self.model = agent.env.reward_func.model
         else:
-            vocab = "output/vilbert_vqav2/bert_base_6layer_6conect.json"
-            path = "output/vilbert_vqav2/model.bin"
-            config = BertConfig.from_json_file(vocab)
-            self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
+            self.model = vilbert_model
         self.batch_size = 30
         self.reset()
         self.env = agent.env

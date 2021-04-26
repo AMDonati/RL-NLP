@@ -7,7 +7,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from pytorch_transformers import BertTokenizer
-
+from RL_toolbox.globals import vilbert_model
 import os
 
 os.environ['TRANSFORMERS_CACHE'] = "/cache"
