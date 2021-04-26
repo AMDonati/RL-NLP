@@ -7,7 +7,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoModelWithLMHead, AutoTokenizer
 from pytorch_transformers import BertTokenizer
-
+from RL_toolbox.globals import vilbert_model
 import os
 
 os.environ['TRANSFORMERS_CACHE'] = "/cache"
@@ -248,7 +248,8 @@ def get_pretrained_lm(args, env, device):
         lm_model = torch.load(args.lm_path, map_location=torch.device('cpu'))
         lm_model.eval()
         pretrained_lm = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
-                                           tokenizer=env.dataset.question_tokenizer, device=device, lm_path=args.lm_path)
+                                           tokenizer=env.dataset.question_tokenizer, device=device,
+                                           lm_path=args.lm_path)
     return pretrained_lm
 
 
@@ -384,12 +385,12 @@ def get_rl_env(args, device):
         env = ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode="train", debug=args.debug,
                        num_questions=args.num_questions, diff_reward=args.diff_reward, reward_path=args.reward_path,
                        reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                       reduced_answers=args.reduced_answers, params=test_reward)
+                       reduced_answers=args.reduced_answers, params=args.params_reward)
         test_modes = args.test_modes
-        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=args.reward, mode=mode, debug=args.debug,
+        test_envs = [ClevrEnv(args.data_path, args.max_len, reward_type=test_reward, mode=mode, debug=args.debug,
                               num_questions=args.num_questions, reward_path=args.reward_path,
                               reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
-                              reduced_answers=args.reduced_answers, params=test_reward)
+                              reduced_answers=args.reduced_answers, params=args.params_reward)
                      for mode in test_modes]
     elif args.env == "vqa":
         metrics["oracle"] = VilbertRecallMetric
@@ -401,19 +402,17 @@ def get_rl_env(args, device):
                      min_data=args.min_data, reduced_answers=args.reduced_answers, answer_sampl=args.answer_sampl,
                      params=args.params_reward, filter_numbers=args.filter_numbers)
         if device.type == "cpu":
-            env.set_reward_function(test_reward, reward_path=args.reward_path, reward_vocab=args.reward_vocab,
-                                    diff_reward=args.diff_reward)
             test_envs = [env]
         else:
             test_envs = []
             if "test_images" in args.test_modes:
                 test_envs.append(VQAEnv(args.data_path, features_h5path=args.features_path, max_len=args.max_len,
-                                        reward_type=args.reward, mode="test_images", max_seq_length=23,
+                                        reward_type=test_reward, mode="test_images", max_seq_length=23,
                                         debug=args.debug,
                                         diff_reward=args.diff_reward, reward_path=args.reward_path,
                                         reward_vocab=args.reward_vocab, mask_answers=args.mask_answers, device=device,
                                         min_data=args.min_data, reduced_answers=args.reduced_answers,
-                                        answer_sampl="random", params=test_reward,
+                                        answer_sampl="random", params=args.params_reward,
                                         filter_numbers=args.filter_numbers))
             if "test_text" in args.test_modes:
                 test_text_env = env

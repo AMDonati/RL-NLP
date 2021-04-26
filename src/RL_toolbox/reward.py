@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from RL_toolbox.globals import gpt2_tokenizer, gpt2_model, vilbert_model
 
 try:
     from vilbert.task_utils import compute_score_with_logits
@@ -248,8 +249,7 @@ class VILBERT(Reward):
         self.dataset = env.dataset if env is not None else None
         self.task_id = 1
         self.env = env
-        config = BertConfig.from_json_file(vocab)
-        self.model = VILBertForVLTasks.from_pretrained(path, config=config, num_labels=1)
+        self.model = vilbert_model
         self.reduced_answers = self.env.reduced_answers
 
     def get_preds(self, question=None, ep_questions_decoded=None):
