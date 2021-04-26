@@ -22,4 +22,4 @@ MODEL_PATH="output/RL/VQA_vilbert_small/proba_thr0.005_temp1.5_tmin1.0"
 NUM_EPISODES_TEST=20000
 
 set -x
-srun python -u src/scripts/test.py -models_path $MODEL_PATH -num_episodes_test $NUM_EPISODES_TEST -test_metrics "return" "oracle" "dialog" "bleu" "meteor" "cider" "ppl_dialog_lm" "size_valid_actions" "sum_probs" "selfbleu" "dialogimage" "language_score" "kurtosis" "peakiness" -eval_modes "greedy" "sampling" "sampling_ranking_lm"
+srun python -u src/scripts/test.py -models_path $MODEL_PATH -num_episodes_test $NUM_EPISODES_TEST -test_metrics "return" "oracle" "dialog" "bleu" "meteor" "cider" "ppl_dialog_lm" "size_valid_actions" "sum_probs" "selfbleu" "dialogimage" "language_score" "kurtosis" "peakiness"
