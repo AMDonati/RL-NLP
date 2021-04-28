@@ -54,12 +54,14 @@ def merge_one_experiment(args):
     # str_mean_std = lambda x: str(round(x.mean(), args.precision)) + "+-" + str(round(x.std(), 2))
 
     if not df_no_trunc.empty:
+        df_no_trunc["no_trunc"] = df_no_trunc["no_trunc"].round(args.precision)
         df_no_trunc = df_no_trunc.pivot(index=['conf', 'exp', 'test', 'sampling'], columns='metric',
                                         values='no_trunc')
         df_no_trunc.to_csv(os.path.join(args.path, "stats_no_trunc.csv"))
         df_no_trunc.to_latex(os.path.join(args.path, "stats_no_trunc.txt"))
 
     if not df_with_trunc.empty:
+        df_with_trunc["with_trunc"] = df_with_trunc["with_trunc"].round(args.precision)
         df_with_trunc = df_with_trunc.pivot(index=['conf', 'exp', 'test', 'sampling'], columns='metric',
                                             values='with_trunc')
         df_with_trunc.to_csv(os.path.join(args.path, "stats_with_trunc.csv"))
