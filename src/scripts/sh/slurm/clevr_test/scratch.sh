@@ -22,4 +22,4 @@ MODEL_PATH="output/RL/CLEVR_lm/FINAL_EXP_test/scratch"
 NUM_EPISODES_TEST=5000
 
 set -x
-srun python -u src/scripts/test.py -models_path $MODEL_PATH -num_episodes_test $NUM_EPISODES_TEST -test_metrics "return" "oracle" "dialog" "bleu" "meteor" "cider" "ppl_dialog_lm" "size_valid_actions" "sum_probs" "selfbleu" "dialogimage" "language_score" "kurtosis" "peakiness"
+srun python -u src/scripts/test.py -models_path $MODEL_PATH -num_episodes_test $NUM_EPISODES_TEST -test_metrics "ppl_dialog_lm"  "language_score"
