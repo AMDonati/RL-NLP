@@ -30,10 +30,10 @@ def merge_one_experiment(args):
                 all_df = all_df.append(df, ignore_index=True)
                 # df.set_index(["index", "root"], inplace=True)
     all_df.columns = ["questions", "ref_questions", "ref_answer", "pred_answer", "link", "reward", "root"]
-    all_df.set_index(["link", "root"], inplace=True)
+    all_df.set_index(["link", "root", "ref_questions", "ref_answer"], inplace=True)
     all_df.sort_values(["link", "root", "reward"], inplace=True, ascending=False)
     all_df.to_csv(os.path.join(args.path, "df.csv"))
-    all_df.to_html(os.path.join(args.path, "df.html"),escape=False )
+    all_df.to_html(os.path.join(args.path, "df.html"), escape=False)
 
 
 if __name__ == '__main__':
