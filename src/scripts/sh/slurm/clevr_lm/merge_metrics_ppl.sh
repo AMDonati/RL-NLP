@@ -17,8 +17,8 @@ conda activate rl-nlp-2
 
 export PYTHONPATH=src:${PYTHONPATH}
 
-OUT_PATH="output/RL/CLEVR_lm/FINAL_EXP_lm" -columns_to_save "ppl_dialog_lm" "ppl_dialog_lm_ext"
+OUT_PATH="output/RL/CLEVR_lm/FINAL_EXP_lm"
 
 set -x
-srun python -u src/merge_metrics.py -path $OUT_PATH
+srun python -u src/merge_metrics.py -path $OUT_PATH -columns_to_save "ppl_dialog_lm" "ppl_dialog_lm_ext"
 #wait
