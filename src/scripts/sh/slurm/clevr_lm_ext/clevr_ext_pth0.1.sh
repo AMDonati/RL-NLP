@@ -41,4 +41,4 @@ REWARD_PATH="output/vqa_model_film/model.pt"
 REWARD_VOCAB="data/closure_vocab.json"
 
 set -x
-srun python -u src/scripts/test.py -models_path "output/RL/CLEVR_lm-ext/pth_0.1" -eval_modes "sampling" "greedy" "sampling_ranking_lm"
+srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -debug $DEBUG -lm_path $LM_PATH -reward $REWARD -reward_path $REWARD_PATH -condition_answer $CONDITION_ANSWER -num_episodes_test $NUM_EPISODE_TEST -reward_vocab $REWARD_VOCAB -mask_answers 1 -truncate_mode "proba_thr" -p_th 0.1 -grad_clip 1
