@@ -32,7 +32,7 @@ def merge_one_experiment(args):
             name_exp = os.path.basename(dir_experiment)
             all_metrics_path = os.path.join(dir_experiment, "all_metrics.csv")
             stat_path = os.path.join(dir_experiment, "stats")
-            if os.path.exists(all_metrics_path) and os.path.exists(all_metrics_path):
+            if os.path.exists(all_metrics_path) and os.path.exists(stat_path):
                 root_stat, _, stats_files = next(os.walk(stat_path))
                 for stat_file in stats_files:
                     if not stat_file.endswith('_div.csv'):
