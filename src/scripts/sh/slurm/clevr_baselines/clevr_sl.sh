@@ -20,7 +20,8 @@ export PYTHONPATH=src:${PYTHONPATH}
 DATA_PATH="data"
 LM_PATH="output/lm_model/model.pt"
 OUTPUT_PATH="output/RL/CLEVR_lm/sl_baseline"
-POLICY_PATH="output/SL_LSTM_32_64/model.pt"
+POLICY_PATH="output/SL_LSTM_32_64/model.pt"sl_baseline
+
 POLICY_PATH_VQA="output/SL_LSTM_32_64_vqa/model.pt"
 K_EPOCHS=20
 MAX_LEN=20
