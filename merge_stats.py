@@ -31,8 +31,9 @@ def merge_one_experiment(args):
         for dir_experiment in dirs:
             name_exp = os.path.basename(dir_experiment)
             all_metrics_path = os.path.join(dir_experiment, "all_metrics.csv")
-            if os.path.exists(all_metrics_path):
-                root_stat, _, stats_files = next(os.walk(os.path.join(dir_experiment, "stats")))
+            stat_path = os.path.join(dir_experiment, "stats")
+            if os.path.exists(all_metrics_path) and os.path.exists(stat_path):
+                root_stat, _, stats_files = next(os.walk(stat_path))
                 for stat_file in stats_files:
                     if not stat_file.endswith('_div.csv'):
                         stat_name = stat_file.split(".")[0]
@@ -50,7 +51,7 @@ def merge_one_experiment(args):
                         if "no_trunc" in df_stat.columns:
                             no_trunc = df_stat[[col for col in df_stat.columns if col != "with_trunc"]]
                             df_no_trunc = df_no_trunc.append(no_trunc, ignore_index=True)
-    #str_mean_std = lambda x: str(round(x.mean(), args.precision)) + "+-" + str(round(x.std(), 2))
+    # str_mean_std = lambda x: str(round(x.mean(), args.precision)) + "+-" + str(round(x.std(), 2))
 
     if not df_no_trunc.empty:
         df_no_trunc = df_no_trunc.pivot(index=['conf', 'exp', 'test', 'sampling'], columns='metric',
