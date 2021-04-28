@@ -47,6 +47,7 @@ def eval(args):
             # defaults.update(dict(config.items("main")))
             defaults = {key: cast_value(value) for key, value in dict(config.items("main")).items()}
             defaults["num_episodes_train"] = 0
+            defaults["device_id"] = 0
             defaults["K_epochs"] = defaults["k_epochs"]
             defaults["old_policy_path"] = defaults["policy_path"]
             defaults["policy_path"] = os.path.join(dir, "model.pth")
