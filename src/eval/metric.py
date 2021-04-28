@@ -47,7 +47,7 @@ def _strip(s):
 
 
 class Metric:
-    def __init__(self, agent, train_test, key, type, env_mode, trunc, sampling):
+    def __init__(self, agent, train_test, key, type, env, trunc, sampling):
         self.measure = []
         self.metric = []
         self.metric_history = []
@@ -59,17 +59,18 @@ class Metric:
         self.idx_word = 0
         self.idx_compute = 0
         self.idx_write = 1
-        self.dataset = agent.env.dataset
+        self.dataset = env.dataset
         self.out_path = agent.out_path
         self.writer = agent.writer
         self.language_model = agent.truncation.language_model
         self.policy = agent.policy
-        self.reward_type = agent.env.reward_type
+        self.reward_type = env.reward_type
         self.type = type
         self.key = key
         self.train_test = train_test
-        self.id = "_".join([env_mode, trunc, sampling])
-        self.env_mode = env_mode
+        self.id = "_".join([env.mode, trunc, sampling])
+        self.env_mode = env.mode
+        self.env = env
         self.trunc = trunc
         self.sampling = sampling
         # self.dict_metric, self.dict_stats = {}, {}  # for csv writing.
@@ -157,8 +158,8 @@ class Metric:
 class VAMetric(Metric):
     '''Display the valid action space in the training log.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "valid_actions", "text", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "valid_actions", "text", env, trunc, sampling)
 
     def fill_(self, **kwargs):
         state_decoded = self.dataset.question_tokenizer.decode(kwargs["state"].text.numpy()[0],
@@ -190,8 +191,8 @@ class VAMetric(Metric):
 class SizeVAMetric(Metric):
     '''Compute the average size of the truncated action space during training for truncation functions proba_thr & sample_va'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "size_valid_actions", "scalar", env, trunc, sampling)
         self.counter = 0
 
     def fill_(self, **kwargs):
@@ -205,8 +206,8 @@ class SizeVAMetric(Metric):
 class SumProbsOverTruncated(Metric):
     '''Compute the sum of the probabilities the action space given by the language model.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "sum_probs_truncated", "scalar", env, trunc, sampling)
 
     def fill_(self, **kwargs):
         sum_over_truncated_space = 1
@@ -223,8 +224,8 @@ class SumProbsOverTruncated(Metric):
 class DialogMetric(Metric):
     """Display the test dialog."""
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "dialog", "text", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "dialog", "text", env, trunc, sampling)
         # self.out_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.txt')
         # self.h5_dialog_file = os.path.join(self.out_path, self.train_test + '_' + self.key + '.h5')
         self.generated_dialog = {}
@@ -270,8 +271,8 @@ class DialogMetric(Metric):
 class DialogImageMetric(Metric):
     '''Display the Dialog on a html format at test time.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "dialog_image", "text", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "dialog_image", "text", env, trunc, sampling)
         self.generated_dialog = []
         self.condition_answer = agent.policy.condition_answer
         self.mode = agent.env.mode
@@ -350,8 +351,8 @@ class DialogImageMetric(Metric):
 class PPLDialogfromLM(Metric):
     '''Computes the PPL of the Language Model over the generated dialog'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ppl_dialog_lm", "scalar", env, trunc, sampling)
         self.min_data = agent.env.min_data
         self.device = agent.device
         self.get_lm_model(agent)
@@ -393,8 +394,8 @@ class PPLDialogfromLM(Metric):
 
 
 class PPLDialogfromLMExt(PPLDialogfromLM):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "ppl_dialog_lm_ext", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ppl_dialog_lm_ext", "scalar", env, trunc, sampling)
         self.min_data = agent.env.min_data
         self.device = agent.device
         self.lm_path = "output/lm_ext/model.pt"
@@ -406,8 +407,8 @@ class PPLDialogfromLMExt(PPLDialogfromLM):
 class LanguageScore(Metric):
     '''Compute the perplexity of a pretrained language model (GPT) on the generated dialog.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "language_score", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "language_score", "scalar", env, trunc, sampling)
         self.lm_model = gpt2_model
         self.tokenizer = gpt2_tokenizer
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -464,8 +465,8 @@ class LanguageScore(Metric):
 
 
 class Return(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "return", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "return", "scalar", env, trunc, sampling)
 
     def fill_(self, **kwargs):
         self.measure.append(kwargs["reward"])
@@ -478,8 +479,8 @@ class Return(Metric):
 class BleuMetric(Metric):
     '''Compute the bleu score over the ref questions and the generated dialog.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "bleu", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "bleu", "scalar", env, trunc, sampling)
         if "bleu" in agent.env.reward_type:
             self.function = agent.env.reward_func
         else:
@@ -501,8 +502,8 @@ class BleuMetric(Metric):
 class SelfBleuImageMetric(Metric):
     '''Compute the self bleu score on generated sentences for one image'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "selfbleu", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "selfbleu", "scalar", env, trunc, sampling)
         if "bleu" in agent.env.reward_type:
             self.function = agent.env.reward_func
         else:
@@ -532,8 +533,8 @@ class SelfBleuImageMetric(Metric):
 class HistogramOracle(Metric):
     """Compute the Histogram of Correct Answers."""
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "histogram_answers", "text", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "histogram_answers", "text", env, trunc, sampling)
         self.metric_history = {}
         self.answer_history = {}
         self.out_png_file = os.path.join(self.out_path, "metrics", self.name + ".png")
@@ -592,8 +593,8 @@ class HistogramOracle(Metric):
 class UniqueWordsMetric(Metric):
     '''Compute the ratio of Unique Words for the set of questions generated for each image. Allows to measure vocabulary diversity.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "ttr", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "ttr", "scalar", env, trunc, sampling)
         self.measure_history = []
         self.threshold = 10
 
@@ -612,24 +613,23 @@ class UniqueWordsMetric(Metric):
 class VilbertRecallMetric(Metric):
     '''Compute the oracle score over the ref answer and the generated dialog.'''
 
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "vilbert_recall", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "vilbert_recall", "scalar", env, trunc, sampling)
 
         self.ranks = []
         self.rewards = []
-        if "vilbert" in agent.env.reward_type:
-            self.model = agent.env.reward_func.model
+        if "vilbert" in env.reward_type:
+            self.model = env.reward_func.model
         else:
             self.model = vilbert_model
         self.batch_size = 30
         self.reset()
-        self.env = agent.env
-        if agent.env.reward_type in ["vilbert_recall"]:
-            self.function = agent.env.reward_func
+        if self.env.reward_type in ["vilbert_recall"]:
+            self.function = agent.reward_func
         else:
             self.function = rewards["vilbert_recall"](path="output/vilbert_vqav2/model.bin",
                                                       vocab="output/vilbert_vqav2/bert_base_6layer_6conect.json",
-                                                      env=agent.env)
+                                                      env=self.env)
 
     def fill_(self, **kwargs):
         pass
@@ -734,8 +734,8 @@ class VilbertRecallMetric(Metric):
 
 
 class OracleClevr(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "oracle_recall", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "oracle_recall", "scalar", env, trunc, sampling)
         vocab = "data/closure_vocab.json"
         path = "output/vqa_model_film/model.pt"
         self.execution_engine, ee_kwargs = load_execution_engine(path)
@@ -803,8 +803,8 @@ class OracleClevr(Metric):
 
 
 class CiderMetric(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "cider", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "cider", "scalar", env, trunc, sampling)
         self.score_function = Cider()
         self.tokenizer = PTBTokenizer()
         self.candidates = []
@@ -828,8 +828,8 @@ class CiderMetric(Metric):
 
 
 class MeteorMetric(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "meteor", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "meteor", "scalar", env, trunc, sampling)
 
     def fill_(self, **kwargs):
         pass
@@ -843,8 +843,8 @@ class MeteorMetric(Metric):
 
 
 class KurtosisMetric(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "kurtosis", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "kurtosis", "scalar", env, trunc, sampling)
 
     def fill_(self, **kwargs):
         dist = pd.Series(kwargs["dist"].probs.squeeze().cpu().numpy())
@@ -855,8 +855,8 @@ class KurtosisMetric(Metric):
 
 
 class PeakinessMetric(Metric):
-    def __init__(self, agent, train_test, env_mode, trunc, sampling):
-        Metric.__init__(self, agent, train_test, "peakiness", "scalar", env_mode, trunc, sampling)
+    def __init__(self, agent, train_test, env, trunc, sampling):
+        Metric.__init__(self, agent, train_test, "peakiness", "scalar", env, trunc, sampling)
 
     def fill_(self, **kwargs):
         sorted, indices = torch.sort(kwargs["dist"].probs.cpu(), descending=True)

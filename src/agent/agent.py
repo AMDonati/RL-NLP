@@ -98,16 +98,16 @@ class Agent:
     def init_metrics(self):
         self.metrics = {}
         self.metrics["train"] = {
-            key: metrics[key](self, train_test="train", env_mode="train", trunc="trunc",
+            key: metrics[key](self, train_test="train", env=self.env, trunc="trunc",
                               sampling="sampling") for key in
             self.train_metrics_names if key in metrics}
-        for mode in [env_.mode for env_ in self.test_envs]:
+        for env_ in self.test_envs:
             for trunc in self.eval_trunc.keys():
                 for sampling_mode in ["sampling", "greedy", "sampling_ranking_lm"]:
-                    id = "_".join([mode, trunc, sampling_mode])
-                    self.metrics[id] = {key: metrics[key](self, train_test="test", env_mode=mode, trunc=trunc,
-                                                          sampling=sampling_mode) for key in self.test_metrics_names if
-                                        key in metrics}
+                    id = "_".join([env_.mode, trunc, sampling_mode])
+                    self.metrics[id] = {key: metrics[key](self, train_test="test", trunc=trunc,
+                                                          sampling=sampling_mode, env=env_) for key in
+                                        self.test_metrics_names if key in metrics}
 
     def get_score_metric(self, metrics):
         # if self.truncation.language_model.__class__ == ClevrLanguageModel:
