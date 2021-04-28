@@ -53,9 +53,10 @@ class GenericLanguageModel(LanguageModel):
                                prefix_tokenizer=prefix_tokenizer, lm_path=lm_path)
         self.tokenizer = tokenizer
         self.name = "generic"
-        self.dataset_to_lm_trad = {value: self.tokenizer.encoder[key] for
+        voc = self.tokenizer.get_vocab()
+        self.dataset_to_lm_trad = {value: voc[key] for
                                    key, value in self.dataset.vocab_questions.items() if
-                                   key in self.tokenizer.encoder.keys()}
+                                   key in voc.keys()}
 
         self.bos_token = self.tokenizer.bos_token
         self.get_init_text(init_text, custom_init, add_answers)
