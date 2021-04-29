@@ -17,7 +17,7 @@ conda activate rl-nlp-2
 
 export PYTHONPATH=src:${PYTHONPATH}
 
-OUT_PATH="output/RL/CLEVR_lm/FINAL_EXP"
+OUT_PATH="output/RL/CLEVR_lm/MAIN_EXP"
 
 set -x
 srun python -u merge_stats.py -path $OUT_PATH
