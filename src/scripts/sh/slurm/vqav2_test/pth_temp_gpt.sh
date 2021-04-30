@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=T-G-pth-temp
-#SBATCH --qos=qos_gpu-t3
+#SBATCH --qos=qos_gpu-t4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
@@ -8,7 +8,7 @@
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa/T-G-pth-temp-%j.out
 #SBATCH --error=slurm_out/vqa/T-G-pth-temp-%j.err
-#SBATCH --time=20:00:00
+#SBATCH --time=100:00:00
 
 
 export TMPDIR=$JOBSCRATCH
