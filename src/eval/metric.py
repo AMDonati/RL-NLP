@@ -724,7 +724,8 @@ class VilbertRecallMetric(Metric):
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         serie_ranks.to_csv(ranks_out_file, index=False, header=False)
         if self.type == "scalar":
-            self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5)}
+            self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5),
+                          "oracle_score": self.get_stats(serie_rewards)}
 
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         rewards_out_file = os.path.join(self.out_path, "metrics", self.name + "_rewards.csv")
