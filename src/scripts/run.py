@@ -110,7 +110,7 @@ def get_parser():
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
-    parser.add_argument('-test_reward_zero', type=int, default=1, help="type of reward function for test")
+    parser.add_argument('-test_reward_zero', type=int, default=0, help="type of reward function for test")
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument("-params_reward", type=int, default=10, help="params reward")
@@ -486,7 +486,8 @@ def run(args):
     # start evaluation
     logger.info(
         '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    for mode in args.eval_modes:
+    eval_modes = ["greedy", "sampling", "sampling_ranking_lm"]
+    for mode in eval_modes:
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))

@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=clevr-pth0.1
+#SBATCH --job-name=clevrtop-k20
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/clevr/pth0.1-%j.out
-#SBATCH --error=slurm_out/clevr/pth0.1-%j.err
+#SBATCH --output=slurm_out/clevr/topk20-%j.out
+#SBATCH --error=slurm_out/clevr/topk20-%j.err
 #SBATCH --time=20:00:00
 
 export TMPDIR=$JOBSCRATCH
@@ -34,11 +34,12 @@ WORD_EMB_SIZE=32
 HIDDEN_SIZE=64
 NUM_EPISODE_TEST=5000
 EPS_CLIP=0.02
-REWARD="vqa"
+REWARD="bleu"
 CONDITION_ANSWER="after_fusion"
 DEBUG="0,20000"
 REWARD_PATH="output/vqa_model_film/model.pt"
 REWARD_VOCAB="data/closure_vocab.json"
 
 set -x
-srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -debug $DEBUG -lm_path $LM_PATH -reward $REWARD -reward_path $REWARD_PATH -condition_answer $CONDITION_ANSWER -num_episodes_test $NUM_EPISODE_TEST -reward_vocab $REWARD_VOCAB -mask_answers 1 -truncate_mode "proba_thr" -p_th 0.1 -grad_clip 1
+srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "top_k" -num_truncated 20 -debug $DEBUG -reward_vocab $REWARD_VOCAB -reward_path $REWARD_PATH
+
