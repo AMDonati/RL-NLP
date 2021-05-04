@@ -53,6 +53,8 @@ class PPO(Agent):
         self.entropy_coeff = entropy_coeff
         self.update_mode = "episode"
         self.writer_iteration = 0
+        if self.KL_coeff > 0:
+            self.kl_loss = torch.nn.KLDivLoss(reduction="none", log_target=True)
 
     def evaluate(self, state_text, state_img, states_answer, action, old_ht_truncated, old_ct_truncated):
         policy_dist, policy_dist_truncated, value, _, _ = self.policy(state_text, state_img, states_answer,
@@ -118,7 +120,8 @@ class PPO(Agent):
             # adding KL_divergence term
             if self.KL_coeff > 0:
                 # KL(LM(p) || pi (q)] = sum p * log (p/q)
-                KL_term = logprobs_lm.exp() * (logprobs_lm - policy_logprobs)
+                # KL_term = logprobs_lm.exp() * (logprobs_lm - policy_logprobs)
+                KL_term = self.kl_loss(policy_logprobs, logprobs_lm)
                 KL_div = KL_term.sum(-1)
             else:
                 KL_div = 0.
