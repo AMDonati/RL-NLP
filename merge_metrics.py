@@ -10,9 +10,8 @@ def get_parser():
     parser.add_argument("-path", type=str, required=True,
                         help="data folder containing experiments")
     parser.add_argument('-columns_to_save', nargs='+', type=str,
-                        default=['action_probs_truncated', 'bleu', 'lv_norm', 'ppl', 'ppl_dialog_lm',
-                                 'return', 'selfbleu', 'size_valid_actions', 'sum_probs', 'ttr_question',
-                                 'vilbert', 'ttr', "oracle_score"], help="")
+                        default=["oracle_score", "recall_5", "bleu", "meteor", "cider", "ppl_dialog_lm",
+                                 "language_score", "selfbleu", "kurtosis", "peakiness"], help="")
     parser.add_argument('-bottom_folder', type=int, default=1)
     parser.add_argument('-top_folder', type=int, default=1)
     parser.add_argument('-precision', type=int, default=4)
