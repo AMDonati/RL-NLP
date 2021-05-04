@@ -2,6 +2,7 @@ import argparse
 import os
 
 import pandas as pd
+import re
 
 
 def get_parser():
@@ -20,22 +21,27 @@ def get_parser():
 
 
 def add_to_metrics(df, path_exp):
+    pattern = "test_(test_images|test_text)_(no_trunc|with_trunc)_(sampling_ranking_lm|sampling|greedy)_vilbert_recall_rewards.csv"
+    all = {"no_trunc": {}, "with_trunc": {}}
     if "oracle_score" not in df.index:
         means = {trunc: [] for trunc in list(df.columns)}
         root, _, files = next(os.walk(os.path.join(path_exp, "metrics")))
-        for f in files:
-            if "train" not in f and "vilbert_recall_rewards" in f:
+        f_patterns = {f: re.findall(pattern, f) for f in files}
+        for f, patterns in f_patterns.items():
+            if "train" not in f and patterns and len(patterns[0]) == 3:
                 try:
+                    mode, trunc, sampl = patterns[0]
+                    id = "_".join([mode, sampl, "oracle_score"])
                     rew_df = pd.read_csv(os.path.join(root, f), header=None)
                     mean_rew = rew_df[0].mean()
-                    if "no_trunc" in f:
-                        means["no_trunc"].append(mean_rew)
-                    if "with_trunc" in f:
-                        means["with_trunc"].append(mean_rew)
+                    all[trunc][id] = mean_rew
+
                 except pd.errors.EmptyDataError:
                     print("empty file {}".format(os.path.join(root, f)))
                     continue
-        oracle_score_serie = pd.DataFrame.from_dict(means).mean()
+        oracle_score = pd.DataFrame.from_dict(all)
+        oracle_score.to_csv(os.path.join(path_exp, "stats", "oracle_score.csv"), )
+        oracle_score_serie = oracle_score.mean()
         oracle_score_serie.name = "oracle_score"
         df = df.append(oracle_score_serie)
     return df
