@@ -3,8 +3,8 @@
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=1-3
-#SBATCH --cpus-per-task=16
+
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa/numbers/scratch-kl%j.out
 #SBATCH --error=slurm_out/vqa/numbers/scratch-kl%j.err
@@ -43,4 +43,4 @@ REWARD="vilbert_rank2"
 FUSION="average"
 CONDITION_ANSWER="after_fusion"
 
-srun python -u src/scripts/run.py -filter_numbers 1 -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 5 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH -KL_coeff 0.1
+srun python -u src/scripts/run.py -filter_numbers 1 -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 5 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH -KL_coeff 0.1 -debug $DEBUG
