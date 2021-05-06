@@ -121,7 +121,8 @@ class PPO(Agent):
             if self.KL_coeff > 0:
                 # KL(LM(p) || pi (q)] = sum p * log (p/q)
                 # KL_term = logprobs_lm.exp() * (logprobs_lm - policy_logprobs)
-                KL_term = self.kl_loss(policy_logprobs, logprobs_lm)
+                KL_term = -logprobs_lm.exp() * policy_logprobs
+                # KL_term = self.kl_loss(policy_logprobs, logprobs_lm)
                 KL_div = KL_term.sum(-1)
             else:
                 KL_div = 0.
