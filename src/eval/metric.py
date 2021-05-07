@@ -25,12 +25,8 @@ from data_provider.CLEVR_Dataset import CLEVR_Dataset
 from models.language_model import ClevrLanguageModel
 from RL_toolbox.reward import get_vocab
 import nltk
-from RL_toolbox.globals import vilbert_model, gpt2_model, gpt2_tokenizer
+from RL_toolbox.globals import vilbert_model, gpt2_model, gpt2_tokenizer, compute_score_with_logits
 
-try:
-    from vilbert.task_utils import compute_score_with_logits
-except ImportError:
-    print("VILBERT NOT IMPORTED!!")
 # nltk.download('wordnet')
 try:
     from vr.utils import load_execution_engine, load_program_generator
