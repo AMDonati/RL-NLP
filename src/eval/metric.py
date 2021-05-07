@@ -121,8 +121,14 @@ class Metric:
     def log(self, **kwargs):
         pass
 
-    def get_stats(self, serie):
-        return [serie.mean(), serie.std(), serie.size]
+    def get_stats(self, serie, num_episodes, idx_to_keep=None, num_diversity=10):
+        if idx_to_keep is not None and serie.size == num_diversity * num_episodes:
+            serie_reshaped = serie.to_numpy().reshape(-1, num_diversity)
+            values = np.take_along_axis(serie_reshaped, np.array(idx_to_keep).reshape(-1, 1), 1)
+            serie_to_keep = pd.Series(values.ravel())
+        else:
+            serie_to_keep = serie
+        return [serie_to_keep.mean(), serie_to_keep.std(), serie_to_keep.size]
 
     def get_stats_div(self, df):
         return df.mean().to_dict()
@@ -136,21 +142,19 @@ class Metric:
             self.metric_history = np.array(self.metric_history)
             self.metric_history = list(self.metric_history[idxs_to_select])
 
-    def save_series_and_stats(self):
+    def save_series_and_stats(self, idx_to_keep, num_episodes):
         serie = pd.Series(self.metric_history)
         serie.to_csv(self.out_csv_file, index=False, header=False)
-
         if self.type == "scalar":
-            self.stats = {self.key: self.get_stats(serie)}
+            self.stats = {self.key: self.get_stats(serie, idx_to_keep=idx_to_keep, num_episodes=num_episodes)}
             if self.metric_diversity_history:
                 df = pd.DataFrame(data=self.metric_diversity_history, columns=["mean", "std", "max", "min"])
                 df.to_csv(self.out_div_csv_file)
                 self.stats_div = {self.key: self.get_stats_div(df)}
 
     def post_treatment(self, num_episodes, idx_to_keep=None):
-        self.filter_reranking(num_episodes, idx_to_keep)
         self.post_treatment_()
-        self.save_series_and_stats()
+        self.save_series_and_stats(idx_to_keep, num_episodes)
 
         # ----------------------------------  TRAIN METRICS -------------------------------------------------------------------------------------
 
@@ -200,7 +204,7 @@ class SizeVAMetric(Metric):
             self.measure.append(kwargs["valid_actions"].size(1))
 
     def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
+        self.metric.append(np.mean(self.measure))
 
 
 class SumProbsOverTruncated(Metric):
@@ -217,7 +221,7 @@ class SumProbsOverTruncated(Metric):
         self.measure.append(float(sum_over_truncated_space))
 
     def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
+        self.metric.append(np.mean(self.measure))
 
 
 # --------------------  TEST METRICS ----------------------------------------------------------------------------------------------------------------------------
@@ -459,9 +463,9 @@ class LanguageScore(Metric):
             ppl = self.process_batch(self.questions)
             self.metric_history.extend(ppl)
             self.reset()
-        self.filter_reranking(num_episodes, idx_to_keep)
+        # self.filter_reranking(num_episodes, idx_to_keep)
         self.post_treatment_()
-        self.save_series_and_stats()
+        self.save_series_and_stats(idx_to_keep, num_episodes)
 
 
 class Return(Metric):
@@ -713,10 +717,20 @@ class VilbertRecallMetric(Metric):
             self.process_batch()
             self.reset()
 
+    def filter_reranking(self, num_episodes, idxs_to_select):
+        if idxs_to_select is not None and self.sampling == "sampling_ranking_lm" and len(
+                self.metric_history) == num_episodes * 10:
+            self.ranks = np.array(self.ranks)
+            self.ranks = list(self.ranks[idxs_to_select])
+            self.rewards = np.array(self.rewards)
+            self.rewards = list(self.rewards[idxs_to_select])
+
     def post_treatment(self, num_episodes, idx_to_keep=None):
-        if len(self.metric_history) > 0:
+        if len(self.features) > 0:
             self.process_batch()
             self.reset()
+        # self.filter_reranking(num_episodes, idx_to_keep)
+
         serie_ranks = pd.Series(self.ranks)
         serie_rewards = pd.Series(self.rewards)
         serie_recall_5 = (serie_ranks < 5).astype(int)
@@ -724,8 +738,11 @@ class VilbertRecallMetric(Metric):
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         serie_ranks.to_csv(ranks_out_file, index=False, header=False)
         if self.type == "scalar":
-            self.stats = {"ranks": self.get_stats(serie_ranks), "recall_5": self.get_stats(serie_recall_5),
-                          "oracle_score": self.get_stats(serie_rewards)}
+            self.stats = {"ranks": self.get_stats(serie_ranks, idx_to_keep=idx_to_keep, num_episodes=num_episodes),
+                          "recall_5": self.get_stats(serie_recall_5, idx_to_keep=idx_to_keep,
+                                                     num_episodes=num_episodes),
+                          "oracle_score": self.get_stats(serie_rewards, idx_to_keep=idx_to_keep,
+                                                         num_episodes=num_episodes)}
 
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         rewards_out_file = os.path.join(self.out_path, "metrics", self.name + "_rewards.csv")
@@ -793,6 +810,7 @@ class OracleClevr(Metric):
         if len(self.questions) != 0:
             self.process_batch()
             self.reset()
+        # self.filter_reranking(num_episodes, idx_to_keep)
         serie_ranks = pd.Series(self.metric_history)
         serie_recall_5 = (serie_ranks < 5).astype(int)
         serie_score = (serie_ranks == 0).astype(int)
@@ -800,7 +818,9 @@ class OracleClevr(Metric):
         ranks_out_file = os.path.join(self.out_path, "metrics", self.name + "_ranks.csv")
         serie_ranks.to_csv(ranks_out_file, index=False, header=False)
         if self.type == "scalar":
-            self.stats = {"oracle_score": self.get_stats(serie_score), "recall_5": self.get_stats(serie_recall_5)}
+            self.stats = {
+                "oracle_score": self.get_stats(serie_score, idx_to_keep=idx_to_keep, num_episodes=num_episodes),
+                "recall_5": self.get_stats(serie_recall_5, idx_to_keep=idx_to_keep, num_episodes=num_episodes)}
 
 
 class CiderMetric(Metric):
@@ -865,7 +885,7 @@ class PeakinessMetric(Metric):
         self.measure.append(sum_10)
 
     def compute_(self, **kwargs):
-        self.metric.extend(self.measure)
+        self.metric.append(np.mean(self.measure))
 
 
 metrics = {"return": Return, "valid_actions": VAMetric, "size_valid_actions": SizeVAMetric,

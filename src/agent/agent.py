@@ -317,6 +317,7 @@ class Agent:
             if test_mode == "sampling_ranking_lm":
                 language_score = metrics["language_score"]
                 idx_to_keep = language_score.get_min_ppl_idxs(num_diversity)
+                pd.Series(idx_to_keep).to_csv(os.path.join(language_score.out_path, "metrics", "min_ppl_idx.csv"))
             for key_metric, metric in metrics.items():
                 metric.post_treatment(num_episodes=num_episodes, idx_to_keep=idx_to_keep)
 
