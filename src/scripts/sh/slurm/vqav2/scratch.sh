@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=scratch
-#SBATCH --qos=qos_gpu-t3
+#SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:2
 #SBATCH --array=1-3
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa/scratch%j.out
-#SBATCH --error=slurm_out/vqa/scratch%j.err
+#SBATCH --output=slurm_out/vqa/scratch-full%j.out
+#SBATCH --error=slurm_out/vqa/scratch-full%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
@@ -31,7 +31,7 @@ MAX_LEN=10
 UPDATE_EVERY=128
 DEBUG="0,20000"
 NUM_EPISODE_TRAIN=100000
-NUM_EPISODE_TEST=40000
+NUM_EPISODE_TEST=20000
 ENV_="vqa"
 MODEL="lstm"
 AGENT="PPO"
@@ -43,4 +43,5 @@ REWARD="vilbert_rank2"
 FUSION="average"
 CONDITION_ANSWER="after_fusion"
 
-srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 5 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH
+OUT_PATH=output/RL/VQAv2/${SLURM_ARRAY_TASK_ID}
+srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path ${OUT_PATH} -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 5 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH

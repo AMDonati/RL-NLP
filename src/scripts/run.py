@@ -110,7 +110,7 @@ def get_parser():
     parser.add_argument("-max_len", type=int, default=10, help="max episode length")
     parser.add_argument('-gamma', type=float, default=1., help="gamma")
     parser.add_argument('-reward', type=str, default="lv_norm", help="type of reward function")
-    parser.add_argument('-test_reward_zero', type=int, default=0, help="type of reward function for test")
+    parser.add_argument('-test_reward_zero', type=int, default=1, help="type of reward function for test")
     parser.add_argument('-reward_path', type=str, help="path for the reward")
     parser.add_argument('-reward_vocab', type=str, help="vocab for the reward")
     parser.add_argument("-params_reward", type=int, default=10, help="params reward")
@@ -173,7 +173,7 @@ def get_parser():
     parser.add_argument("-test_seed", type=int, default=1,
                         help="using a seed for the episode generation in test or not...")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved checkpoint')
-    parser.add_argument('-eval_no_trunc', type=int, default=1,
+    parser.add_argument('-eval_no_trunc', type=int, default=0,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions", "ppl_dialog_lm",
