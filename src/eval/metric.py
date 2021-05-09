@@ -622,7 +622,7 @@ class VilbertRecallMetric(Metric):
             self.model = env.reward_func.model
         else:
             self.model = vilbert_model
-        self.batch_size = 30
+        self.batch_size = 128
         self.reset()
         if self.env.reward_type in ["vilbert_recall"]:
             self.function = agent.reward_func
