@@ -439,7 +439,7 @@ def run(args):
     writer = SummaryWriter(log_dir=os.path.join(output_path, "runs"))
 
     device = torch.device("cuda:{}".format(args.device_id) if torch.cuda.is_available() else "cpu")
-
+    logger.info("this experiment is in {}".format(output_path))
     # log hparams:
     log_hparams(logger, args)
 
