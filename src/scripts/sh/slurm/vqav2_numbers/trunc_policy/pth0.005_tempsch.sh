@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=G-temp-pth-n
+#SBATCH --job-name=temp-pth-n
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa/numbers/G-temp-pth%j.out
-#SBATCH --error=slurm_out/vqa/numbers/G-temp-pth%j.err
+#SBATCH --output=slurm_out/vqa/numbers/temp-pth%j.out
+#SBATCH --error=slurm_out/vqa/numbers/temp-pth%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
@@ -17,11 +17,12 @@ conda activate rl-nlp-2
 
 export PYTHONPATH=src:${PYTHONPATH}
 
+
 DATA_PATH="data/vqa-v2/"
 FEATURES_PATH="data/vqa-v2/coco_trainval.lmdb/"
-LM_PATH="gpt"
+LM_PATH="output/vqa_lm_model/model.pt"
 LM_PATH_MIN="output/vqa_lm_model_smallvocab/model.pt"
-OUTPUT_PATH="output/RL/VQAv2_numbers"
+OUTPUT_PATH="output/RL/VQAv2_numbers_truncated"
 POLICY_PATH="output/vqa_policy_128_256_answer/model.pt"
 POLICY_PATH_MIN="output/vqa_policy_128_256_answer_smallvocab/model.pt"
 VILBERT_VOCAB="output/vilbert_vqav2/bert_base_6layer_6conect.json"
@@ -48,4 +49,5 @@ TEMP_FACTOR=0.75
 TEMP_MIN=1
 S_MIN=1
 
-srun python -u src/scripts/run.py -filter_numbers 1 -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH  -grad_clip 5 -truncate_mode "proba_thr" -p_th 0.0075 -init_text "Here are a few examples:" -custom_init 100 -temperature $TEMPERATURE -temp_step $TEMP_STEP -temp_min $TEMP_MIN -s_min $S_MIN -debug $DEBUG
+srun python -u src/scripts/run.py -filter_numbers 1 -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH  -grad_clip 5 -truncate_mode "proba_thr" -p_th 0.005 -temperature $TEMPERATURE -temp_step $TEMP_STEP -temp_min $TEMP_MIN -s_min $S_MIN -debug $DEBUG -truncation_optim 1
+
