@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=G-pth-temp-KL
+#SBATCH --job-name=G-pth-temp-KL.05
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:2
 #SBATCH --array=1-3
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa/G-pth-temp-KL-%j.out
-#SBATCH --error=slurm_out/vqa/G-pth-temp-KL-%j.err
+#SBATCH --output=slurm_out/vqa/G-pth-temp-KL.05-%j.out
+#SBATCH --error=slurm_out/vqa/G-pth-temp-KL.05-%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
@@ -50,4 +50,4 @@ S_MIN=1
 
 echo "now processing task id:: " ${SLURM_ARRAY_TASK_ID}
 OUT_PATH=output/RL/VQAv2_add/${SLURM_ARRAY_TASK_ID}
-srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path ${OUT_PATH} -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -debug $DEBUG -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH  -grad_clip 5 -truncate_mode "proba_thr" -p_th 0.0075 -temperature $TEMPERATURE -temp_step $TEMP_STEP -temp_min $TEMP_MIN -temp_factor $TEMP_FACTOR -s_min $S_MIN -KL_coeff 0.1 -init_text "Here are a few examples:" -custom_init 100
+srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path ${OUT_PATH} -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -debug $DEBUG -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -fusion $FUSION -condition_answer $CONDITION_ANSWER -features_path $FEATURES_PATH -reward_vocab $VILBERT_VOCAB -reward_path $VILBERT_PATH  -grad_clip 5 -truncate_mode "proba_thr" -p_th 0.0075 -temperature $TEMPERATURE -temp_step $TEMP_STEP -temp_min $TEMP_MIN -temp_factor $TEMP_FACTOR -s_min $S_MIN -KL_coeff 0.05 -init_text "Here are a few examples:" -custom_init 100
