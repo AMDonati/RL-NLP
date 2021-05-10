@@ -22,4 +22,4 @@ MODEL_PATH="output/RL/CLEVR_lm-ext/trunc_policy/4/clevr_bleu_PPO_answ-img_sampli
 NUM_EPISODES_TEST=5000
 
 set -x
-srun python -u src/scripts/test.py -models_path $MODEL_PATH -num_episodes_test $NUM_EPISODES_TEST -eval_modes sampling_ranking_lm
+srun python -u src/scripts/test.py -models_path $MODEL_PATH -num_episodes_test $NUM_EPISODES_TEST
