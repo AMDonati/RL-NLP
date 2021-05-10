@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=pretrain
+#SBATCH --job-name=slbase
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa_test/pretrain%j.out
-#SBATCH --error=slurm_out/vqa_test/pretrain%j.err
+#SBATCH --output=slurm_out/vqa_test/slbase%j.out
+#SBATCH --error=slurm_out/vqa_test/slbase%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
