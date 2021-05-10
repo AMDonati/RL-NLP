@@ -173,7 +173,7 @@ def get_parser():
     parser.add_argument("-test_seed", type=int, default=1,
                         help="using a seed for the episode generation in test or not...")
     parser.add_argument('-resume_training', type=str, help='folder path to resume training from saved checkpoint')
-    parser.add_argument('-eval_no_trunc', type=int, default=0,
+    parser.add_argument('-eval_no_trunc', type=int, default=1,
                         help="if using truncation at training: at test time, evaluate also langage generated without truncation. Default to False.")
     parser.add_argument('-train_metrics', nargs='+', type=str,
                         default=["return", "size_valid_actions", "ppl_dialog_lm",
@@ -486,8 +486,8 @@ def run(args):
     # start evaluation
     logger.info(
         '---------------------------------- STARTING EVALUATION --------------------------------------------------------------------------')
-    eval_modes = ["greedy", "sampling", "sampling_ranking_lm"]
-    for mode in eval_modes:
+    #eval_modes = ["greedy", "sampling", "sampling_ranking_lm"]
+    for mode in args.eval_modes:
         logger.info(
             "----------------------------- Starting evaluation for {} action selection -------------------------".format(
                 mode))
