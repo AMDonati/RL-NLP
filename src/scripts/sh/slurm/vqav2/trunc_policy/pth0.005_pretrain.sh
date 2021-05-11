@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=pth0.005-full
+#SBATCH --job-name=pth0.005-pretrain-full
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:2
 #SBATCH --array=1-3
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa/pth0.005-trunc-full-%j.out
-#SBATCH --error=slurm_out/vqa/pth0.005-trunc-full-%j.err
+#SBATCH --output=slurm_out/vqa/pth0.005-trunc-pretrain-full-%j.out
+#SBATCH --error=slurm_out/vqa/pth0.005-trunc-pretrain-full-%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
