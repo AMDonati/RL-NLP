@@ -131,8 +131,8 @@ if __name__ == '__main__':
                 train_dataset = copy_attributes(train_dataset, train_dataset.dataset)
                 test_dataset = copy_attributes(test_dataset, test_dataset.dataset)
                 val_dataset = copy.deepcopy(test_dataset)
-        elif args.dataset == "vqa":
 
+        elif args.dataset == "vqa":
             lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
             reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
             images_feature_reader = ImageFeaturesH5Reader(args.features_path, False)
