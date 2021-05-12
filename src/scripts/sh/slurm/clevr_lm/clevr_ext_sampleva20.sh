@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=sampl20
+#SBATCH --job-name=C-sampl20
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -43,7 +43,7 @@ REWARD_VOCAB="data/closure_vocab.json"
 set -x
 #srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 20 -debug $DEBUG -reward_vocab $REWARD_VOCAB -reward_path $REWARD_PATH &
 #srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 20 -debug $DEBUG -reward_vocab $REWARD_VOCAB -reward_path $REWARD_PATH &
-srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 20 -debug $DEBUG -reward_vocab $REWARD_VOCAB -reward_path $REWARD_PATH &
+srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 20 -debug $DEBUG -reward_vocab $REWARD_VOCAB -reward_path $REWARD_PATH
 #srun python -u src/scripts/run.py -env $ENV_ -max_len $MAX_LEN -data_path $DATA_PATH -out_path $OUTPUT_PATH -model $MODEL -update_every $UPDATE_EVERY -agent $AGENT -K_epochs $K_EPOCHS -eps_clip $EPS_CLIP -lr $LR -word_emb_size $WORD_EMB_SIZE -hidden_size $HIDDEN_SIZE -num_episodes_train $NUM_EPISODE_TRAIN -lm_path $LM_PATH -reward $REWARD -num_episodes_test $NUM_EPISODE_TEST -mask_answers 1 -grad_clip 1 -condition_answer $CONDITION_ANSWER -truncate_mode "sample_va" -num_truncated 20 -debug $DEBUG -reward_vocab $REWARD_VOCAB -reward_path $REWARD_PATH
 #wait
 
