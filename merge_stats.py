@@ -66,7 +66,7 @@ def merge_one_experiment(args):
         df_no_trunc.to_latex(os.path.join(args.path, "stats_no_trunc.txt"))
 
         df_no_trunc_grouped.to_csv(os.path.join(args.path, "stats_no_trunc_grouped.csv"))
-        df_no_trunc_grouped.to_csv(os.path.join(args.path, "stats_no_trunc_grouped.csv"))
+        df_no_trunc_grouped.to_latex(os.path.join(args.path, "stats_no_trunc_grouped.txt"))
 
     if not df_with_trunc.empty:
         df_with_trunc["with_trunc"] = df_with_trunc["with_trunc"].round(args.precision)
