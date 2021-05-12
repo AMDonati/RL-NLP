@@ -6,8 +6,8 @@
 #SBATCH --array=1-3
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa/numbers/numbers/pth0.005-%j.out
-#SBATCH --error=slurm_out/vqa/numbers/numbers/pth0.005-%j.err
+#SBATCH --output=slurm_out/vqa/numbers/trunc/pth0.005-%j.out
+#SBATCH --error=slurm_out/vqa/numbers/trunc/pth0.005-%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
