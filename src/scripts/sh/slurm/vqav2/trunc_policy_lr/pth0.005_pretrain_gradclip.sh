@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa_lr/pth0.005-trunc-pretrain-full-%j.out
 #SBATCH --error=slurm_out/vqa_lr/pth0.005-trunc-pretrain-full-%j.err
