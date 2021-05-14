@@ -91,11 +91,14 @@ def merge_all_experiments(args):
             df = pd.read_csv(filename, index_col=0)
             if "with_trunc" in df.index:
                 df_with_trunc = df_with_trunc.append(pd.Series(df.loc["with_trunc"], name=name_experiment))
-            df_no_trunc = df_no_trunc.append(pd.Series(df.loc["no_trunc"], name=name_experiment))
+            if "no_trunc" in df.index:
+                df_no_trunc = df_no_trunc.append(pd.Series(df.loc["no_trunc"], name=name_experiment))
 
     columns_to_save = [col for col in args.columns_to_save if col in df_with_trunc.columns]
-    df_with_trunc = df_with_trunc[columns_to_save]
-    df_no_trunc = df_no_trunc[columns_to_save]
+    if not df_with_trunc.empty:
+        df_with_trunc = df_with_trunc[columns_to_save]
+    if not df_no_trunc.empty:
+        df_no_trunc = df_no_trunc[columns_to_save]
 
     df_with_trunc.to_csv(os.path.join(args.path, "merged_with_trunc.csv"))
     df_no_trunc.to_csv(os.path.join(args.path, "merged_no_trunc.csv"))

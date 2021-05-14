@@ -28,6 +28,7 @@ def extract(args):
             print(f"{file.name} --> {parent_1}_{parent_2}{file.suffix}")
 
 if __name__ == '__main__':
-    args = get_parser()
+    parser = get_parser()
+    args = parser.parse_args()
     extract(args)
 

@@ -36,11 +36,14 @@ def get_google_api():
 
 
 def get_by_name(service, name):
-    # Call the Drive v3 API
-    results = service.files().list(q="name='CLEVR_val_{}.png'".format(name),
-                                   pageSize=10, fields="nextPageToken, files(id, name)").execute()
-    items = results.get('files', [])
-    return items[0]
+    try:
+        # Call the Drive v3 API
+        results = service.files().list(q="name='CLEVR_val_{}.png'".format(name),
+                                       pageSize=10, fields="nextPageToken, files(id, name)").execute()
+        items = results.get('files', [])
+        return items[0]
+    except:
+        return {"id":None}
 
 
 if __name__ == '__main__':
