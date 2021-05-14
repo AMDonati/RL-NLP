@@ -5,8 +5,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa/pretrain%j.out
-#SBATCH --error=slurm_out/vqa/pretrain%j.err
+#SBATCH --output=slurm_out/vqa_lr/pretrain%j.out
+#SBATCH --error=slurm_out/vqa_lr/pretrain%j.err
 #SBATCH --time=100:00:00
 
 export TMPDIR=$JOBSCRATCH
