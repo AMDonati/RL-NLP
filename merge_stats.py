@@ -53,35 +53,47 @@ def merge_one_experiment(args):
     # str_mean_std = lambda x: str(round(x.mean(), args.precision)) + "+-" + str(round(x.std(), 2))
 
     if not df_no_trunc.empty:
-        df_no_trunc["no_trunc"] = df_no_trunc["no_trunc"].round(args.precision)
+        df_no_trunc["no_trunc"] = df_no_trunc["no_trunc"]
         df_no_trunc = df_no_trunc.pivot(index=['conf', 'exp', 'test', 'sampling'], columns='metric',
                                         values='no_trunc')
         columns_to_save = [col for col in args.columns_to_save if col in df_no_trunc.columns]
 
         df_no_trunc = df_no_trunc[columns_to_save]
 
-        df_no_trunc_grouped = df_no_trunc.groupby(["conf", "sampling"]).mean().round(args.precision)
+        df_no_trunc_grouped = df_no_trunc.groupby(["conf", "sampling"]).mean()
 
-        df_no_trunc.to_csv(os.path.join(args.path, "stats_no_trunc.csv"))
-        df_no_trunc.to_latex(os.path.join(args.path, "stats_no_trunc.txt"))
+        df_no_trunc_recap = df_no_trunc_grouped.groupby(["conf"]).mean().round(args.precision).astype(
+            str) + "+-" + df_no_trunc_grouped.groupby(["conf"]).std().round(args.precision).astype(str)
 
-        df_no_trunc_grouped.to_csv(os.path.join(args.path, "stats_no_trunc_grouped.csv"))
-        df_no_trunc_grouped.to_latex(os.path.join(args.path, "stats_no_trunc_grouped.txt"))
+        df_no_trunc.round(args.precision).to_csv(os.path.join(args.path, "stats_no_trunc.csv"))
+        df_no_trunc.round(args.precision).to_latex(os.path.join(args.path, "stats_no_trunc.txt"))
+
+        df_no_trunc_grouped.round(args.precision).to_csv(os.path.join(args.path, "stats_no_trunc_grouped.csv"))
+        df_no_trunc_grouped.round(args.precision).to_latex(os.path.join(args.path, "stats_no_trunc_grouped.txt"))
+
+        df_no_trunc_recap.round(args.precision).to_csv(os.path.join(args.path, "stats_no_trunc_recap.csv"))
+        df_no_trunc_recap.round(args.precision).to_latex(os.path.join(args.path, "stats_no_trunc_recap.txt"))
 
     if not df_with_trunc.empty:
-        df_with_trunc["with_trunc"] = df_with_trunc["with_trunc"].round(args.precision)
+        df_with_trunc["with_trunc"] = df_with_trunc["with_trunc"]
         df_with_trunc = df_with_trunc.pivot(index=['conf', 'exp', 'test', 'sampling'], columns='metric',
                                             values='with_trunc')
         columns_to_save = [col for col in args.columns_to_save if col in df_with_trunc.columns]
         df_with_trunc = df_with_trunc[columns_to_save]
 
-        df_with_trunc_grouped = df_with_trunc.groupby(["conf", "sampling"]).mean().round(args.precision)
+        df_with_trunc_grouped = df_with_trunc.groupby(["conf", "sampling"]).mean()
 
-        df_with_trunc.to_csv(os.path.join(args.path, "stats_with_trunc.csv"))
-        df_with_trunc.to_latex(os.path.join(args.path, "stats_with_trunc.txt"))
+        df_with_trunc_recap = df_with_trunc_grouped.groupby(["conf"]).mean().round(args.precision).astype(
+            str) + "+-" + df_with_trunc_grouped.groupby(["conf"]).std().round(args.precision).astype(str)
 
-        df_with_trunc_grouped.to_csv(os.path.join(args.path, "stats_with_trunc_grouped.csv"))
-        df_with_trunc_grouped.to_latex(os.path.join(args.path, "stats_with_trunc_grouped.txt"))
+        df_with_trunc.round(args.precision).to_csv(os.path.join(args.path, "stats_with_trunc.csv"))
+        df_with_trunc.round(args.precision).to_latex(os.path.join(args.path, "stats_with_trunc.txt"))
+
+        df_with_trunc_grouped.round(args.precision).to_csv(os.path.join(args.path, "stats_with_trunc_grouped.csv"))
+        df_with_trunc_grouped.round(args.precision).to_latex(os.path.join(args.path, "stats_with_trunc_grouped.txt"))
+
+        df_with_trunc_recap.round(args.precision).to_csv(os.path.join(args.path, "stats_with_trunc_recap.csv"))
+        df_with_trunc_recap.round(args.precision).to_latex(os.path.join(args.path, "stats_with_trunc_recap.txt"))
 
 
 if __name__ == '__main__':
