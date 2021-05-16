@@ -11,7 +11,7 @@ def get_parser():
     parser.add_argument("-path", type=str, required=True,
                         help="data folder containing experiments")
     parser.add_argument('-columns_to_save', nargs='+', type=str,
-                        default=["oracle_score", "recall_5", "bleu", "meteor", "cider", "ppl_dialog_lm",
+                        default=["oracle_score", "recall_5", "bleu", "meteor", "cider", "ppl_dialog_lm","ppl_dialog_lm_ext",
                                  "language_score", "selfbleu", "kurtosis", "peakiness"], help="")
     parser.add_argument('-bottom_folder', type=int, default=1)
     parser.add_argument('-top_folder', type=int, default=1)
