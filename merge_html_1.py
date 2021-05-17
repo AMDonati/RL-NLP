@@ -48,16 +48,17 @@ def merge_one_experiment(args, api):
             group_to_save["questions_"] = group_to_save.apply(
                 lambda x: f"\\textcolor{{Mahogany}}{{{x.questions}}}" if x.reward == "0.0" else f"\\textcolor{{PineGreen}}{{{x.questions}}}",
                 axis=1)
-            group_to_save = group_to_save[['root', 'reward', 'questions']]
+            group_to_save = group_to_save[['root',  'questions']]
             # group_to_save.to_csv(os.path.join(path, f"{name[0]}_{name[-1]}.csv"))
             url = re.findall("<img src=(.*?)>", name[1])[0]
-            img = f"21-RL-NLP/figures/vqav2/COCO_val2014_000000{name[0]}.jpeg"
+            name_=name[0].zfill(6)
+            img = f"21-RL-NLP/figures/vqav2/COCO_val2014_000000{name_}.jpg"
             captions_items = {}
             captions_items["url"] = f"\\href{{ici}}{{{url}}}"
             captions_items["img"] = name[0]
             captions_items["ref questions"] = name[2]
             captions_items["ref answer"] = name[-1]
-            captions_items["img_"] = f"\\includegraphics{{{img}}}"
+            captions_items["img_"] = f"\\includegraphics[width=200px]{{{img}}}"
 
             caption = "\\\\".join([f"{key}: {value}" for key, value in captions_items.items()])
             with pd.option_context("max_colwidth", 1000):
