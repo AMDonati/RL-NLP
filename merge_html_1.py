@@ -1,10 +1,10 @@
 import argparse
 import os
-import pandas as pd
-from bs4 import BeautifulSoup
 import re
-from gapi import get_google_api, get_by_name
-from pathlib import Path
+
+import pandas as pd
+
+from gapi import get_google_api
 
 
 def get_parser():
@@ -46,19 +46,23 @@ def merge_one_experiment(args, api):
         if len(list(group.index.unique("root"))) > 3:
             group_to_save = group.reset_index()
             group_to_save["questions_"] = group_to_save.apply(
-                lambda x: f"\\textcolor{{Mahogany}}{{{x.questions}}}" if x.reward == "0.0" else f"\\textcolor{{PineGreen}}{{{x.questions}}}",
+                lambda
+                    x: f"\\textcolor{{Mahogany}}{{{x.questions}}}" if x.reward == "0.0" else f"\\textcolor{{PineGreen}}{{{x.questions}}}",
                 axis=1)
-            group_to_save = group_to_save[['root',  'questions']]
+            group_to_save = group_to_save[['root', 'questions']]
             # group_to_save.to_csv(os.path.join(path, f"{name[0]}_{name[-1]}.csv"))
             url = re.findall("<img src=(.*?)>", name[1])[0]
-            name_=name[0].zfill(6)
-            img = f"21-RL-NLP/figures/vqav2/COCO_val2014_000000{name_}.jpg"
+            name_ = name[0].zfill(6)
+            img = f"img/coco/COCO_val2014_000000{name_}.jpg"
+            url = f"\\href{{ici}}{{{url}}}"
+            print(url)
+
             captions_items = {}
-            captions_items["url"] = f"\\href{{ici}}{{{url}}}"
-            captions_items["img"] = name[0]
+            captions_items["img"] = f"\\includegraphics[width=200px]{{{img}}}"
+            # captions_items["url"] = f"\\href{{ici}}{{{url}}}"
+            captions_items["imgid"] = name[0]
             captions_items["ref questions"] = name[2]
             captions_items["ref answer"] = name[-1]
-            captions_items["img_"] = f"\\includegraphics[width=200px]{{{img}}}"
 
             caption = "\\\\".join([f"{key}: {value}" for key, value in captions_items.items()])
             with pd.option_context("max_colwidth", 1000):
