@@ -9,7 +9,7 @@
 #SBATCH --output=slurm_out/vqa_lr/gptmodel-%j.out
 #SBATCH --error=slurm_out/vqa_lr/gptmodel-%j.err
 #SBATCH --time=100:00:00
-#SBATCH -A ajx@gpu
+#SBATCH -A ktz@gpu
 
 export TMPDIR=$JOBSCRATCH
 module purge
