@@ -6,6 +6,7 @@ from torch import nn
 from torch.distributions import Categorical
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchcontrib import nn as contrib_nn
+from transformers import AutoModelWithLMHead, AutoTokenizer, GPT2Model
 
 from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 
@@ -195,6 +196,34 @@ class PolicyLSTMBatch(nn.Module):
         pad_embed_pack = pack_padded_sequence(pad_embed, lens, batch_first=True, enforce_sorted=False)
         packed_output, (ht, ct) = self.lstm(pad_embed_pack)
         return ht[-1], ct
+
+
+class PolicyGPTBatch(PolicyLSTMBatch):
+    def __init__(self, num_tokens, word_emb_size, hidden_size,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
+                 kernel_size=1, stride=5, fusion="cat", env=None,
+                 condition_answer="none", attention_dim=512):
+        super().__init__(num_tokens, word_emb_size, hidden_size,
+                         device=device, num_layers=num_layers,
+                         num_filters=num_filters, kernel_size=kernel_size,
+                         stride=stride, fusion=fusion, env=env, condition_answer=condition_answer,
+                         attention_dim=attention_dim)
+        self.lm_model = GPT2Model.from_pretrained('cache/gpt-2')
+        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
+        self.dataset_tokenizer = env.dataset.question_tokenizer
+        self.fusion_dim = 768 + hidden_size
+        if self.condition_answer in ["after_fusion", "attention"]:
+            self.fusion_dim += word_emb_size
+        self.action_head = nn.Linear(self.fusion_dim, num_tokens)
+        self.value_head = nn.Linear(self.fusion_dim, 1)
+
+    def _get_embed_text(self, text, answer, img, h, c):
+        text = self.dataset_tokenizer.decode(text.cpu().numpy().ravel(), stop_at_end=True)
+        input_ids = self.tokenizer.encode(text, return_tensors="pt")
+        if input_ids.size(1) == 0:
+            input_ids = self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
+        outputs = self.lm_model(input_ids.to(self.device))
+        return outputs["last_hidden_state"][:, -1, :], None
 
 
 class PolicyLSTMBatch_SL(nn.Module):
