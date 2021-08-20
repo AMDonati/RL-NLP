@@ -14,7 +14,7 @@
 
 module purge
 module load  pytorch-gpu/py3/1.7.1
-conda activate rl-nlp
+conda activate rl-nlp-2
 
 export PYTHONPATH=src:${PYTHONPATH}
 
