@@ -1,6 +1,6 @@
 
 if __name__ == '__main__':
-    from transformers import BertTokenizer, GPT2Tokenizer
+    from transformers import BertTokenizer, AutoTokenizer
     import argparse
     from data_provider.vqa_tokenizer import VQATokenizer
     import numpy as np
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
 
-    lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    lm_tokenizer = AutoTokenizer.from_pretrained("gpt2")
     reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     features_h5path = args.features_path
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
