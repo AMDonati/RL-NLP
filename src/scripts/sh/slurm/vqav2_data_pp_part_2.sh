@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=debug-vqa
-#SBATCH --qos=qos_gpu-t3
+#SBATCH --qos=qos_gpu-t4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
