@@ -8,7 +8,7 @@
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa_lr/gptmodel-%j.out
 #SBATCH --error=slurm_out/vqa_lr/gptmodel-%j.err
-#SBATCH --time=100:00:00
+#SBATCH --time=20:00:00
 #SBATCH -A ktz@gpu
 
 export TMPDIR=$JOBSCRATCH
@@ -32,8 +32,8 @@ K_EPOCHS=20
 MAX_LEN=10
 UPDATE_EVERY=128
 DEBUG="0,20000"
-NUM_EPISODE_TRAIN=100000
-NUM_EPISODE_TEST=20000
+NUM_EPISODE_TRAIN=10000
+NUM_EPISODE_TEST=2000
 ENV_="vqa"
 MODEL="gpt"
 AGENT="PPO"
