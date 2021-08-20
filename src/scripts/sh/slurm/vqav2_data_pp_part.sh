@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=gptmodel
-#SBATCH --qos=qos_cpu-t3
+#SBATCH --job-name=debug-vqa
+#SBATCH --qos=qos_gpu-t3
+#SBATCH --nodes=1
 #SBATCH --ntasks=1
-
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=vqav2data-pp%j.out
-#SBATCH --error=vqav2data-pp%j.err
+#SBATCH --output=slurm_out/debugvqa%j.out
+#SBATCH --error=slurm_out/debugvqa%j.err
 #SBATCH --time=20:00:00
 #SBATCH -A ktz@gpu
 
