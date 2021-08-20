@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=debug-vqa
 #SBATCH --qos=qos_gpu-t4
-#SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
@@ -11,7 +10,7 @@
 #SBATCH --time=20:00:00
 #SBATCH -A ktz@gpu
 
-
+export TMPDIR=$JOBSCRATCH
 module purge
 module load  pytorch-gpu/py3/1.7.1
 conda activate rl-nlp-2
