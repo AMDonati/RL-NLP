@@ -1,10 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=vqav2data-pp
-#SBATCH --partition=prepost
-#SBATCH --nodes=1
+#SBATCH --job-name=gptmodel
+#SBATCH --qos=qos_cpu-t3
 #SBATCH --ntasks=1
+
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=8g
 #SBATCH --output=vqav2data-pp%j.out
 #SBATCH --error=vqav2data-pp%j.err
+#SBATCH --time=20:00:00
 #SBATCH -A ktz@gpu
 
 
