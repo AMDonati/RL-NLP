@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument("-test", type=int, default=1)
     args = parser.parse_args()
 
-    lm_tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    lm_tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
     reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     features_h5path = args.features_path
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
