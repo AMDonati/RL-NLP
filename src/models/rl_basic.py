@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Categorical
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from torchcontrib import nn as contrib_nn
 from transformers import AutoModelWithLMHead, AutoTokenizer, GPT2Model
 
@@ -203,6 +203,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
                  device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
                  kernel_size=1, stride=5, fusion="cat", env=None,
                  condition_answer="none", attention_dim=512):
+        # hidden size to 768 for transformers
+        self.hidden_size_transformers = 768
         super().__init__(num_tokens, word_emb_size, hidden_size,
                          device=device, num_layers=num_layers,
                          num_filters=num_filters, kernel_size=kernel_size,
@@ -211,19 +213,42 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.lm_model = GPT2Model.from_pretrained('cache/gpt-2')
         self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
         self.dataset_tokenizer = env.dataset.question_tokenizer
-        self.fusion_dim = 768 + hidden_size
+        self.fusion_dim = self.hidden_size_transformers + hidden_size
+        # self.fusion_dim = hidden_size_transformers
         if self.condition_answer in ["after_fusion", "attention"]:
             self.fusion_dim += word_emb_size
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
     def _get_embed_text(self, text, answer, img, h, c):
-        text = self.dataset_tokenizer.decode(text.cpu().numpy().ravel(), stop_at_end=True)
-        input_ids = self.tokenizer.encode(text, return_tensors="pt")
-        if input_ids.size(1) == 0:
-            input_ids = self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
+        lens = (text != 0).sum(dim=1).type(torch.int64).cpu()
+        plain_text = [self.dataset_tokenizer.decode(x.cpu().numpy().ravel(), stop_at_end=True) for x in text]
+        encoded = [self.tokenizer.encode(x, return_tensors="pt").view(-1) if x != "" else self.tokenizer.encode(
+            self.tokenizer.bos_token, return_tensors="pt").view(-1) for x in plain_text]
+        input_ids = pad_sequence(encoded, batch_first=True)
+        # input_ids = self.tokenizer.encode(text, return_tensors="pt")
+        # pad_sequence()
+        # if input_ids.size(1) == 0:
+        #    input_ids = self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
         outputs = self.lm_model(input_ids.to(self.device))
-        return outputs["last_hidden_state"][:, -1, :], None
+        embed_text = outputs["last_hidden_state"][:, -1, :]
+        return embed_text, torch.zeros_like(embed_text).unsqueeze(1)
+
+    def init_hidden_state(self, state):
+        """
+        Creates the initial hidden and cell states for the decoder's LSTM based on the encoded images.
+
+        :return: hidden state, cell state
+        """
+        (text, img, answer) = state
+        h, c = torch.zeros((img.size(0), self.hidden_size_transformers)).to(self.device), torch.zeros(
+            (img.size(0), 1, self.hidden_size_transformers)).to(self.device)
+        if self.fusion == "sat":
+            encoder_out = img.transpose(2, 1).to(self.device)
+            mean_encoder_out = encoder_out.mean(dim=1)
+            h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
+            c = self.init_c(mean_encoder_out.to(self.device))
+        return h, c
 
 
 class PolicyLSTMBatch_SL(nn.Module):
