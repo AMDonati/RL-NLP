@@ -212,6 +212,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
                          attention_dim=attention_dim)
         self.lm_model = GPT2Model.from_pretrained('cache/gpt-2')
         self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
         self.dataset_tokenizer = env.dataset.question_tokenizer
         self.fusion_dim = self.hidden_size_transformers + hidden_size
         # self.fusion_dim = hidden_size_transformers
@@ -221,18 +223,15 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.value_head = nn.Linear(self.fusion_dim, 1)
 
     def _get_embed_text(self, text, answer, img, h, c):
-        lens = (text != 0).sum(dim=1).type(torch.int64).cpu()
-        plain_text = [self.dataset_tokenizer.decode(x.cpu().numpy().ravel(), stop_at_end=True) for x in text]
-        encoded = [self.tokenizer.encode(x, return_tensors="pt").view(-1) if x != "" else self.tokenizer.encode(
-            self.tokenizer.bos_token, return_tensors="pt").view(-1) for x in plain_text]
-        input_ids = pad_sequence(encoded, batch_first=True)
-        # input_ids = self.tokenizer.encode(text, return_tensors="pt")
-        # pad_sequence()
-        # if input_ids.size(1) == 0:
-        #    input_ids = self.tokenizer.encode(self.tokenizer.bos_token, return_tensors="pt")
-        outputs = self.lm_model(input_ids.to(self.device))
-        embed_text = outputs["last_hidden_state"][:, -1, :]
-        return embed_text, torch.zeros_like(embed_text).unsqueeze(1)
+        batch_sentences = [
+            self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
+                                          stop_at_end=True) if x.sum() > 1 else self.tokenizer.bos_token for x in text]
+        batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
+        outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()})
+        lengths = batch["attention_mask"].sum(dim=-1)
+        index = (lengths - 1)
+        embed_text = outputs["last_hidden_state"][torch.arange(index.size(0)), index]
+        return embed_text, torch.zeros_like(embed_text.unsqueeze(dim=1))
 
     def init_hidden_state(self, state):
         """
