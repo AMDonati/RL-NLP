@@ -227,6 +227,10 @@ class PolicyGPTBatch(PolicyLSTMBatch):
             self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
                                           stop_at_end=True) if x.sum() > 1 else self.tokenizer.bos_token for x in text]
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
+        # check if input_ids is empty to avoid the runtime error in the forward pass
+        # TODO understand why it happens
+        if batch["input_ids"].nelement() == 0:
+            batch = self.tokenizer(['<|endoftext|>'], padding=True, truncation=True, return_tensors="pt")
         outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()})
         lengths = batch["attention_mask"].sum(dim=-1)
         index = (lengths - 1)
