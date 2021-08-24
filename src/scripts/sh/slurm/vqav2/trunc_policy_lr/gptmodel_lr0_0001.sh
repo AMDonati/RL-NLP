@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=gptmodel
+#SBATCH --job-name=gpt00001
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/vqa_lr/gptmodel-%j.out
-#SBATCH --error=slurm_out/vqa_lr/gptmodel-%j.err
+#SBATCH --output=slurm_out/vqa_lr/gptmodel00001-%j.out
+#SBATCH --error=slurm_out/vqa_lr/gptmodel00001-%j.err
 #SBATCH --time=7:00:00
 #SBATCH -A ktz@gpu
 
@@ -37,7 +37,7 @@ NUM_EPISODE_TEST=20000
 ENV_="vqa"
 MODEL="gpt"
 AGENT="PPO"
-LR=0.0001
+LR=0.00001
 WORD_EMB_SIZE=128
 HIDDEN_SIZE=256
 EPS_CLIP=0.01
