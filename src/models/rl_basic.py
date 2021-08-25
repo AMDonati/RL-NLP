@@ -281,10 +281,10 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
 
     def _get_embed_text(self, text, answer, img, h, c):
         lens = (text != 0).sum(dim=1).type(torch.int64).cpu()
-        emb = self.lm_model.language_model.embedding(text)
+        emb = self.lm_model.language_model.embedding(text.to(self.device))
         emb = self.lm_model.language_model.dropout(emb)
         pad_embed_pack = pack_padded_sequence(emb, lens, batch_first=True, enforce_sorted=False)
-        packed_output, (ht, ct) = self.lm_model.language_model.lstm(pad_embed_pack)
+        packed_output, (ht, ct) = self.lm_model.language_model.lstm(pad_embed_pack.to(self.device))
         return ht[-1], ct
 
     def init_hidden_state(self, state):
