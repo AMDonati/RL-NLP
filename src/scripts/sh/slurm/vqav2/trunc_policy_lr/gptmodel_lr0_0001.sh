@@ -8,7 +8,7 @@
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa_lr/gptmodel00001-%j.out
 #SBATCH --error=slurm_out/vqa_lr/gptmodel00001-%j.err
-#SBATCH --time=7:00:00
+#SBATCH --time=100:00:00
 #SBATCH -A ktz@gpu
 
 export TMPDIR=$JOBSCRATCH
