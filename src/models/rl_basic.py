@@ -9,6 +9,7 @@ from torchcontrib import nn as contrib_nn
 from transformers import AutoModelWithLMHead, AutoTokenizer, GPT2Model
 
 from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
+from models.language_model import ClevrLanguageModel
 
 
 class Attention(nn.Module):
@@ -251,6 +252,50 @@ class PolicyGPTBatch(PolicyLSTMBatch):
             mean_encoder_out = encoder_out.mean(dim=1)
             h = self.init_h(mean_encoder_out.to(self.device))  # (batch_size, decoder_dim)
             c = self.init_c(mean_encoder_out.to(self.device))
+        return h, c
+
+
+class PolicyCLOSUREBatch(PolicyLSTMBatch):
+    def __init__(self, num_tokens, word_emb_size, hidden_size,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
+                 kernel_size=1, stride=5, fusion="cat", env=None,
+                 condition_answer="none", attention_dim=512):
+        super().__init__(num_tokens, word_emb_size, hidden_size,
+                         device=device, num_layers=num_layers,
+                         num_filters=num_filters, kernel_size=kernel_size,
+                         stride=stride, fusion=fusion, env=env, condition_answer=condition_answer,
+                         attention_dim=attention_dim)
+        lm_path = "output/lm_ext/model.pt"
+        lm_model = torch.load(lm_path, map_location=torch.device(device))
+        self.lm_model = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
+                                           tokenizer=env.dataset.question_tokenizer, device=device,
+                                           lm_path=lm_path)
+        self.hidden_size_closure = self.lm_model.language_model.lstm.hidden_size
+        h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
+        self.dataset_tokenizer = env.dataset.question_tokenizer
+        self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size_closure
+        if self.condition_answer in ["after_fusion", "attention"]:
+            self.fusion_dim += word_emb_size
+        self.action_head = nn.Linear(self.fusion_dim, num_tokens)
+        self.value_head = nn.Linear(self.fusion_dim, 1)
+
+    def _get_embed_text(self, text, answer, img, h, c):
+        lens = (text != 0).sum(dim=1).type(torch.int64).cpu()
+        emb = self.lm_model.language_model.embedding(text)
+        emb = self.lm_model.language_model.dropout(emb)
+        pad_embed_pack = pack_padded_sequence(emb, lens, batch_first=True, enforce_sorted=False)
+        packed_output, (ht, ct) = self.lm_model.language_model.lstm(pad_embed_pack)
+        return ht[-1], ct
+
+    def init_hidden_state(self, state):
+        """
+        Creates the initial hidden and cell states for the decoder's LSTM based on the encoded images.
+
+        :return: hidden state, cell state
+        """
+        (text, img, answer) = state
+        h, c = torch.zeros((img.size(0), self.hidden_size_closure)).to(self.device), torch.zeros(
+            (img.size(0), 1, self.hidden_size_closure)).to(self.device)
         return h, c
 
 
