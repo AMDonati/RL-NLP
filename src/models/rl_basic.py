@@ -267,6 +267,7 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
                          attention_dim=attention_dim)
         lm_path = "output/lm_ext/model.pt"
         lm_model = torch.load(lm_path, map_location=torch.device(device))
+        lm_model.train()
         self.lm_model = ClevrLanguageModel(pretrained_lm=lm_model, dataset=env.dataset,
                                            tokenizer=env.dataset.question_tokenizer, device=device,
                                            lm_path=lm_path)
