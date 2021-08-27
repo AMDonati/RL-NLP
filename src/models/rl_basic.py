@@ -211,8 +211,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
                          num_filters=num_filters, kernel_size=kernel_size,
                          stride=stride, fusion=fusion, env=env, condition_answer=condition_answer,
                          attention_dim=attention_dim)
-        self.lm_model = GPT2Model.from_pretrained('cache/gpt-2')
-        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
+        self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
+        self.tokenizer = AutoTokenizer.from_pretrained("gpt2", add_prefix_space=True)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.dataset_tokenizer = env.dataset.question_tokenizer
@@ -222,20 +222,31 @@ class PolicyGPTBatch(PolicyLSTMBatch):
             self.fusion_dim += word_emb_size
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
+        lm_weights_vocab = self.lm_model.lm_head.weight[list(env.dataset.lm_to_dataset_trad.keys())]
+        self.text_fc = torch.cat((torch.zeros((4, 768)), lm_weights_vocab))
+        self.action_head.weight.data = torch.zeros_like(self.action_head.weight.data)
+        self.action_head.weight.data.t()[self.hidden_size:-self.word_emb_size] = self.text_fc.t()
+        self.env = env
+        start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
+        self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
 
     def _get_embed_text(self, text, answer, img, h, c):
         batch_sentences = [
             self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
-                                          stop_at_end=True) if x.sum() > 1 else self.tokenizer.bos_token for x in text]
+                                          stop_at_end=True) if x.sum() > 1 else self.start_input_for_gpt for x in
+            text]
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
         # check if input_ids is empty to avoid the runtime error in the forward pass
         # TODO understand why it happens
         if batch["input_ids"].nelement() == 0:
-            batch = self.tokenizer(['<|endoftext|>'], padding=True, truncation=True, return_tensors="pt")
-        outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()})
+            batch = self.tokenizer([self.start_input_for_gpt], padding=True, truncation=True, return_tensors="pt")
+        outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()}, output_hidden_states=True)
+        #v, indices = torch.sort(outputs["logits"], descending=True)
+        #print(batch_sentences)
+        #print(self.tokenizer.batch_decode(indices[:, -1, :10].view(-1, 1)))
         lengths = batch["attention_mask"].sum(dim=-1)
         index = (lengths - 1)
-        embed_text = outputs["last_hidden_state"][torch.arange(index.size(0)), index]
+        embed_text = outputs["hidden_states"][-1][torch.arange(index.size(0)), index]
         return embed_text, torch.zeros_like(embed_text.unsqueeze(dim=1))
 
     def init_hidden_state(self, state):
@@ -279,6 +290,7 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
             self.fusion_dim += word_emb_size
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
+        self.da
 
     def _get_embed_text(self, text, answer, img, h, c):
         lens = (text != 0).sum(dim=1).type(torch.int64).cpu()
