@@ -124,6 +124,9 @@ class PolicyLSTMBatch(nn.Module):
             c = self.init_c(mean_encoder_out.to(self.device))
         return h, c
 
+    def filter_logits(self, logits):
+        return logits
+
     def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0., ht=None,
                 ct=None):
         embed_text, ct = self._get_embed_text(state_text, state_answer, state_img, ht, ct)
@@ -133,9 +136,10 @@ class PolicyLSTMBatch(nn.Module):
             self.conv(img_feat))  # shape (1,3,7,7)
         embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
         logits = self.action_head(embedding)  # (B,S,num_tokens)
+        logits_filtered = self.filter_logits(logits)
         value = self.value_head(embedding)
         # adding lm logits bonus
-        logits_exploration = (1 - alpha) * logits + alpha * logits_lm
+        logits_exploration = (1 - alpha) * logits_filtered + alpha * logits_lm
         policy_dist, policy_dist_truncated = self.get_policies(valid_actions, logits_exploration)
         return policy_dist, policy_dist_truncated, value, embed_text, ct
 
@@ -212,7 +216,7 @@ class PolicyGPTBatch(PolicyLSTMBatch):
                          stride=stride, fusion=fusion, env=env, condition_answer=condition_answer,
                          attention_dim=attention_dim)
         self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2", add_prefix_space=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.dataset_tokenizer = env.dataset.question_tokenizer
@@ -229,12 +233,15 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.env = env
         start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
         self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
+        #self.init_text = self.get_init_text(10)
 
     def _get_embed_text(self, text, answer, img, h, c):
         batch_sentences = [
             self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
                                           stop_at_end=True) if x.sum() > 1 else self.start_input_for_gpt for x in
             text]
+        #if self.init_text is not None:
+        #    batch_sentences = self.init_text + batch_sentences
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
         # check if input_ids is empty to avoid the runtime error in the forward pass
         # TODO understand why it happens
@@ -265,6 +272,16 @@ class PolicyGPTBatch(PolicyLSTMBatch):
             c = self.init_c(mean_encoder_out.to(self.device))
         return h, c
 
+    def filter_logits(self, logits):
+        logits[:, torch.arange(0, 4)] = torch.tensor(-1e32).to(self.device)
+        return logits
+
+    def get_init_text(self, custom_init=10):
+        idxs = np.random.randint(0, len(self.env.dataset.remaining_entries), size=custom_init)
+        samples = np.array(self.env.dataset.remaining_entries)[list(set(idxs))]
+        example_questions = [s["question"] for s in samples]
+        return example_questions
+
 
 class PolicyCLOSUREBatch(PolicyLSTMBatch):
     def __init__(self, num_tokens, word_emb_size, hidden_size,
@@ -294,7 +311,7 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
 
         self.unk_idx = env.dataset.vocab_questions["<UNK>"]
         lm_weights_vocab = self.lm_model.language_model.fc.weight  # [list(env.dataset.lm_to_dataset_trad.keys())]
-        #lm_weights_vocab[self.unk_idx] = 0.
+        # lm_weights_vocab[self.unk_idx] = 0.
         self.action_head.weight.data = torch.zeros_like(self.action_head.weight.data)
         self.action_head.weight.data.t()[img_dim:-self.word_emb_size] = lm_weights_vocab.t()
 
@@ -319,21 +336,9 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
             (img.size(0), 1, self.hidden_size_closure)).to(self.device)
         return h, c
 
-    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0., ht=None,
-                ct=None):
-        embed_text, ct = self._get_embed_text(state_text, state_answer, state_img, ht, ct)
-        state_answer = state_answer if state_answer is None else state_answer.to(self.device)
-        img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
-        img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(
-            self.conv(img_feat))  # shape (1,3,7,7)
-        embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
-        logits = self.action_head(embedding)  # (B,S,num_tokens)
+    def filter_logits(self, logits):
         logits[:, self.unk_idx] = torch.tensor(-1e32).to(self.device)
-        value = self.value_head(embedding)
-        # adding lm logits bonus
-        logits_exploration = (1 - alpha) * logits + alpha * logits_lm
-        policy_dist, policy_dist_truncated = self.get_policies(valid_actions, logits_exploration)
-        return policy_dist, policy_dist_truncated, value, embed_text, ct
+        return logits
 
 
 class PolicyLSTMBatch_SL(nn.Module):
