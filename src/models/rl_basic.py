@@ -215,8 +215,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
                          num_filters=num_filters, kernel_size=kernel_size,
                          stride=stride, fusion=fusion, env=env, condition_answer=condition_answer,
                          attention_dim=attention_dim)
-        self.lm_model = AutoModelWithLMHead.from_pretrained("gpt2")
-        self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+        self.lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
+        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         self.dataset_tokenizer = env.dataset.question_tokenizer
