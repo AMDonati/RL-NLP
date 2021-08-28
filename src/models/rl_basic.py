@@ -241,9 +241,9 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         if batch["input_ids"].nelement() == 0:
             batch = self.tokenizer([self.start_input_for_gpt], padding=True, truncation=True, return_tensors="pt")
         outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()}, output_hidden_states=True)
-        #v, indices = torch.sort(outputs["logits"], descending=True)
-        #print(batch_sentences)
-        #print(self.tokenizer.batch_decode(indices[:, -1, :10].view(-1, 1)))
+        # v, indices = torch.sort(outputs["logits"], descending=True)
+        # print(batch_sentences)
+        # print(self.tokenizer.batch_decode(indices[:, -1, :10].view(-1, 1)))
         lengths = batch["attention_mask"].sum(dim=-1)
         index = (lengths - 1)
         embed_text = outputs["hidden_states"][-1][torch.arange(index.size(0)), index]
@@ -285,12 +285,18 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
         self.hidden_size_closure = self.lm_model.language_model.lstm.hidden_size
         h_out = int((14 + 2 * 0 - 1 * (self.kernel_size - 1) - 1) / self.stride + 1)
         self.dataset_tokenizer = env.dataset.question_tokenizer
-        self.fusion_dim = self.num_filters * h_out ** 2 + self.hidden_size_closure
+        img_dim = self.num_filters * h_out ** 2
+        self.fusion_dim = img_dim + self.hidden_size_closure
         if self.condition_answer in ["after_fusion", "attention"]:
             self.fusion_dim += word_emb_size
         self.action_head = nn.Linear(self.fusion_dim, num_tokens)
         self.value_head = nn.Linear(self.fusion_dim, 1)
-        self.da
+
+        self.unk_idx = env.dataset.vocab_questions["<UNK>"]
+        lm_weights_vocab = self.lm_model.language_model.fc.weight  # [list(env.dataset.lm_to_dataset_trad.keys())]
+        #lm_weights_vocab[self.unk_idx] = 0.
+        self.action_head.weight.data = torch.zeros_like(self.action_head.weight.data)
+        self.action_head.weight.data.t()[img_dim:-self.word_emb_size] = lm_weights_vocab.t()
 
     def _get_embed_text(self, text, answer, img, h, c):
         lens = (text != 0).sum(dim=1).type(torch.int64).cpu()
@@ -312,6 +318,22 @@ class PolicyCLOSUREBatch(PolicyLSTMBatch):
         h, c = torch.zeros((img.size(0), self.hidden_size_closure)).to(self.device), torch.zeros(
             (img.size(0), 1, self.hidden_size_closure)).to(self.device)
         return h, c
+
+    def forward(self, state_text, state_img, state_answer=None, valid_actions=None, logits_lm=0, alpha=0., ht=None,
+                ct=None):
+        embed_text, ct = self._get_embed_text(state_text, state_answer, state_img, ht, ct)
+        state_answer = state_answer if state_answer is None else state_answer.to(self.device)
+        img_feat = state_img.to(self.device)  # shape (1, 1024, 14, 14) vs (1,101,2048)
+        img_feat_ = img_feat if self.fusion in ["average", "none", "sat"] else F.relu(
+            self.conv(img_feat))  # shape (1,3,7,7)
+        embedding = self.process_fusion(embed_text, img_feat_, img_feat, state_answer)
+        logits = self.action_head(embedding)  # (B,S,num_tokens)
+        logits[:, self.unk_idx] = torch.tensor(-1e32).to(self.device)
+        value = self.value_head(embedding)
+        # adding lm logits bonus
+        logits_exploration = (1 - alpha) * logits + alpha * logits_lm
+        policy_dist, policy_dist_truncated = self.get_policies(valid_actions, logits_exploration)
+        return policy_dist, policy_dist_truncated, value, embed_text, ct
 
 
 class PolicyLSTMBatch_SL(nn.Module):
