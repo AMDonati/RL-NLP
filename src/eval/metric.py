@@ -421,6 +421,8 @@ class LanguageScore(Metric):
     def process_batch(self, questions):
         loss = torch.nn.CrossEntropyLoss(reduction="none")
         inputs = self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt")
+        if inputs["input_ids"].nelement() == 0:
+            return [0] * 10
         labels = inputs["input_ids"].clone()
         labels[inputs["attention_mask"] == 0] = -100
         outputs = self.lm_model(**inputs, labels=labels)
