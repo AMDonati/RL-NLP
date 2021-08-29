@@ -233,7 +233,9 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.env = env
         start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
         self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
-        self.init_text = f"Here are a few examples: {self.get_init_text(100)} "
+        self.init_text = f"Here are a few examples:{self.get_init_text(100)}"
+        batch = self.tokenizer([self.init_text], padding=True, truncation=True, return_tensors="pt")
+        self.len_init_text = batch["input_ids"].size(1) - 1
 
     def _get_embed_text(self, text, answer, img, h, c):
         batch_sentences = [
@@ -247,6 +249,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         if batch["input_ids"].nelement() == 0:
             batch = self.tokenizer([self.start_input_for_gpt], padding=True, truncation=True, return_tensors="pt")
         outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()}, output_hidden_states=True)
+        outputs["hidden_states"][-1][:, :self.len_init_text, :].detach()
+        # self.lm_model.generate()
         # v, indices = torch.sort(outputs["logits"], descending=True)
         # print(batch_sentences)
         # print(self.tokenizer.batch_decode(indices[:, -1, :10].view(-1, 1)))
