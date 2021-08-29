@@ -233,14 +233,13 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.env = env
         start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
         self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
-        #self.init_text = self.get_init_text(10)
+        self.init_text = f"Here are a few examples: {self.get_init_text(100)} "
 
     def _get_embed_text(self, text, answer, img, h, c):
         batch_sentences = [
-            self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
-                                          stop_at_end=True) if x.sum() > 1 else self.start_input_for_gpt for x in
-            text]
-        #if self.init_text is not None:
+            self.init_text + self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
+                                                           stop_at_end=True) for x in text]
+        # if self.init_text is not None:
         #    batch_sentences = self.init_text + batch_sentences
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
         # check if input_ids is empty to avoid the runtime error in the forward pass
@@ -280,7 +279,7 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         idxs = np.random.randint(0, len(self.env.dataset.remaining_entries), size=custom_init)
         samples = np.array(self.env.dataset.remaining_entries)[list(set(idxs))]
         example_questions = [s["question"] for s in samples]
-        return example_questions
+        return " ".join(example_questions)
 
 
 class PolicyCLOSUREBatch(PolicyLSTMBatch):
