@@ -234,26 +234,27 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
         self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
         self.init_text = f"Here are a few examples:{self.get_init_text(100)}"
-        batch = self.tokenizer([self.init_text], padding=True, truncation=True, return_tensors="pt")
-        self.len_init_text = batch["input_ids"].size(1) - 1
+        self.init_batch = self.tokenizer([self.init_text], padding=True, truncation=True, return_tensors="pt")
+        past_key_values = self.lm_model(**self.init_batch, output_hidden_states=True, use_cache=True).past_key_values
+        self.init_past_key_values = [kv.detach() for kv in past_key_values]
 
     def _get_embed_text(self, text, answer, img, h, c):
-        batch_sentences = [
-            self.init_text + self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
-                                                           stop_at_end=True) for x in text]
+        batch_sentences = ["?" + self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
+                                                               stop_at_end=True) for x in text]
+        batch_size = len(batch_sentences)
         # if self.init_text is not None:
         #    batch_sentences = self.init_text + batch_sentences
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
+        init_past_key_values = [pkv.repeat_interleave(batch_size, 1) for pkv in self.init_past_key_values]
+        init_batch = self.init_batch.attention_mask.repeat((batch_size, 1))
+        attention_mask = torch.cat((init_batch, batch.attention_mask), dim=-1).to(self.device)
+        input_ids = batch.input_ids.to(self.device)
         # check if input_ids is empty to avoid the runtime error in the forward pass
         # TODO understand why it happens
         if batch["input_ids"].nelement() == 0:
             batch = self.tokenizer([self.start_input_for_gpt], padding=True, truncation=True, return_tensors="pt")
-        outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()}, output_hidden_states=True)
-        outputs["hidden_states"][-1][:, :self.len_init_text, :].detach()
-        # self.lm_model.generate()
-        # v, indices = torch.sort(outputs["logits"], descending=True)
-        # print(batch_sentences)
-        # print(self.tokenizer.batch_decode(indices[:, -1, :10].view(-1, 1)))
+        outputs = self.lm_model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True,
+                                past_key_values=init_past_key_values)
         lengths = batch["attention_mask"].sum(dim=-1)
         index = (lengths - 1)
         embed_text = outputs["hidden_states"][-1][torch.arange(index.size(0)), index]
