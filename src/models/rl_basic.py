@@ -236,7 +236,7 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.init_text = f"Here are a few examples:{self.get_init_text(100)}"
         self.init_batch = self.tokenizer([self.init_text], padding=True, truncation=True, return_tensors="pt")
         past_key_values = self.lm_model(**self.init_batch, output_hidden_states=True, use_cache=True).past_key_values
-        self.init_past_key_values = [kv.detach() for kv in past_key_values]
+        self.init_past_key_values = [[kv[0].detach(), kv[1].detach()] for kv in past_key_values]
 
     def _get_embed_text(self, text, answer, img, h, c):
         batch_sentences = ["?" + self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
@@ -245,7 +245,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         # if self.init_text is not None:
         #    batch_sentences = self.init_text + batch_sentences
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
-        init_past_key_values = [pkv.repeat_interleave(batch_size, 1) for pkv in self.init_past_key_values]
+        init_past_key_values = [[k.repeat_interleave(batch_size, 1).detach(), v.repeat_interleave(batch_size, 1).detach()] for (k, v) in
+                                self.init_past_key_values]
         init_batch = self.init_batch.attention_mask.repeat((batch_size, 1))
         attention_mask = torch.cat((init_batch, batch.attention_mask), dim=-1).to(self.device)
         input_ids = batch.input_ids.to(self.device)
