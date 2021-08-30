@@ -245,7 +245,8 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         # if self.init_text is not None:
         #    batch_sentences = self.init_text + batch_sentences
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
-        init_past_key_values = [[k.repeat_interleave(batch_size, 1).detach(), v.repeat_interleave(batch_size, 1).detach()] for (k, v) in
+        init_past_key_values = [[k.repeat_interleave(batch_size, 1).detach().to(self.device),
+                                 v.repeat_interleave(batch_size, 1).detach().to(self.device)] for (k, v) in
                                 self.init_past_key_values]
         init_batch = self.init_batch.attention_mask.repeat((batch_size, 1))
         attention_mask = torch.cat((init_batch, batch.attention_mask), dim=-1).to(self.device)
