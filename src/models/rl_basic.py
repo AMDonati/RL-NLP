@@ -321,14 +321,9 @@ class PolicyGPTBatch_No_Cond(PolicyGPTBatch):
         batch_sentences = [self.tokenizer.bos_token + self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
                                                                                     stop_at_end=True) for x in text]
         batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
-        # check if input_ids is empty to avoid the runtime error in the forward pass
-        # TODO understand why it happens
         if batch["input_ids"].nelement() == 0:
             batch = self.tokenizer([self.tokenizer.pad_token], padding=True, truncation=True, return_tensors="pt")
-        outputs = self.lm_model(**batch, output_hidden_states=True)
-        if len(batch_sentences):
-            v, i = torch.sort(outputs.logits.squeeze(), descending=True)
-            #print(self.tokenizer.batch_decode(i[:10]))
+        outputs = self.lm_model(**{k: v.to(self.device) for k, v in batch.items()}, output_hidden_states=True)
         lengths = batch["attention_mask"].sum(dim=-1)
         index = (lengths - 1)
         # self.lm_model.generate()
