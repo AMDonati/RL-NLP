@@ -233,7 +233,7 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.env = env
         start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
         self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
-        self.init_text = f"Here are a few examples:{self.get_init_text(10)}"
+        self.init_text = f"Here are a few examples:{self.get_init_text(50)}"
         self.init_batch = self.tokenizer([self.init_text], padding=True, truncation=True, return_tensors="pt")
         past_key_values = self.lm_model(**self.init_batch, output_hidden_states=True, use_cache=True).past_key_values
         self.init_past_key_values = [[kv[0].detach(), kv[1].detach()] for kv in past_key_values]
