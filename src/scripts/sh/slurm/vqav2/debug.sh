@@ -7,7 +7,8 @@
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/vqa/debug%j.out
 #SBATCH --error=slurm_out/vqa/debug%j.err
-#SBATCH --time=100:00:00
+#SBATCH --time=20:00:00
+#SBATCH -A ktz@gpu
 
 export TMPDIR=$JOBSCRATCH
 module purge
