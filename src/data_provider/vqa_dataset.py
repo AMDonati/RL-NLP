@@ -443,7 +443,7 @@ if __name__ == '__main__':
     features_path = "data/vqa-v2/coco_trainval.lmdb"
     vocab_path = "data/vqa-v2/cache/vocab_min.json"
 
-    lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    lm_tokenizer = GPT2Tokenizer.from_pretrained("cache/gpt2")
     print("test of lm_tokenizer...")
     ids = lm_tokenizer("The cat is on the mat", add_prefix_space=True)
     print(ids)
