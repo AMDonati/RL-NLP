@@ -16,7 +16,7 @@ from agent.ppo import PPO
 from agent.reinforce import REINFORCE
 from envs.clevr_env import ClevrEnv, VQAEnv
 from models.language_model import GenericLanguageModel, ClevrLanguageModel
-from models.rl_basic import PolicyLSTMBatch, PolicyGPTBatch, PolicyCLOSUREBatch
+from models.rl_basic import PolicyLSTMBatch, PolicyGPTBatch, PolicyCLOSUREBatch, PolicyGPTBatch_No_Cond
 from utils.utils_train import create_logger
 from torch import optim
 from torch.optim import lr_scheduler
@@ -451,7 +451,8 @@ def run(args):
     logger.info("number of training questions:{}".format(len(env.dataset)))
     logger.info("vocab size:{}".format(len(env.dataset.vocab_questions)))
 
-    models = {"lstm": PolicyLSTMBatch, "gpt": PolicyGPTBatch, "closure": PolicyCLOSUREBatch}
+    models = {"lstm": PolicyLSTMBatch, "gpt": PolicyGPTBatch, "closure": PolicyCLOSUREBatch,
+              "gpt_no_cond": PolicyGPTBatch_No_Cond}
     # creating the policy model.
     policy = models[args.model](env.dataset.len_vocab, args.word_emb_size, args.hidden_size,
                                 kernel_size=args.conv_kernel,

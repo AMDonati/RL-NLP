@@ -10,6 +10,7 @@ from transformers import AutoModelWithLMHead, AutoTokenizer, GPT2Model
 
 from RL_toolbox.truncation import mask_truncature, mask_inf_truncature
 from models.language_model import ClevrLanguageModel
+from typing import Optional
 
 
 class Attention(nn.Module):
@@ -233,7 +234,7 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         self.env = env
         start_input_encoded = torch.tensor([self.tokenizer.bos_token_id])
         self.start_input_for_gpt = self.tokenizer.decode(start_input_encoded)
-        self.init_text = f"Here are a few examples:{self.get_init_text(50)}"
+        self.init_text = f"Here are a few examples:{self.get_init_text(10)}"
         self.init_batch = self.tokenizer([self.init_text], padding=True, truncation=True, return_tensors="pt")
         past_key_values = self.lm_model(**self.init_batch, output_hidden_states=True, use_cache=True).past_key_values
         self.init_past_key_values = [[kv[0].detach(), kv[1].detach()] for kv in past_key_values]
@@ -287,6 +288,69 @@ class PolicyGPTBatch(PolicyLSTMBatch):
         samples = np.array(self.env.dataset.remaining_entries)[list(set(idxs))]
         example_questions = [s["question"] for s in samples]
         return " ".join(example_questions)
+
+
+class PolicyGPTBatch_No_Cond(PolicyGPTBatch):
+    def __init__(self, num_tokens, word_emb_size, hidden_size,
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), num_layers=1, num_filters=3,
+                 kernel_size=1, stride=5, fusion="cat", env=None,
+                 condition_answer="none", attention_dim=512):
+        super().__init__(num_tokens, word_emb_size, hidden_size,
+                         device=device, num_layers=num_layers,
+                         num_filters=num_filters, kernel_size=kernel_size,
+                         stride=stride, fusion=fusion, env=env, condition_answer=condition_answer,
+                         attention_dim=attention_dim)
+        self.lm_model = AutoModelWithLMHead.from_pretrained("cache/gpt-2")
+        self.tokenizer = AutoTokenizer.from_pretrained("cache/gpt-2")
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.dataset_tokenizer = env.dataset.question_tokenizer
+        self.fusion_dim = self.hidden_size_transformers + hidden_size
+        # self.fusion_dim = hidden_size_transformers
+        if self.condition_answer in ["after_fusion", "attention"]:
+            self.fusion_dim += word_emb_size
+        self.action_head = nn.Linear(self.fusion_dim, num_tokens)
+        self.value_head = nn.Linear(self.fusion_dim, 1)
+        lm_weights_vocab = self.lm_model.lm_head.weight[list(env.dataset.lm_to_dataset_trad.keys())]
+        self.text_fc = torch.cat((torch.zeros((4, 768)), lm_weights_vocab))
+        self.action_head.weight.data = torch.zeros_like(self.action_head.weight.data)
+        self.action_head.weight.data.t()[self.hidden_size:-self.word_emb_size] = self.text_fc.t()
+        self.env = env
+
+    def _get_embed_text(self, text, answer, img, h, c):
+        batch_sentences = [self.tokenizer.bos_token + self.dataset_tokenizer.decode(x.cpu().numpy().ravel(),
+                                                                                    stop_at_end=True) for x in text]
+        batch = self.tokenizer(batch_sentences, padding=True, truncation=True, return_tensors="pt")
+        # check if input_ids is empty to avoid the runtime error in the forward pass
+        # TODO understand why it happens
+        if batch["input_ids"].nelement() == 0:
+            batch = self.tokenizer([self.tokenizer.pad_token], padding=True, truncation=True, return_tensors="pt")
+        outputs = self.lm_model(**batch, output_hidden_states=True)
+        if len(batch_sentences):
+            v, i = torch.sort(outputs.logits.squeeze(), descending=True)
+            #print(self.tokenizer.batch_decode(i[:10]))
+        lengths = batch["attention_mask"].sum(dim=-1)
+        index = (lengths - 1)
+        # self.lm_model.generate()
+        embed_text = outputs["hidden_states"][-1][torch.arange(index.size(0)), index]
+        return embed_text, torch.zeros_like(embed_text.unsqueeze(dim=1))
+
+    def _prepare_input_ids_for_generation(
+            self, bos_token_id: Optional[int]) -> torch.LongTensor:
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` has to be defined when no `input_ids` are provided.")
+        return torch.ones((1, 1), dtype=torch.long, device=self.device) * bos_token_id
+
+    def _prepare_attention_mask_for_generation(
+            self, input_ids: torch.Tensor, pad_token_id: int, eos_token_id: int
+    ) -> torch.LongTensor:
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and (pad_token_id in input_ids)
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+                (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            return input_ids.ne(pad_token_id).long()
+        return input_ids.new_ones(input_ids.shape, dtype=torch.long)
 
 
 class PolicyCLOSUREBatch(PolicyLSTMBatch):
