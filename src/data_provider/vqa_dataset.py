@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import copy
 
-#nltk.download('punkt')
+# nltk.download('punkt')
 from data_provider._image_features_reader import ImageFeaturesH5Reader
 
 logger = logging.getLogger()  # pylint: disable=invalid-name
@@ -176,7 +176,7 @@ class VQADataset(Dataset):
         reward_question_idx = self.reward_tokenizer.encode(question_decoded)
         return reward_question_idx
 
-    def filter_entries(self, num_answers=1, filter_yes_no=True, num_images=None,filter_floats=False):
+    def filter_entries(self, num_answers=1, filter_yes_no=True, num_images=None, filter_floats=False):
         self.filtered_entries = []
         self.remaining_entries = []
         yes_idx = self.ans2label["yes"]
@@ -209,7 +209,7 @@ class VQADataset(Dataset):
 
     def split_entries(self, duplicate_entries=False):
         train_entries, test_entries = [], []
-        self.answer_img_map = {k:[] for k in self.images_idx}
+        self.answer_img_map = {k: [] for k in self.images_idx}
         for img_idx in self.images_idx:
             img_entries = [entry for entry in self.filtered_entries if entry["image_id"] == img_idx]
             if len(img_entries) > 1:
@@ -221,12 +221,13 @@ class VQADataset(Dataset):
                 else:
                     train_entries.append(l)
                 self.answer_img_map[img_idx].extend([ans.item() for ans in l["answer"]["labels"].view(-1).cpu()])
-        self.answer_img_map = {k:list(set(v)) for k,v in self.answer_img_map.items()}
+        self.answer_img_map = {k: list(set(v)) for k, v in self.answer_img_map.items()}
         self.filtered_entries = train_entries
         self.test_entries = test_entries
         print("splitting filtered entries between {} for train and {} for test".format(len(self.filtered_entries),
                                                                                        len(self.test_entries)))
-        self.reduced_answers = [torch.tensor(item, dtype=torch.int) for l in list(self.answer_img_map.values()) for item in l]
+        self.reduced_answers = [torch.tensor(item, dtype=torch.int) for l in list(self.answer_img_map.values()) for item
+                                in l]
         self.reduced_answers = torch.stack(self.reduced_answers).unique()
 
     def duplicate_entries(self, train_entries, entry):
@@ -240,9 +241,8 @@ class VQADataset(Dataset):
         else:
             train_entries.append(entry)
 
-
     def get_answer_img_stats(self):
-        num_answer_dict = {k:len(v) for k,v in self.answer_img_map.items()}
+        num_answer_dict = {k: len(v) for k, v in self.answer_img_map.items()}
         min = np.min(list(num_answer_dict.values()))
         mean = np.mean(list(num_answer_dict.values()))
         max = np.max(list(num_answer_dict.values()))
@@ -251,8 +251,8 @@ class VQADataset(Dataset):
     def get_answers_frequency(self):
         answers_idx = [item for entry in self.filtered_entries for item in entry["answer"]["labels"].view(-1).cpu()]
         freq_answers = Counter(answers_idx)
-        inv_freq_norm = F.softmax(torch.tensor([1/item for item in list(freq_answers.values())], dtype=torch.float32))
-        inv_freq_answers = {k:inv_freq_norm[i].item() for i,k in enumerate(list(freq_answers.keys()))}
+        inv_freq_norm = F.softmax(torch.tensor([1 / item for item in list(freq_answers.values())], dtype=torch.float32))
+        inv_freq_answers = {k: inv_freq_norm[i].item() for i, k in enumerate(list(freq_answers.keys()))}
         return inv_freq_answers
 
     def get_masks_for_tokens(self, tokens):
@@ -456,7 +456,7 @@ if __name__ == '__main__':
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
-    split = "mintrain"
+    split = "train"
     vqa_dataset = VQADataset(split=split, dataroot=data_path,
                              question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                              reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
