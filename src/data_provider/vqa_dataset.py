@@ -443,15 +443,14 @@ if __name__ == '__main__':
     features_path = "data/vqa-v2/coco_trainval.lmdb"
     vocab_path = "data/vqa-v2/cache/vocab_min.json"
 
-    lm_tokenizer = GPT2Tokenizer.from_pretrained("cache/gpt2")
+    lm_tokenizer = GPT2Tokenizer.from_pretrained("cache/gpt-2")
     print("test of lm_tokenizer...")
     ids = lm_tokenizer("The cat is on the mat", add_prefix_space=True)
     print(ids)
     decode_ids = lm_tokenizer.decode(ids["input_ids"])
     print(decode_ids)
     ids_2 = lm_tokenizer.encode("The cat is on the mat", add_prefix_space=True)
-
-    reward_tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+    reward_tokenizer = BertTokenizer.from_pretrained("cache/bert")
     features_h5path = features_path
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
