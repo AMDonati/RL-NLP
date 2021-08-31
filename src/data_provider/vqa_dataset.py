@@ -439,9 +439,9 @@ if __name__ == '__main__':
     from data_provider.vqa_tokenizer import VQATokenizer
     import numpy as np
 
-    data_path = '../../data/vqa-v2'
-    features_path = "../../data/vqa-v2/coco_trainval.lmdb"
-    vocab_path = "../../data/vqa-v2/cache/vocab_min.json"
+    data_path = 'data/vqa-v2'
+    features_path = "data/vqa-v2/coco_trainval.lmdb"
+    vocab_path = "data/vqa-v2/cache/vocab_min.json"
 
     lm_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     print("test of lm_tokenizer...")
@@ -456,64 +456,63 @@ if __name__ == '__main__':
     images_feature_reader = ImageFeaturesH5Reader(features_h5path, False)
     question_tokenizer = VQATokenizer(lm_tokenizer=lm_tokenizer)
 
-    split = "train"
+    split = "trainval"
     vqa_dataset = VQADataset(split=split, dataroot=data_path,
                              question_tokenizer=question_tokenizer, image_features_reader=images_feature_reader,
                              reward_tokenizer=reward_tokenizer, clean_datasets=True, max_seq_length=23,
                              num_images=None, vocab_path=vocab_path)
     test = 1 if split == "mintrain" else 0
-    if test:
-        vocab = vqa_dataset.vocab_questions
-        new_d = {}
-        for k in sorted(vocab, key=len):
-            new_d[k] = vocab[k]
+    vocab = vqa_dataset.vocab_questions
+    new_d = {}
+    for k in sorted(vocab, key=len):
+        new_d[k] = vocab[k]
 
-        # test of answers vocab:
-        answers_ids = list(vqa_dataset.ans2label.values())
-        print("first id", answers_ids[0])
-        print("last id", answers_ids[-1])
-        print("len vocab answers", vqa_dataset.len_vocab_answer)
+    # test of answers vocab:
+    answers_ids = list(vqa_dataset.ans2label.values())
+    print("first id", answers_ids[0])
+    print("last id", answers_ids[-1])
+    print("len vocab answers", vqa_dataset.len_vocab_answer)
 
-        # test of translate functions:
-        # print("Test of reward tokenizer...")
-        # print('Is there a pizza?')
-        # lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
-        # input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
-        # reward_idx = vqa_dataset.translate_for_reward(input_idx)
-        # question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
-        # print('question decoded', question_decoded)
+    # test of translate functions:
+    # print("Test of reward tokenizer...")
+    # print('Is there a pizza?')
+    # lm_idx = vqa_dataset.lm_tokenizer.encode('Is there a pizza?')
+    # input_idx = [vqa_dataset.lm_to_dataset_trad[idx] for idx in lm_idx]
+    # reward_idx = vqa_dataset.translate_for_reward(input_idx)
+    # question_decoded = vqa_dataset.reward_tokenizer.decode(reward_idx)
+    # print('question decoded', question_decoded)
 
-        print("Test of lm_to_dataset_function ...")
-        idx = np.random.randint(vqa_dataset.len_vocab)
-        token_idx = list(vqa_dataset.lm_to_dataset_trad.keys())[idx]
-        print("word from lm_tokenizer")
-        print(vqa_dataset.lm_tokenizer.decoder[token_idx])
-        trad_token_idx = vqa_dataset.lm_to_dataset_trad[token_idx]
-        print("word from dataset vocab")
-        print(vqa_dataset.question_tokenizer.decode([trad_token_idx]))
+    print("Test of lm_to_dataset_function ...")
+    idx = np.random.randint(vqa_dataset.len_vocab)
+    token_idx = list(vqa_dataset.lm_to_dataset_trad.keys())[idx]
+    print("word from lm_tokenizer")
+    print(vqa_dataset.lm_tokenizer.decoder[token_idx])
+    trad_token_idx = vqa_dataset.lm_to_dataset_trad[token_idx]
+    print("word from dataset vocab")
+    print(vqa_dataset.question_tokenizer.decode([trad_token_idx]))
 
-        print("test of get_item function...")
-        (inputs, targets), labels, (features, image_mask, spatials) = vqa_dataset.__getitem__(1)
-        print("inputs", inputs)
-        print("targets", targets)
-        print("answer labels", labels.shape)
-        print("features", features.shape)
-        print("image_mask", image_mask.shape)
-        print("spatials", spatials.shape)
+    print("test of get_item function...")
+    (inputs, targets), labels, (features, image_mask, spatials) = vqa_dataset.__getitem__(1)
+    print("inputs", inputs)
+    print("targets", targets)
+    print("answer labels", labels.shape)
+    print("features", features.shape)
+    print("image_mask", image_mask.shape)
+    print("spatials", spatials.shape)
 
-        print("test of get_data_for_VILBERT function...")
-        features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
-            index=0)
-        print("question", question)
-        print("target", target.shape)  # 3129 answers.
+    print("test of get_data_for_VILBERT function...")
+    features, spatials, image_mask, question, target, input_mask, segment_ids, co_attention_mask, question_id = vqa_dataset.get_data_for_ViLBERT(
+        index=0)
+    print("question", question)
+    print("target", target.shape)  # 3129 answers.
 
-        print("print test of decode function...")
-        entry = vqa_dataset.filtered_entries[0]
-        print("true question:{}".format(entry["question"]))
-        print("question decoded - question_tokenizer: {}".format(
-            vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
-        print("question decoded - lm_tokenizer: {}".format(
-            vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
+    print("print test of decode function...")
+    entry = vqa_dataset.filtered_entries[0]
+    print("true question:{}".format(entry["question"]))
+    print("question decoded - question_tokenizer: {}".format(
+        vqa_dataset.question_tokenizer.decode(entry["q_token"].numpy())))
+    print("question decoded - lm_tokenizer: {}".format(
+        vqa_dataset.lm_tokenizer.decode(entry["q_token_lm"].numpy())))
 
 # VQA
 # Input
