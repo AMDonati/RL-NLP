@@ -9,6 +9,7 @@
 #SBATCH --output=slurm_out/clevr/sampleva20-%j.out
 #SBATCH --error=slurm_out/clevr/sampleva20-%j.err
 #SBATCH --time=100:00:00
+#SBATCH -A ktz@gpu
 
 export TMPDIR=$JOBSCRATCH
 module purge
