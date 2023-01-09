@@ -1,9 +1,8 @@
 # RL-NLP
 
-## CLEVR Datasets: 
-* [CLEVR original dataset page](https://cs.stanford.edu/people/jcjohns/clevr/)
-* [CLEVR preprocessing github](https://github.com/facebookresearch/clevr-iep/blob/master/TRAINING.md)
-* [CLOSURE dataset github page](https://github.com/rizar/CLOSURE)
+Code for the paper [Learning Natural Language Generation with Truncated Reinforcement Learning](https://aclanthology.org/2022.naacl-main.2/) accepted at Proceedings of the 2022 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies. 
+
+This repo is using  [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/) and [VQAv2](https://visualqa.org/) Datasets: 
 
 ## Get data
 * Get data
