@@ -10,7 +10,7 @@ scikit_learn==0.23.1
 nltk==3.5
 torchcontrib==0.0.2
 termcolor==1.1.0
-scipy==1.4.1
+scipy==1.10.0
 pandas==1.0.3
 tqdm==4.48.2
 tensorboard==2.3.0
